@@ -3,5 +3,4 @@ CVS
 *~
 .DS_Store
 depend.mk
-fabber
-mvntool
+asl_file
