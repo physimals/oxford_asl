@@ -80,7 +80,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: asl_calib,v 1.25 2014/12/02 16:58:53 chappell Exp $"
+echo "$Id: asl_calib,v 1.26 2015/02/04 17:34:31 chappell Exp $"
 exit 0
 }
 
@@ -271,7 +271,7 @@ pccsf=1.15 # a blood water density of 0.87
 pcwm=0.82
 pcgm=0.98
 
-if [ -z $t2star ]; then
+if [ ! -z $t2star ]; then
 # we need to correct for T2* not T2 so change the defaults
 # NB these will still be overridden by specific values supplied
     T2csf=400
