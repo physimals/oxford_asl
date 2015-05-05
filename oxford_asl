@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # OXFORD_ASL: Converts ASL images in to perfusion maps
 #
@@ -12,36 +12,59 @@ Usage() {
     echo "OXFORD_ASL"
     echo "Calculate perfusion maps from ASL data"
     echo ""
-    echo "Usage (optional parameters in {}):"
-    echo " -i          : specify input/data file"
-    echo " {-o}        : specify output directory - {default: pwd}"
-    echo " {-m}        : mask (in native space of ASL data) - {default: automatically generated}"
+    echo "Usage: oxford_asl -i <asl_data> -o <output_dir_name> [options]"
+    echo ""
+    echo ""
+    echo " Main options:"
+    echo " -m        : mask (in native space of ASL data) - {default: automatically generated}"
+    echo " --spatial    : Perform ASL analysis with automatic spatial smoothing of CBF"
+    echo " --wp      : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
+    echo " --more     : see extended options and usage notes"
+    echo ""
     echo " Acquisition specific"
-    echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
-    echo " {--casl}    : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
-    echo " {--bolus}   : Bolus duration - {default: 1}"
-    echo " {--bat}     : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
-    echo " {--t1}      : Tissue T1 value - {default: 1.3}"
-    echo " {--t1b}     : Blood T1 value - {default: 1.65}"
-    echo " {--slicedt} : Timing difference between slices - {default: 0}"
+    echo " --tis     : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
+    echo " --casl    : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
+    echo " --artsupp : Arterial suppression (vascular crushing) was used"
+    echo " --bolus   : Bolus duration - {default: 1}"
+    echo " --bat     : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
+    echo " --t1      : Tissue T1 value - {default: 1.3}"
+    echo " --t1b     : Blood T1 value - {default: 1.65}"
+    echo " --slicedt : Timing difference between slices - {default: 0}"
     echo ""
     echo "Structural image (see also Registration)"
-    echo " {-s}          : structural image (already BETed)"
-    echo " {--senscorr}  : use bias field (from segmentation) for sensitivity correction"
+    echo " -s          : structural image (already BETed)"
+    echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
     echo ""
     echo " Output options"
     echo " --vars     : also save the parameter estimated variances"
-    echo " If structural image is supplied:"
-    echo " --report    : [BETA] Report mean perfusion within a GM mask"
-    echo " --norm      : [BETA] Output perfusion maps normalised by GM mean (sets --report)"
+    echo "  If structural image is supplied:"
+    echo " --report    : Report mean perfusion within a GM mask"
+    echo " --norm      : Output perfusion maps normalised by GM mean (sets --report)"
     echo ""
+    echo " Calibration"
+    echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
+    echo " --alpha     : Inversion efficiency - {default: 0.98 (pASL); 0.85 (cASL)}"
+    echo "  To supply calibration data:"
+    echo "  -c          : M0 calibration image (proton density or mean control image)"
+    echo "  --tr        : TR of calibration data - {default: 3.2 s}"
+    echo "  --cmethod   : Calibration method: "
+    echo "                single - default if structural image is supplied"
+    echo "                 M0 value will be calculated within automatically created CSF mask"
+    echo "                voxel  - default if no structral image is supplied"
+    echo "                 voxelwise M0 values derrived from calibration image"
+    echo ""
+}
+
+Usage_extended() {
     echo "Extended options (all optional):"
     echo " Analysis"
-    echo " --artoff     : Do not infer arterial signal - e.g. arterial suppression has been applied"
+    echo " --artoff     : Do not infer arterial signal - (same as --artsupp)"
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
-#    echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
-    echo " --spatial    : Perform ASL analysis with automatic spatial smoothing of CBF"
+    echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
+    echo " --exch       : Set exchange model {default: mix}"
+    echo "                 mix - well mixed (see Buxton 1998)"
+    echo "                 simple - no exchange, single T1 (see Alsop at al. 2014)"
     echo " --fulldata   : Never average multiple measurements at each TI"
     echo " --noiseprior : Use an informative prior for the noise estimation"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
@@ -58,15 +81,9 @@ Usage() {
     echo " -r          : low resolution structural image (already BETed)"
 
     echo " Calibration"
-    echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
-    echo " --alpha     : Inversion efficiency - {default: 0.98 (pASL); 0.85 (cASL)}"
-    echo "  To supply calibration data:"
-    echo "  -c          : M0 calibration image"
-    echo "  --tr        : TR of calibration data - {default: 3.2 s}"
     echo "  --cgain     : Relative gain between calibration and ASL image - {default: 1}"
-    echo "  --cmethod   : Calibration method: {default: single}"
-    echo "                single - M0 value will be calculated within automatically created CSF mask"
-    echo "                voxel  - voxelwise M0 values derrived from calibration image"
+    echo "   extended options for voxel"
+    echo "    --t1t      : Assumed T1 of tissue (only used if TR<5 s) {default: 1.3 s}"
     echo "   extended options for single"
     echo "    --csf      : Manually specify csf mask for calibration"
     echo "    --t1csf    : T1 of CSF (s) - {for default see asl_calib}"
@@ -74,7 +91,8 @@ Usage() {
     echo "    --t2star   : Correct for T2* rather than T2"
     echo "    --t2csf    : T2 of CSF (ms) - {for default see asl_calib}"
     echo "    --t2bl     : T2 of blood (ms) - {for default see asl_calib}"
-    echo "    --cref     : Supply a reference image for sensitivity correction" 
+    echo "    --cref     : Supply a reference image for sensitivity correction"
+ 
     echo "Partial volume correction"
     echo " --pvcorr    : Do partial volume correction"
     echo "               *Automated determination of PV estimates {default} requires:"
@@ -83,6 +101,7 @@ Usage() {
     echo "               *Alternatively supply PV images in same space as ASL data:"
     echo "   --pvgm    : Partial volume estimates for GM"
     echo "   --pvwm    : Partial volume estimates for WM"
+
     echo " Epochs "
     echo " --elen      : Length of each epoch in TIs"
     echo " --eol       : Overlap of each epoch in TIs- {deafult: 0}"
@@ -93,7 +112,9 @@ Usage() {
     echo "              By default for multi-TI data mulitple measurements at each TI will be averaged"
     echo "              prior to analysis. Overwride with --fulldata, useful for small numbers of TIs."
     echo " Analysis  -  If only one TI is specified then the following options are set:"
-    echo "              --fixbat --fixbolus --artoff"
+    echo "              --fixbat --fixbolus --artoff --fulldata"
+    echo "              White Paper mode - to conform to the 'white paper' the follow options are also set:"
+    echo "              --t1=1.65 --exch=simple --cmethod=voxel"
     echo " Registration - Results are saved in native space by default in case you need to revisit this."
     echo "                By default the mean ASL timeseries is used for registration, which is oftefn sub optimal"
     echo "                An alternative base image for registration can be supplied with --regfrom"
@@ -113,7 +134,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: oxford_asl,v 1.41.2.1 2014/12/01 16:08:39 mwebster Exp $"
+echo "$Id: oxford_asl,v 1.41 2014/11/26 14:07:24 chappell Exp $"
 exit 0
 }
 
@@ -471,10 +492,10 @@ fi
 # Masked results (PVcorr)
 if [ ! -z $pvcorr ]; then
     OutputMasked perfusion $subdir gm
-    OutputMasked perfusion_wm $subdir gm
+    OutputMasked perfusion_wm $subdir wm
     if [ -z $fixbat ]; then
 	OutputMasked arrival $subdir gm
-	OutputMasked deltwm $subdir gm
+	OutputMasked deltwm $subdir wm
     fi
 fi
 
@@ -548,6 +569,10 @@ Log() {
 if [ -z $1 ]; then
     Usage
     exit 1
+elif [ $1 = "--more" ]; then
+    Usage
+    Usage_extended
+    exit 1
 fi
 
 #basil=basil
@@ -580,6 +605,8 @@ takeargs=0;
 	    takeargs=1;;
 	-c) calibflag=1 calib=$argument #calibration image
 	    takeargs=1;;
+	--wp) whitepaper=1; # operate in 'white paper' mode
+	    ;;
 	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
 	--strucbet) strucbet=$argument # user supplied BETed structural
@@ -602,7 +629,7 @@ takeargs=0;
 	    takeargs=1;;
 	--slicedt) slicedt=$argument
 	    takeargs=1;;
-	--t1) t1set=$argument
+	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
 	    takeargs=1;;
 	--t1b) t1bset=$argument
 	    takeargs=1;;
@@ -621,6 +648,8 @@ takeargs=0;
 	#--senscorr) needseg=1; senscorr=1; #disbale 
 	#    ;;
 	--M0) M0=$argument; calibflag=1;
+	    takeargs=1;;
+	--t1t) t1tset=$argument; #the T1 of tissue to be used in calibration
 	    takeargs=1;;
 	--tr) tr=$argument
 	    takeargs=1;;
@@ -656,12 +685,16 @@ takeargs=0;
 	    ;;
 	--artoff) artoff=1
 	    ;;
+	--artsupp) artoff=1 #this does same job as --artoff, but is explicitly linked to vascular crushers in the data
+	    ;;
 	--fixbat) fixbat=1
 	    ;;
 	--fixbolus) fixbolus=1
 	    ;;
 	--casl) casl=1
 	    ;;
+	--exch) exch=$argument
+	    takeargs=1;;
 	--pvcorr) pvcorr=1
 	    ;;
 	--pvgm) pvgm=$argument
@@ -812,6 +845,15 @@ echo "Saving advanced outputs"
     mkdir $outdir/advanced
 fi
 
+# white paper mode - this overrieds defaults, but can be overwritten (below) by command line specification of individual parameters
+if [ ! -z $whitepaper ]; then
+    Log "Analysis in white paper mode"
+    t1set=1.65
+    exch=simple
+    cmethod=voxel
+    bat=0 # the white paper model ignores BAT
+    # note that other things related to the model will be set by single TI mode below
+fi
 
 # general pre-processing
 echo "Pre-processing"
@@ -998,6 +1040,11 @@ if [ -z $t1bset ]; then
 fi
 Log "T1b: $t1bset"
 
+if [ -z $t1tset ]; then
+    t1tset=1.3;
+fi
+Log "T1t (for calibration): $t1tset"
+
 # TR (for calibration image)
 if [ -z $tr ]; then
     tr=3.2
@@ -1020,8 +1067,12 @@ if [ -z $alpha ]; then
 fi
 
 if [ -z $cmethod ]; then
-# default calibration method is to calculate a single M0 value from CSF
-    cmethod=single
+# default calibration method is 'voxelwise' unless a structural image (or CSF mask) is supplied
+    if [ ! -z $struc ] || [ ! -z $csf ]; then
+	cmethod=single
+    else
+	cmethod=voxel
+    fi
 fi
 
 if [ ! -z $calib ]; then
@@ -1042,8 +1093,8 @@ if [ ! -z $calib ]; then
 	Mo=$outdir/calib/M0 
 	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
 	 # correct the M0 image for short TR using the equation from the white paper
-	    echo "Correcting the calibration (M0) image for short TR"
-	    ccorr=`echo "1 / (1 - e(- $tr / $t1set) )" | bc -l`
+	    Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
+	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
 	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
 	fi
     else
@@ -1098,11 +1149,11 @@ Log "Bolus duration: $boluslen"
 # However, this is not the form required by BASIL (blocks of TIs)
 if [ $count -lt 2 ]; then
 # single TI data - dont average send to basil as-is (helps with noise estimation)
-    echo "Single TI data to be passed to BASIL" >> $log
+    Log "Single TI data to be passed to BASIL"
     datafile=$infile
     # OPERATE in 'single TI mode'
-    artoff=1; fixbolus=1; #fixbat=1; fast=1; 
-    echo "Operating in Single TI mode" >> $log
+    artoff=1; fixbolus=1; fixbat=1; #fast=1; 
+    Log "Operating in Single TI mode"
 elif [ $repeats -gt 1 ]; then
      # use asl_file to get data into the correct format for basil/fabber
     if [ -z $fulldata ]; then
@@ -1197,7 +1248,9 @@ else
 fi
 
 # Noise specification
-snr=10; #default SNR
+if [ -z $snr ]; then
+    snr=10; #default SNR
+fi
 if [ $tpoints -eq 1 ]; then
     # only a single time point in data, will use informative noise prior
    noiseprior=1
@@ -1207,7 +1260,7 @@ fi
 if [ ! -z $noiseprior ]; then
     # use an informative nosie prior
      if [ -z $noisesd ]; then
-	 Log "Using default SNR (=$snr) to set noise std dev"
+	 Log "Using SNR of $snr to set noise std dev"
 	# estimate signal magntiude
 	${FSLDIR}/bin/fslmaths $datafile -Tmax $tempdir/datamax
 	brain_mag=`${FSLDIR}/bin/fslstats $tempdir/datamax -k $tempdir/mask -M`
@@ -1216,8 +1269,9 @@ if [ ! -z $noiseprior ]; then
     fi
 
     Log "Using a prior noise sd of: $noisesd"
-    echo "--prior-noise-stdev=$noisesd" >> $tempdir/basil_options.txt
+    echo "--prior-noise-stddev=$noisesd" >> $tempdir/basil_options.txt
 fi
+
 
 # Exteneded options for BASIL
 if [ ! -z $spatial ]; then
@@ -1231,6 +1285,12 @@ if [ ! -z $infert1 ]; then
     echo "Instructing BASIL to infer variable T1 values"
     basil_options=$basil_options"--infert1 "
     Log "Including T1 uncertainty"
+fi
+
+if [ ! -z $exch ]; then
+    # use a specific exchange model in BASIL
+    Log "Using exchange model: $exch"
+    basil_options=$basil_options"--exch=$exch "
 fi
 
 if [ ! -z $devel ]; then
