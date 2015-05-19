@@ -1,8 +1,10 @@
 /*   asl_file.cc file manipulator for multi-TI ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
@@ -69,12 +71,20 @@ int main(int argc, char *argv[])
     else if(oaf.compare("tc")==0) outdiff=false;
     else throw Exception("Unrecognised output asl form");
     */
-
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
 
     //load data
     volume4D<float> data;
     read_volume4D(data,opts.datafile.value());
+
+    // Partail volume correction variables
+    volume<float> pvmap;
+    read_volume(pvmap, opts.pvfile.value());
+    int kernel;
+    kernel = opts.kernel.value(); // default kernel size is 5
+    volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    string pvout_file_name; // partial volume corrected output file name
+    pvout_file_name = opts.pvout_file.value();
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -200,21 +210,32 @@ int main(int argc, char *argv[])
     
       //split data into separate file for each TI
       if (opts.splitout.set()) {
-	splitout(asldataout,mask,opts.splitout.value()+fsub);
-	/*cout << "Splitting ASL data into files for each TI" << endl;
-	  volume4D<float> blockout;
-	  for (int n=0; n<ntis; n++) 
-	  {
-	  char cstr [5];
-	  if (n<10) sprintf(cstr,"00%d",n);
-	  else if (n<100) sprintf(cstr,"0%d",n);
-	  else if (n<1000) sprintf(cstr,"%d",n);
-	  else throw Exception("More than 1000 measurements in this ASL data file, sorry cannot handle this operation");
-	  string tino(cstr);
-	  
-	  blockout.setmatrix(asldata[n],mask);
-	  save_volume4D(blockout,opts.splitout.value()+tino);
-	  }*/
+        splitout(asldataout,mask,opts.splitout.value()+fsub);
+      }
+
+      // Partial volume correction on each TI
+      if(opts.pvfile.set()) {
+
+        // Check mask file is specified
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.pvout_file.set()) )  {
+          cout << "Start partial volume correction" << endl;
+          // function to perform partial volume correction by linear regression
+          pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
+          save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else if(!opts.maskfile.set()) {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.pvout_file.set()) {
+          throw Exception("Missing output file. --pvout=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
+        }
       }
 
     //do epochwise output
