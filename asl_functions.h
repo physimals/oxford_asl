@@ -1,8 +1,10 @@
 /*   asl_functions.h various functions for the manipulation of ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
@@ -46,6 +48,15 @@ namespace OXASL {
   ReturnMatrix SVDdeconv(const Matrix& data, const Matrix& aif);
   // create a (simple) convolution matrix
   ReturnMatrix convmtx(const ColumnVector& invec);
+
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(const volume4D<float>& data, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr);
+
+  // PV correction using linear regression (Asllani's method)
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel);
+
+  // Function to correct NaN values
+  volume<float> correct_NaN(const volume<float>& data_in);
 }
 
 #endif

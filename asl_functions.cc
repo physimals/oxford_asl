@@ -1,8 +1,10 @@
 /*   asl_functions.cc various functions for the manipulation of ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
@@ -415,6 +417,213 @@ namespace OXASL {
     magout.setmatrix(mag.AsMatrix(1,nvox),mask);
     save_volume4D(magout,fname+"_magntiude");
   }
+
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map, int kernel, volume4D<float>& data_pvcorr) {
+
+    // Clone input data to pv corrected data
+    data_pvcorr = data_in;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    volume<float> pv_map_in_corr(pv_map.xsize(), pv_map.ysize(), pv_map.zsize());
+    mask_in_corr   = correct_NaN(mask);
+    pv_map_in_corr = correct_NaN(pv_map);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> corrected_data_ti = correct_NaN(data_in[i]);
+
+      // Linear regression PV correction
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_in_corr, kernel);
+    }
+  }
+
+  // Function to correct PV using LR method
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map, int kernel)
+  {
+
+    volume<float> submask;
+    volume<float> data_roi;
+    volume<float> pv_roi;
+    RowVector pseudo_inv;
+    Matrix pv_corr_result;
+
+    // Variables to store the boundary index of submask (ROI)
+    int x_0;
+    int x_1;
+    int y_0;
+    int y_1;
+    int z_0;
+    int z_1;
+
+    int count;
+    float pv_ave = 0.0f;
+
+    // Get x y z dimension
+    int x = data_in.xsize();
+    int y = data_in.ysize();
+    int z = data_in.zsize();
+
+    volume<float> corr_data(x, y, z); // result matrix
+
+    // Linear regression to correct (smooth) the data
+    for (int i = 0; i < x; i++) {
+      for (int j = 0; j < y; j++) {
+        for (int k = 0; k < z; k++) {
+          // Only work with positive voxels
+          if(mask.value(i, j, k) > 0) {
+
+            // Determine ROI boundary index
+            x_0 = max(i - kernel, 0);
+            x_1 = min(i + kernel, x - 1);
+            y_0 = max(j - kernel, 0);
+            y_1 = min(j + kernel, y - 1);
+            z_0 = max(k - kernel, 0);
+            z_1 = min(k + kernel, z - 1);
+
+            // create a submask here
+            mask.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+            mask.activateROI();
+            submask = mask.ROI();
+
+            // calculate the sum of all elements in submask
+            // proceed if sum is greater than 5 (arbitrary threshold)
+            if(submask.sum() > 5) {
+              /* Create an ROI (sub volume of data and PV map),
+                then mask it with submask to create sub data and PV map */
+
+              // Obtain ROI volume (must set limits and activate first)
+              data_in.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+              pv_map.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+              data_in.activateROI();
+              pv_map.activateROI();
+              data_roi = data_in.ROI();
+              pv_roi = pv_map.ROI();
+
+              cout << "correctionhhh" << endl;
+              getchar();
+              
+              
+              ColumnVector data_roi_v_t = ColumnVector(data_roi.xsize() * data_roi.ysize() * data_roi.zsize());
+              ColumnVector pv_roi_v_t = ColumnVector(pv_roi.xsize() * pv_roi.ysize() * pv_roi.zsize());
+
+              count = 0;
+              // Apply a mask on data_roi and pv_roi
+              // Extract values from data_roi and pv_roi whose mask values are non-zero
+              for(int a = 0; a < data_roi.xsize(); a++) {
+                for(int b = 0; b < data_roi.ysize(); b++) {
+                  for(int c = 0; c < data_roi.zsize(); c++) {
+                    if(submask.value(a, b, c) > 0) {
+                      data_roi_v_t.element(count) = data_roi.value(a, b, c);
+                      pv_roi_v_t.element(count) = pv_roi.value(a, b, c);
+                      count++;
+
+                    }
+                    else {
+                      continue;
+                    }
+                  }
+                }
+              }
+              
+              ColumnVector data_roi_v = ColumnVector(count);
+              ColumnVector pv_roi_v = ColumnVector(count);
+              
+              
+              for(int a = 0; a < count; a++) {
+                data_roi_v.element(a) = data_roi_v_t.element(a);
+                pv_roi_v.element(a) = pv_roi_v_t.element(a);
+              }
+              
+              // Unstable function
+              //data_roi_v = apply_mask(data_roi, submask);
+              //pv_roi_v = apply_mask(pv_roi, submask);
+
+              
+              // Now data_roi_v and pv_roi_v stores the non-zero elemnts within this submask
+
+              // Deactivate ROI
+              data_in.deactivateROI();
+              pv_map.deactivateROI();
+
+              // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
+              // This will cause run time error
+              // So we assign the corrected result to zero in such cases
+              if(pv_roi_v.IsZero()) {
+                corr_data.value(i, j, k) = 0.0f;
+              }
+              else {
+                // Compute pseudo inversion matrix of PV map
+                // ((P^t * P) ^ -1) * (P^t)
+                pseudo_inv = ( (pv_roi_v.t() * pv_roi_v).i() ) * (pv_roi_v.t());
+
+                //cout << "  hh" << endl;
+
+                // Get average PV value of the current kernel
+                pv_ave = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
+
+                // Calculate PV corrected data only if there is some PV compoment
+                // If there is little PV small, make it zero
+                if(pv_ave >= 0.01) {
+                  pv_corr_result = pseudo_inv * data_roi_v;
+                  corr_data.value(i, j, k) = pv_corr_result.element(0, 0);
+                }
+                else {
+                  corr_data.value(i, j, k) = 0.0f;
+                }
+              }
+            }
+
+            else {
+              // do nothing at the moment
+            } // end submask
+
+            // Discard current submask (ROI)
+            mask.deactivateROI();
+
+          }
+
+          else{
+            // do nothing at the moment
+          } // end mask
+
+        }
+      }
+    }
+
+    return corr_data;
+
+  } // End function correct_pv_lr
+
+  // Function to correct NaN values
+  volume<float> correct_NaN(const volume<float>& data_in) {
+
+    // Clone the input data to output data
+    volume<float> data_out = data_in;
+
+    for(int i = 0; i < data_in.xsize(); i++) {
+      for(int j = 0; j < data_in.ysize(); j++) {
+        for(int k = 0; k < data_in.zsize(); k++) {
+          // IEEE standard: comparison between NaN values is always false
+          // i.e. NaN == NaN is false
+          // In this case, we set it to zero
+          if(data_in.value(i, j, k) != data_in.value(i, j, k)) {
+            data_out.value(i, j, k) = 0.0f;
+          }
+          else {
+            continue;
+          }
+        }
+      }
+    }
+
+    return data_out;
+
+  }
+
+
 
 
 
