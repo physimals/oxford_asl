@@ -595,7 +595,10 @@ elif [ $mode = satrecov ]; then
     if [ ! -z $senson ]; then
 	echo "Apply sensitivity image to data for reference tisse M0 estimation" >> $log
         # apply sensitivity map to calibration image - ONLY for the reference tissue calculations
-	fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
+	${FSLDIR}/bin/fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
+    else
+	# no sensitivity correction required, but copy image over ready for next command
+	${FSLDIR}/bin/imcp $calib $temp_calib/calib_senscorr
     fi
     echo "FABBER within reference tissue mask" >> $log
     $fabber --data=$temp_calib/calib_senscorr --mask=$mask --output=$temp_calib/satrecov --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts --t1=$T1r
