@@ -266,7 +266,7 @@ T2gm=100
 T1wm=1.0
 T2wm=50
 
-T2b=150
+T2b=150 # lu et a. 2012 MRM 67:42-49 have 154ms at 3T during normoxia
 
 # partition coeffs
 # based on Herscovitch and Raichle 1985
