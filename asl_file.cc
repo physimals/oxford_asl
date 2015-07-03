@@ -130,34 +130,33 @@ int main(int argc, char *argv[])
       separatepairs(asldata,asldataodd,asldataeven);
     }
 
-      //tag control difference
-      if (opts.tcdiff.value()) {
-	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
-	//overwrite asldata with differenced data
-	for (int ti=0; ti<ntis; ti++) {
-	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
-	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
-	}
+  //tag control difference
+  if (opts.tcdiff.value()) {
+    separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    //overwrite asldata with differenced data
+    for (int ti=0; ti<ntis; ti++) {
+      asldata[ti] = asldataeven[ti] - asldataodd[ti];
+      if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    }
 	outpairs=false;
+  }
 
-
-	/*	for (int ti=0; ti<ntis; ti++) {
-	  Matrix oddmtx;
-	  oddmtx = asldata[ti].Row(1);
-	  Matrix evenmtx;
-	  evenmtx = asldata[ti].Row(2);
-	  for (int r=2; r<=nrpts; r++) {
-	    idx=(r-1)*2+1;
-	    oddmtx &= asldata[ti].Row(idx);
-	    evenmtx &= asldata[ti].Row(idx+1);
-	  }
-	  
-	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
-	  asldata[ti] = diffmtx;
-	  outpairs=false;
-	}
-	*/
+  // surround tag-control difference
+  if (opts.surrtcdiff.value()) {
+    //separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    //overwrite asldata with differenced data
+    for (int ti=0; ti<ntis; ti++) {
+      Matrix tempindata;
+      tempindata=asldata[ti];
+      Matrix tempdata(tempindata.Nrows()-1,tempindata.Ncols());
+      for (int aq=1; aq<tempindata.Nrows(); aq++) {
+	tempdata.Row(aq) = tempindata.Row(aq) - tempindata.Row(aq+1);
       }
+      asldata[ti] = tempdata;
+      if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    }
+	outpairs=false;
+  }
 
 
     vector<Matrix> asldataout; //the data we are about to use for output purposes
