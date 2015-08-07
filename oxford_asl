@@ -62,9 +62,6 @@ Usage_extended() {
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
-    echo " --exch       : Set exchange model {default: mix}"
-    echo "                 mix - well mixed (see Buxton 1998)"
-    echo "                 simple - no exchange, single T1 (see Alsop at al. 2014)"
     echo " --fulldata   : Never average multiple measurements at each TI"
     echo " --noiseprior : Use an informative prior for the noise estimation"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
@@ -693,8 +690,6 @@ takeargs=0;
 	    ;;
 	--casl) casl=1
 	    ;;
-	--exch) exch=$argument
-	    takeargs=1;;
 	--pvcorr) pvcorr=1
 	    ;;
 	--pvgm) pvgm=$argument
@@ -849,7 +844,6 @@ fi
 if [ ! -z $whitepaper ]; then
     Log "Analysis in white paper mode"
     t1set=1.65
-    exch=simple
     cmethod=voxel
     bat=0 # the white paper model ignores BAT
     # note that other things related to the model will be set by single TI mode below
@@ -1155,7 +1149,7 @@ if [ $count -lt 2 ]; then
     Log "Single TI data to be passed to BASIL"
     datafile=$infile
     # OPERATE in 'single TI mode'
-    artoff=1; fixbolus=1; fixbat=1; #fast=1; 
+    artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
     Log "Operating in Single TI mode"
 elif [ $repeats -gt 1 ]; then
      # use asl_file to get data into the correct format for basil/fabber
@@ -1288,12 +1282,6 @@ if [ ! -z $infert1 ]; then
     echo "Instructing BASIL to infer variable T1 values"
     basil_options=$basil_options"--infert1 "
     Log "Including T1 uncertainty"
-fi
-
-if [ ! -z $exch ]; then
-    # use a specific exchange model in BASIL
-    Log "Using exchange model: $exch"
-    basil_options=$basil_options"--exch=$exch "
 fi
 
 if [ ! -z $devel ]; then
