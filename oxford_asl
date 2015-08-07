@@ -131,7 +131,7 @@ Usage_extended() {
 }
 
 Version() {
-echo "$Id: oxford_asl,v 1.41 2014/11/26 14:07:24 chappell Exp $"
+echo "$Id: oxford_asl,v 1.43 2015/08/07 14:43:52 chappell Exp $"
 exit 0
 }
 

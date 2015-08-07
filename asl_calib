@@ -81,7 +81,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: asl_calib,v 1.26 2015/02/04 17:34:31 chappell Exp $"
+echo "$Id: asl_calib,v 1.27 2015/08/07 14:43:52 chappell Exp $"
 exit 0
 }
 
