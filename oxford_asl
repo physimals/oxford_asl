@@ -1097,6 +1097,9 @@ if [ ! -z $calib ]; then
 	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
 	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
 	fi
+
+	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
+	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
     else
 	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 
