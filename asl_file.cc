@@ -39,6 +39,7 @@ int main(int argc, char *argv[])
     bool ispairs=false; //indicates if data contains adjacent pairs of measurments
     bool isdiff=false; //indicates if we have differenced data
     bool tagfirst=true; //indicates that tag comes first in tag-control pairs
+    bool blockpairs=false; //indicates that the tag-control pairs are grouped separelty within the blocks, not in adacent volumes of tag then control
     //ispairs=opts.ispairs.value();
     
     // block format: isblocked indicates if data are in *blocks of repeats*
@@ -48,9 +49,11 @@ int main(int argc, char *argv[])
     else    throw Exception("Unrecognised input block format");
     
     string iaf=opts.inaslform.value();
-    if      (iaf.compare("diff")==0) isdiff=true;
-    else if (iaf.compare("tc")==0)   isdiff=false;
-    else if (iaf.compare("ct")==0)  { isdiff=false; tagfirst=false;}
+    if      (iaf.compare("diff")==0) isdiff=true; // differenced data
+    else if (iaf.compare("tc")==0)   isdiff=false; //tag control pairs, tag first
+    else if (iaf.compare("ct")==0)  { isdiff=false; tagfirst=false; } //tag control pairs, control first
+    else if (iaf.compare("tcb")==0) { isdiff=false; blockpairs=true; } // tag control pairs, tag first, all the tags and controls are sepratedly grouped together (not adjacent to each other)
+    else if (iaf.compare("ctb")==0) { isdiff=false; blockpairs=true; tagfirst=false; } // ditto, control first
     else    throw Exception("Unrecognised input asl form");
     
     ispairs=!isdiff; //convienient to have ispairs as a bool
@@ -112,7 +115,7 @@ int main(int argc, char *argv[])
 
     //get data into 'standard' format
     vector<Matrix> asldata;
-    data2stdform(datamtx,asldata,ntis,isblocked,ispairs);
+    data2stdform(datamtx,asldata,ntis,isblocked,ispairs,blockpairs);
 
     //deal with the splitting of pairs
     vector<Matrix> asldataodd;
@@ -126,13 +129,13 @@ int main(int argc, char *argv[])
 
 
   if (opts.splitpairs.value()) {
-    // need to split the data here if plit pairs has been requested
-      separatepairs(asldata,asldataodd,asldataeven);
+    // need to split the data here if split pairs has been requested
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs);
     }
 
   //tag control difference
   if (opts.tcdiff.value()) {
-    separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
     //overwrite asldata with differenced data
     for (int ti=0; ti<ntis; ti++) {
       asldata[ti] = asldataeven[ti] - asldataodd[ti];
@@ -143,14 +146,15 @@ int main(int argc, char *argv[])
 
   // surround tag-control difference
   if (opts.surrtcdiff.value()) {
-    //separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
     //overwrite asldata with differenced data
     for (int ti=0; ti<ntis; ti++) {
-      Matrix tempindata;
-      tempindata=asldata[ti];
-      Matrix tempdata(tempindata.Nrows()-1,tempindata.Ncols());
-      for (int aq=1; aq<tempindata.Nrows(); aq++) {
-	tempdata.Row(aq) = tempindata.Row(aq) - tempindata.Row(aq+1);
+      //Matrix tempindata;
+      //tempindata=asldata[ti];
+      Matrix tempdata(asldata[ti].Nrows()-1,asldata[ti].Ncols()); //surr diff data will have one fewer measurement than non-differenced data
+      for (int aq=1; aq<tempdata.Nrows(); aq = aq + 2) {
+	tempdata.Row(aq) = asldataeven[ti].Row(aq) - asldataodd[ti].Row(aq);
+	tempdata.Row(aq+1) = asldataeven[ti].Row(aq) - asldataodd[ti].Row(aq+1);
       }
       asldata[ti] = tempdata;
       if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here

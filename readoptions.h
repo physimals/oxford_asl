@@ -94,10 +94,11 @@ help(string("-h,--help"), false,
 	       string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
 	       false,requires_argument),
    inaslform(string("--iaf,--inaslform"),string("diff"),
-	     string("ASL data form:\n          diff - differenced data {default}\n          tc - Tag-Control pairs\n          ct - Control-Tag pairs\n"),
+	     string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block\n"),
 	     false,requires_argument),
+
    ispairs(string("--pairs,--inpairs"),false,
-	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control)"),
+	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead"),
 	   false,no_argument),
    
 
@@ -110,10 +111,10 @@ help(string("-h,--help"), false,
 	      string("Split the pairs within the data, e.g. to separate tag and control images in output"),
 	      false,no_argument),
    tcdiff(string("--diff"), false,
-	   string("Take the difference between the pairs, i.e. Tag control difference\n"),
+	   string("Take the difference between the pairs, i.e. Tag control difference"),
 	   false,no_argument),
    surrtcdiff(string("--surrdiff"), false,
-	      string("Do surround subtraction on the pairs"),
+	      string("Do surround subtraction on the pairs\n"),
 	      false,no_argument),
 
    //basic output
