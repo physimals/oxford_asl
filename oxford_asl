@@ -22,14 +22,15 @@ Usage() {
     echo " --more     : see extended options and usage notes"
     echo ""
     echo " Acquisition specific"
-    echo " --tis     : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
-    echo " --casl    : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
-    echo " --artsupp : Arterial suppression (vascular crushing) was used"
-    echo " --bolus   : Bolus duration - {default: 1}"
-    echo " --bat     : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
-    echo " --t1      : Tissue T1 value - {default: 1.3}"
-    echo " --t1b     : Blood T1 value - {default: 1.65}"
-    echo " --slicedt : Timing difference between slices - {default: 0}"
+    echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
+    echo " --casl      : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
+    echo " --artsupp   : Arterial suppression (vascular crushing) was used"
+    echo " --bolus     : Bolus duration - {default: 1}"
+    echo " --bat       : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
+    echo " --t1        : Tissue T1 value - {default: 1.3}"
+    echo " --t1b       : Blood T1 value - {default: 1.65}"
+    echo " --slicedt   : Timing difference between slices - {default: 0}"
+    echo " --sliceband : Number of slices per band in a multi-band setup - {default: n/a}."
     echo ""
     echo "Structural image (see also Registration)"
     echo " -s          : structural image (already BETed)"
@@ -629,6 +630,8 @@ takeargs=0;
 	    takeargs=1;;
 	--slicedt) slicedt=$argument
 	    takeargs=1;;
+	--sliceband) sliceband=$argument
+	    takeargs=1;;
 	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
 	    takeargs=1;;
 	--t1b) t1bset=$argument
@@ -1212,6 +1215,12 @@ echo "--tau=$boluslen" >> $tempdir/basil_options.txt
 if [ ! -z $slicedt ]; then
     echo "--slicedt=$slicedt" >> $tempdir/basil_options.txt
     Log "Slice timing correction with delta: $slicedt"
+fi
+
+# Multi-band setup (if not set then this is ignored)
+if [ ! -z $sliceband ]; then
+    echo "--sliceband=$sliceband" >> $tempdir/basil_options.txt
+    Log "Multi-band setup with number of slices per band: $slicedband"
 fi
 
 # Infer arterial component?
