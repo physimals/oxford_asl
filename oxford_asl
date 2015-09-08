@@ -632,6 +632,8 @@ takeargs=0;
 	    takeargs=1;;
 	--sliceband) sliceband=$argument
 	    takeargs=1;;
+	--fa) fa=$argument
+	    takeargs=1;;
 	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
 	    takeargs=1;;
 	--t1b) t1bset=$argument
@@ -1215,6 +1217,12 @@ echo "--tau=$boluslen" >> $tempdir/basil_options.txt
 if [ ! -z $slicedt ]; then
     echo "--slicedt=$slicedt" >> $tempdir/basil_options.txt
     Log "Slice timing correction with delta: $slicedt"
+fi
+
+# Flip anlge for look-locker readout
+if [ ! -z $fa ]; then
+    echo "--FA=$fa" >> $tempdir/basil_options.txt
+    Log "Flip angle (look-locker readout): $fa"
 fi
 
 # Multi-band setup (if not set then this is ignored)
