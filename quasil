@@ -33,7 +33,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: quasil,v 1.11 2014/06/10 15:11:17 chappell Exp $"
+echo "$Id: quasil,v 1.10 2013/01/10 17:00:39 chappell Exp $"
 exit 0
 }
 
@@ -309,13 +309,13 @@ echo "Begin model-based analysis"
 	#infer bolus duration
 	echo "--infertau --tauboff" >> options.txt #Note we have only a single tau for both arterial and tissue signal (both also share the same dispersion properties)
 	echo "--image-prior6=calib_latest/T1t " >> options.txt
-	echo "--image-prior13=calib_latest/g" >> options.txt
-	echo "--param-spatial-priors=MNNANINNNNNNI" >> options.txt
+	echo "--image-prior12=calib_latest/g" >> options.txt
+	echo "--param-spatial-priors=MNNANINNNNNI" >> options.txt
     else
 	# spatial prior list without bolus duration
 	echo "--image-prior5=calib_latest/T1t " >> options.txt
-	echo "--image-prior12=calib_latest/g" >> options.txt
-	echo "--param-spatial-priors=MNANINNNNNNI" >> options.txt
+	echo "--image-prior11=calib_latest/g" >> options.txt
+	echo "--param-spatial-priors=MNANINNNNNI" >> options.txt
     fi
 
 
@@ -364,8 +364,8 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
     echo "--artdir" >> aifoptions.txt
 # use calibration information within inference
     echo " --usecalib ">> aifoptions.txt
-    echo "--image-prior10=calib/g" >> aifoptions.txt
-    echo "--param-spatial-priors=MNNNNNNNNI" >> aifoptions.txt
+    echo "--image-prior9=calib/g" >> aifoptions.txt
+    echo "--param-spatial-priors=MNNNNNNNI" >> aifoptions.txt
     echo "--save-model-fit" >> aifoptions.txt
     
     $fabber --data=asl_blood --disp=gvf --output=aif -@ aifoptions.txt
