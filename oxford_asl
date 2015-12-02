@@ -694,7 +694,11 @@ takeargs=0;
 	--fixbolus) fixbolus=1
 	    ;;
 	--casl) casl=1
-	    ;;
+		;;
+	--disp) disp=$argument
+	    takeargs=1;;
+	--exch) exch=$argument
+	    takeargs=1;;
 	--pvcorr) pvcorr=1
 	    ;;
 	--pvgm) pvgm=$argument
@@ -1299,6 +1303,19 @@ if [ ! -z $infert1 ]; then
     echo "Instructing BASIL to infer variable T1 values"
     basil_options=$basil_options"--infert1 "
     Log "Including T1 uncertainty"
+fi
+
+
+if [ ! -z $exch ]; then
+    # use a specific exchange model in BASIL
+    Log "Using exchange model: $exch"
+    basil_options=$basil_options"--exch=$exch "
+fi
+
+if [ ! -z $disp ]; then
+    # use a specific dispersion model in BASIL
+    Log "Using dispersion model: $disp"
+    basil_options=$basil_options"--disp=$disp "
 fi
 
 if [ ! -z $devel ]; then
