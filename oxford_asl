@@ -717,7 +717,9 @@ takeargs=0;
 	--elen) epoch=1 elen=$argument
 	    takeargs=1;;
 	--eol) eol=$argument
-	    takeargs=1;;
+	       takeargs=1;;
+	--fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
+		;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
