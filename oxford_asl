@@ -637,7 +637,9 @@ takeargs=0;
 	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
 	    takeargs=1;;
 	--t1b) t1bset=$argument
-	    takeargs=1;;
+	       takeargs=1;;
+	--t1im) t1im=$argument # A T1 (of tissue) image
+		takeargs=1;;
 	--noiseprior) noiseprior=1
 	    ;;
 	--noisesd) noisesd=$argument
@@ -1205,6 +1207,11 @@ if [ ! -z $pvcorr ]; then
 fi
 
 echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
+
+if [ ! -z $t1im ]; then
+    echo "--t1im=$t1im" >> $tempdir/basil_options.txt
+    Log "Using supplied T1 (tissue) image in BASIL: $t1im"
+fi
 
 # data acquired using CASL?
 if [ ! -z $casl ]; then
