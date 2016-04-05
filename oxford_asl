@@ -1209,7 +1209,8 @@ fi
 echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
 
 if [ ! -z $t1im ]; then
-    echo "--t1im=$t1im" >> $tempdir/basil_options.txt
+    basil_options=$basil_options"--t1im=$t1im "
+    #echo "--t1im=$t1im" >> $tempdir/basil_options.txt
     Log "Using supplied T1 (tissue) image in BASIL: $t1im"
 fi
 
