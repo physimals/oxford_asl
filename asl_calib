@@ -580,7 +580,7 @@ if [ $mode = longtr ]; then
    # calcualte T2 of reference region (if a T2 image has been supplied)
    if [ ! -z $T2rim ]; then
        fslmaths $T2rim -mas $mask $temp_calib/T2r
-       T1r=`fslstats $temp_calib/T2r -M`
+       T2r=`fslstats $temp_calib/T2r -M`
        echo "Calculated T2 of reference tissue: $T2r"
        echo "Calculated T2 of reference tissue: $T2r" >> $log
    fi
