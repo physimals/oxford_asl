@@ -308,7 +308,7 @@ echo "Tissue reference : $tissref" >> $log
 
 # command line override of default T1 and T2
 if [ ! -z $T1rin ]; then
-    if [ `${FSLDIR}\bin\imtest $T1rin` ]; then
+    if [ `${FSLDIR}/bin/imtest $T1rin` ]; then
 	# we have been supplied with a T1 image - record that here to process later
 	T1rim=$T1rin
 	echo "Loading T1 image for reference region: T1im" >> $log
@@ -318,7 +318,7 @@ if [ ! -z $T1rin ]; then
     fi
 fi
 if [ ! -z $T2rin ]; then
-    if [ `${FSLDIR}\bin\imtest $T2rin` ]; then
+    if [ `${FSLDIR}/bin/imtest $T2rin` ]; then
 	# we have been supplied with a T2 image - record that here to process later
 	T2rim=$T2rin
 	echo "Loading T2 image for reference region: T2im" >> $log
@@ -573,13 +573,15 @@ if [ $mode = longtr ]; then
    if [ ! -z $T1rim ]; then
        fslmaths $T1rim -mas $mask $temp_calib/T1r
        T1r=`fslstats $temp_calib/T1r -M`
+       echo "Calculated T1 of reference tissue: $T1r"
        echo "Calculated T1 of reference tissue: $T1r" >> $log
    fi
 
    # calcualte T2 of reference region (if a T2 image has been supplied)
    if [ ! -z $T2rim ]; then
        fslmaths $T2rim -mas $mask $temp_calib/T2r
-       T1r=`fslstats $temp_calib/T2r -M`
+       T2r=`fslstats $temp_calib/T2r -M`
+       echo "Calculated T2 of reference tissue: $T2r"
        echo "Calculated T2 of reference tissue: $T2r" >> $log
    fi
 
