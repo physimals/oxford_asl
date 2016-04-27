@@ -24,7 +24,6 @@ Usage() {
     echo "                if supplying a low res. strctural this matrix should refer to that image"
     echo " --inweight : specify weights for input image"
     echo "                same functionality as the flirt -inweight option"
-    echo " --zblur    : Try and account for z-blurring"
     echo ""
 }
 
@@ -99,14 +98,8 @@ if [ ! -z $inweight ]; then
     weightinstr="-inweight $inweight"
 fi
 
-# deal with option to try and handle z blurring resulting in a streching of image
-# increase DOF to 9 for asl->struct/lowstruct step
-if [ -z $unblur ]; then
-    DOF=6;
-else
-    echo "Using 9DOF in asl->struct to account for z-blurring"
-    DOF=9;
-fi
+# set the DOF - we will routinely use 6
+DOF=6;
 
 # optional flirt schedule for main transformation of asl to structural
 if [ -z $flirtsch ]; then
