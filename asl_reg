@@ -10,18 +10,24 @@
 
 Usage() {
     echo "ASL_REG"
-    echo "Version: 1.0"
+    echo "Version: 2.0"
     echo "Registration for ASL data"
     echo ""
     echo "Usage (optional parameters in {}):"
     echo " -i         : specify input image"
     echo " {-o}       : specify output directory - {default: pwd}"
     echo " -s         : specify structural brain image"
+    echo " {--sbet}   : specify structural brain image - brain extracted"
+    echo " Extra 'final' registration refinement (optional parameters in {}):"
+    echo " -c         : specify an ASL control/calibration image for initial registration"
+    echo "               (input image should be perfusion image in this case)"
+    echo " --sbet     : specify brain extracted structural brain image"
+    echo " {--wmseg}  : specify white matter segmenation image (in structural image space)"
     echo " Extended options (all optional):"
     echo " -t         : specify structural-->standard brain transformation matrix"
     echo " -r         : specify extra low resolution structural image"
     echo " --imat     : specify initial transformation matrix for input to structural image"
-    echo "                if supplying a low res. strctural this matrix should refer to that image"
+    echo "                if supplying a low res. structural this matrix should refer to that image"
     echo " --inweight : specify weights for input image"
     echo "                same functionality as the flirt -inweight option"
     echo ""
@@ -47,11 +53,15 @@ until [ -z $1 ]; do
 	-r) lowstrucflag=1 lowstruc=$2
 	    shift;;
 	--imat) init=1 inmat=$2
-	    shift;;
+		shift;;
 	--inweight) inweight=$2
+		    shift;;
+	-c) cflag=1 cfile=$2
 	    shift;;
-	--zblur) unblur=1
-	    ;;
+	--sbet) sbet=$2
+		shift;;
+	--wmseg) wmseg=$2
+		 shift;;
 	--flirtsch) flirtsch=$2
 	    shift;;
 	--debug) debug=1
@@ -108,23 +118,39 @@ else
     echo "Using supplied FLIRT schedule"
 fi
 
-echo "Running FLIRT"
+# check if a supplementary image has been provded on which to base (inital) registration
+if [ -z $cflag ]; then
+    cfile=$infile
+fi
+
+# do the MAIN registration run - use the supplementary image for this
+echo "Running FLIRT - registration MAIN stage"
 if [ -z $lowstrucflag ]; then
     #Step1: 3DOF translation only transformation
-    flirt -in $infile -ref $struc -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2high1.mat -out $tempdir/low2hig1 $inittext $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $struc -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2high1.mat -out $tempdir/low2hig1 $inittext $weigthinstr
     #step2: 6DOF transformation with small search region
-    flirt -in $infile -ref $struc -dof $DOF -omat $tempdir/low2high.mat -init $tempdir/low2high1.mat  -schedule $flirtsch -out $tempdir/low2high $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $struc -dof $DOF -omat $tempdir/low2high.mat -init $tempdir/low2high1.mat -schedule $flirtsch -out $tempdir/low2high $weigthinstr
 else
     #as we have a structural image in perfusion space use it to improve registration
     echo "Using structral image in perfusion space ($lowstruc)"
     #Step1: 3DOF translation only transformation perfusion->lowstruc
-    flirt -in $infile -ref $lowstruc -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2low1.mat $inittext $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $lowstruc -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2low1.mat $inittext $weigthinstr
     #Step2: 6DOF limited transformation in perfusion space
-    flirt -in $infile -ref $lowstruc -dof $DOF -schedule $flirtsch -init $tempdir/low2low1.mat -omat $tempdir/low2low.mat $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $lowstruc -dof $DOF -schedule $flirtsch -init $tempdir/low2low1.mat -omat $tempdir/low2low.mat $weigthinstr
     #step3: 6DOF transformation of lowstruc to struc
-    flirt -in $lowstruc -ref $struc -omat $tempdir/str2str.mat
+    $FSLDIR/bin/flirt -in $lowstruc -ref $struc -omat $tempdir/str2str.mat
     #step4: combine the two transformations
-    convert_xfm -omat $tempdir/low2high.mat -concat $tempdir/str2str.mat $tempdir/low2low.mat 
+    $FSLDIR/bin/convert_xfm -omat $tempdir/low2high.mat -concat $tempdir/str2str.mat $tempdir/low2low.mat 
+fi
+
+# do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image and we will only do this if we have been given a supplementary image to get the initialisation above right
+if [ ! -z $cflag ]; then
+    if [ ! -z $wmseg ]; then
+	# do a final refinement of the registration using the perfusion and the white matter segmentation - this is based on epi_reg
+	$FSLDIR/bin/flirt -ref $sbet -in $infile -dof 6 -cost bbr -wmseg $wmseg -init $tempdir/low2high.mat -omat $tempdir/low2high.mat -out $tempdir/low2high_final -schedule ${FSLDIR}/etc/flirtsch/bbr.sch
+    else
+	echo "Cannot run FINAL stage without Brain extracted structural (suppled using --sbet) and white matter segmentation (supplied using --wmseg) - SKIPPING"
+    fi 
 fi
 
 # make the output files
