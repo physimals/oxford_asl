@@ -14,18 +14,17 @@ Usage() {
     echo "Registration for ASL data"
     echo ""
     echo "Usage (optional parameters in {}):"
-    echo " -i         : specify input image"
+    echo " -i         : specify input image - brain extracted perfusion-weighted image"
     echo " {-o}       : specify output directory - {default: pwd}"
-    echo " -s         : specify structural brain image"
+    echo " -s         : specify structural brain image - wholehead"
     echo " {--sbet}   : specify structural brain image - brain extracted"
     echo " Extra 'final' registration refinement (optional parameters in {}):"
-    echo " -c         : specify an ASL control/calibration image for initial registration"
+    echo "  -c         : specify an ASL control/calibration image for initial registration"
     echo "               (input image should be perfusion image in this case)"
-    echo " --sbet     : specify brain extracted structural brain image"
-    echo " {--wmseg}  : specify white matter segmenation image (in structural image space)"
+    echo "  {--tissseg}: specify tissue segmenation image for bbr (in structural image space)"
     echo " Extended options (all optional):"
-    echo " -t         : specify structural-->standard brain transformation matrix"
-    echo " -r         : specify extra low resolution structural image"
+#    echo " -t         : specify structural-->standard brain transformation matrix"
+    echo " -r         : specify extra low resolution structural image - brain extracted"
     echo " --imat     : specify initial transformation matrix for input to structural image"
     echo "                if supplying a low res. structural this matrix should refer to that image"
     echo " --inweight : specify weights for input image"
@@ -60,7 +59,7 @@ until [ -z $1 ]; do
 	    shift;;
 	--sbet) sbet=$2
 		shift;;
-	--wmseg) wmseg=$2
+	--tissseg) tissseg=$2
 		 shift;;
 	--flirtsch) flirtsch=$2
 	    shift;;
@@ -123,13 +122,20 @@ if [ -z $cflag ]; then
     cfile=$infile
 fi
 
+# BET the structural image if required
+if [ -z $sbet ]; then
+    echo "Running BET on structural image"
+    $FSLDIR/bin/bet $struc $tempdir/struc_brain
+    sbet=$tempdir/struc_brain
+fi
+
 # do the MAIN registration run - use the supplementary image for this
 echo "Running FLIRT - registration MAIN stage"
 if [ -z $lowstrucflag ]; then
     #Step1: 3DOF translation only transformation
-    $FSLDIR/bin/flirt -in $cfile -ref $struc -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2high1.mat -out $tempdir/low2hig1 $inittext $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $sbet -schedule $FSLDIR/etc/flirtsch/xyztrans.sch -omat $tempdir/low2high1.mat -out $tempdir/low2hig1 $inittext $weigthinstr
     #step2: 6DOF transformation with small search region
-    $FSLDIR/bin/flirt -in $cfile -ref $struc -dof $DOF -omat $tempdir/low2high.mat -init $tempdir/low2high1.mat -schedule $flirtsch -out $tempdir/low2high $weigthinstr
+    $FSLDIR/bin/flirt -in $cfile -ref $sbet -dof $DOF -omat $tempdir/low2high.mat -init $tempdir/low2high1.mat -schedule $flirtsch -out $tempdir/low2high $weigthinstr
 else
     #as we have a structural image in perfusion space use it to improve registration
     echo "Using structral image in perfusion space ($lowstruc)"
@@ -138,34 +144,49 @@ else
     #Step2: 6DOF limited transformation in perfusion space
     $FSLDIR/bin/flirt -in $cfile -ref $lowstruc -dof $DOF -schedule $flirtsch -init $tempdir/low2low1.mat -omat $tempdir/low2low.mat $weigthinstr
     #step3: 6DOF transformation of lowstruc to struc
-    $FSLDIR/bin/flirt -in $lowstruc -ref $struc -omat $tempdir/str2str.mat
+    $FSLDIR/bin/flirt -in $lowstruc -ref $sbet -omat $tempdir/str2str.mat
     #step4: combine the two transformations
     $FSLDIR/bin/convert_xfm -omat $tempdir/low2high.mat -concat $tempdir/str2str.mat $tempdir/low2low.mat 
 fi
 
 # do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image and we will only do this if we have been given a supplementary image to get the initialisation above right
 if [ ! -z $cflag ]; then
-    if [ ! -z $wmseg ]; then
-	# do a final refinement of the registration using the perfusion and the white matter segmentation - this is based on epi_reg
-	$FSLDIR/bin/flirt -ref $sbet -in $infile -dof 6 -cost bbr -wmseg $wmseg -init $tempdir/low2high.mat -omat $tempdir/low2high.mat -out $tempdir/low2high_final -schedule ${FSLDIR}/etc/flirtsch/bbr.sch
-    else
-	echo "Cannot run FINAL stage without Brain extracted structural (suppled using --sbet) and white matter segmentation (supplied using --wmseg) - SKIPPING"
-    fi 
+    if [ -z $tissseg ]; then
+	# Running FAST segmentation
+	$FSLDIR/bin/fast -o $tempdir/struct_fast $sbet
+	# combine WM and CSF then threshold
+	$FSLDIR/bin/fslmaths $tempdir/struct_fast_pve_2 -add $tempdir/struct_fast_pve_1 -thr 0.5 -bin ${tempdir}/fast_tissseg
+    fi
+
+    # do a final refinement of the registration using the perfusion and the white matter segmentation - using epi_reg to get BBR (and allow for fielmap correction in future)
+    $FSLDIR/bin/epi_reg --epi=$infile --t1=$struc --t1brain=$sbet --init=low2high.mat --out=low2high_final --wmseg=$tissseg
+    
+    #	$FSLDIR/bin/flirt -ref $sbet -in $infile -dof 6 -cost bbr -wmseg $wmseg -init $tempdir/low2high.mat -omat $tempdir/low2high.mat -out $tempdir/low2high_final -schedule ${FSLDIR}/etc/flirtsch/bbr.sch
+
+
 fi
 
 # make the output files
-# ASL--> strucutral transformation
-cp $tempdir/low2high.mat $outdir/asl2struct.mat
-# ASL-->standard transformation (if specified)
-if [ ! -z $transflag ]; then
-    echo "Combining transformations"
-    convert_xfm -omat $outdir/asl2std.mat -concat $trans $tempdir/low2high.mat 
+# ASL--> structural transformation
+if [ ! -z $cflag ]; then
+    cp $tempdir/low2high_final.mat $outdir/asl2struct.mat #the transformation matrix from epi_reg
+    #$FSLDIR/bin/imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
+    # copy the edge image from epi_reg output as that is good for visualisation
+    ${FSLDIR}/bin/imcp $tempdir/low2high_final_fast_wmedge $outdir/asl2struct_tissedge
+else
+    cp $tempdir/low2high.mat $outdir/asl2struct.mat #the transformation matrix from MAIN registration
 fi
 
-if [ ! -z $lowstrucflag ]; then
+## ASL-->standard transformation (if specified)
+#if [ ! -z $transflag ]; then
+#    echo "Combining transformations"
+#    convert_xfm -omat $outdir/asl2std.mat -concat $trans $tempdir/low2high.mat 
+#fi
+
+#if [ ! -z $lowstrucflag ]; then
 # ASL--> low structral transformtaion (if supllied)
-    cp $tempdir/low2low.mat $outdir/asl2lowstruct.mat
-fi
+#    cp $tempdir/low2low.mat $outdir/asl2lowstruct.mat
+#fi
 
 # remove temporary directory
 if [ -z $debug ]; then
