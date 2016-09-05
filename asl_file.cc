@@ -150,7 +150,12 @@ int main(int argc, char *argv[])
       tempindata=asldata[ti];
       Matrix tempdata(tempindata.Nrows()-1,tempindata.Ncols());
       for (int aq=1; aq<tempindata.Nrows(); aq++) {
-	tempdata.Row(aq) = tempindata.Row(aq) - tempindata.Row(aq+1);
+	if (aq % 2) { //Being careful - we always want tag-control
+	   tempdata.Row(aq) = tempindata.Row(aq+1) - tempindata.Row(aq);
+	}
+	else {
+	 tempdata.Row(aq) = tempindata.Row(aq) - tempindata.Row(aq+1);
+	}
       }
       asldata[ti] = tempdata;
       if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
