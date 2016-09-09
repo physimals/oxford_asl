@@ -379,9 +379,9 @@ $basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $basil_o
 
 # work out which is the final step from BASIL
 finalstep=`ls -d $2/basil/step? | sed -n '$ p'`
-echo "Using BASIL step $finalstep" >> $log
+Log "Using BASIL step $finalstep"
 
-# extract image from BASIL results (and throw away values below zero)
+# extract images from BASIL results (and throw away values below zero)
 fslmaths ${finalstep}/mean_ftiss -thr 0 $2/ftiss
 if [ ! -z $senscorr ]; then
 # sensitivity correction
@@ -399,16 +399,16 @@ if [ -z $artoff ]; then
     fi
 fi
 
-#Partial volume correction (3/3) - sort out basil results when PV corrected
+#Partial volume correction - sort out basil results when PV corrected
 if [ ! -z $pvcorr ]; then
-fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
-if [ ! -z $senscorr ]; then
-# sensitivity correction
-    fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
-fi
-if [ -z $fixbat ]; then
-    fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
-fi
+    fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
+    if [ ! -z $senscorr ]; then
+        # sensitivity correction
+	fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
+    fi
+    if [ -z $fixbat ]; then
+	fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
+    fi
 
 fi
 
@@ -968,57 +968,11 @@ if [ ! -z $struc ]; then
 fi
 ### End of: Segmentation
 
-### Partial Volume Estimates
-if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
-    # PVE in ASL space from strcutural segmentation results
-    # invert the transformation matrix
-    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
-    
-    # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-    # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-    # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
-    pvexist=1
-fi
 
-if [ ! -z $pvgm ]; then
-    #using supplied PV images
-	Log "Loading supplied PV images"
-	if [ -z $pvwm ]; then
-	    echo "ERROR: no WM PV image has been supplied"
-	fi
-	Log "PV GM is: $pvgm"
-	${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
-	Log "PV WM is: $pvwm"
-	${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
-	pvexist=1
-fi
-
-# make some masks 
-# these are currently used for masking after model fitting
-${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
-# these are for calculating mean perfusion within tissue types
-${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
-### End of: Partial Volume Estimates
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
     ${FSLDIR}/bin/imcp $isen $outdir/native_space/sensitivity
-fi
-
-
-#  - Partial volume correction (1/3) - setup the PV images
-# a cehck at this point as to wehther PV correction will be feasible
-if [ ! -z $pvcorr ]; then
-    if [ `$FSLDIR/bin/imtest $tempdir/pvgm_inasl` -eq 0 ]; then
-	echo "ERROR: PV correction cannot be performed without either a structural image or supplied PVE"
-	exit 1
-    fi
 fi
 
 # Defaults for (some) parameters
@@ -1184,13 +1138,6 @@ fi
 echo "Setting up BASIL"
 Log "BASIL setup"
 
-# Partial volume correction (2/3) - instructions for basil
-if [ ! -z $pvcorr ]; then
-    basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
-fi
-
-echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
-
 # data acquired using CASL?
 if [ ! -z $casl ]; then
     echo "--casl" >> $tempdir/basil_options.txt;
@@ -1288,6 +1235,9 @@ if [ ! -z $devel ]; then
     basil_options=$basil_options" --devel "
 fi
 
+# T1 values
+echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
+
 Log "BASIL options ($tempdir/basil_options.txt):"
 Log "----"
 Log "`cat $tempdir/basil_options.txt`"
@@ -1296,26 +1246,95 @@ Log "----"
 
 cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of the core options accumulated thus far (we might need these again for the epoch analysis)
 
-# Analyse data using BASIL
-#if [ -z $epoch ]; then
-# normal single analysis of data
+
+##### Analyse data using BASIL
+### First analysis on whole data, normal perfusion image
 echo "--repeats=$repeats" >> $tempdir/basil_options.txt
 echo "$tislist" >> $tempdir/basil_options.txt
 
-echo "Calling BASIL on data"
+echo "Calling BASIL on data - conventional perusion image"
 Dobasil $datafile $tempdir
+### End of: First analysis on whole data
 
+### Registration (2/2)
+# Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
+# use existing registration for initial aligment
+if [ $register -eq 1 ]; then 
+	echo "Performing final registration"
+	Log "Final registration"
+	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+    fi
+fi
+### End of: Registration (2/2)
+
+### Partial Volume Estimates
+# Note we do this here since we have the final registration now which we need to transform PV estimates into ASL space
+if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
+    # PVE in ASL space from strcutural segmentation results
+    # invert the transformation matrix
+    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    
+    # Gray matter - assume this will be PVE 1
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # white matter  - assume this will be PVE 2
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
+    pvexist=1
+fi
+
+if [ ! -z $pvgm ]; then
+    #using supplied PV images
+	Log "Loading supplied PV images"
+	if [ -z $pvwm ]; then
+	    echo "ERROR: no WM PV image has been supplied"
+	fi
+	Log "PV GM is: $pvgm"
+	${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
+	Log "PV WM is: $pvwm"
+	${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
+	pvexist=1
+fi
+
+# make some masks 
+# these are currently used for masking after model fitting
+${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
+${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+# these are for calculating mean perfusion within tissue types
+${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
+${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+### End of: Partial Volume Estimates
+
+### Output main BASIL results
+# Note we do this here, as we have the registration done and masks created
+Dooutput
+### End of: Output main BASIL results
+
+### Partial Volume Correction BASIL
+if [ ! -z $pvcorr ]; then
+    # intructions for BASIL
+    basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
+    # Run BASIL
+    Dobasil $datafile $tempdir/pvcorr
+
+    #output the results
+    Dooutput pvcorr
+fi
+### End of: Partial Volume Correction
+
+### Epoch BASIL
 if [ ! -z $epoch ]; then
-# epochwise analysis
-echo "Epochwise analysis"
+    # epochwise analysis
+    echo "Epochwise analysis"
 
-#genereate a list of epochs
-currdir=`pwd`
-cd $tempdir
-epochlist=`imglob epoch*`
-cd $currdir
+    #genereate a list of epochs
+    currdir=`pwd`
+    cd $tempdir
+    epochlist=`imglob epoch*`
+    cd $currdir
 
-ecount=0
+    ecount=0
     for e in $epochlist; do
 	Log "Processing epoch: $e"
 	etislist=""
@@ -1338,23 +1357,16 @@ ecount=0
 	
 	Dobasil $tempdir/$e $tempdir/$e
 
+        #output 
+	Log "Saving results from epoch: $e"
+	Dooutput $e
+
 	ecount=`expr $ecount + 1`
     done
-
-# produce an ftiss image to use for registration - mean of all the ftiss images over the epochs
-#fslmerge -t  $tempdir/ftiss `ls $tempdir/epoch*/ftiss.nii.gz`
 fi
+### End of: Epoch BASIL
 
-### Registration (2/2)
-# Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
-# use existing registration for initial aligment
-if [ $register -eq 1 ]; then 
-	echo "Performing final registration"
-	Log "Final registration"
-	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
-    fi
-fi
-### End of: Registration (2/2)
+
 
 #OUTPUTS
 # Setup option outputs - anything that would be common to all epochs
@@ -1370,15 +1382,15 @@ fi
 
 #if [ -z $epoch ]; then
 # normal single analysis of data
-Dooutput
+#Dooutput
 
-if [ ! -z $epoch ]; then
+##if [ ! -z $epoch ]; then
 # epochwise analysis
-    for e in $epochlist; do
-	Log "Saving results from epoch: $e"
-	Dooutput $e
-    done
-fi
+#    for e in $epochlist; do
+#	Log "Saving results from epoch: $e"
+#	Dooutput $e
+ #   done
+#fi
 
 
 # save the mask used to the (native space) output directory
