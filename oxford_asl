@@ -32,7 +32,8 @@ Usage() {
     echo " --slicedt : Timing difference between slices - {default: 0}"
     echo ""
     echo "Structural image (see also Registration)"
-    echo " -s          : structural image (already BETed)"
+    echo " -s          : structural image (whole head)"
+    echo " --sbet      : structural image (already BETed)"
     echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
     echo ""
     echo " Output options"
@@ -71,10 +72,10 @@ Usage_extended() {
     echo "                (skips registration)"
     echo " --regfrom   : image to use a basis for registration (already BETed)"
     echo "               (must be same resolution as ASL data)"
-    echo " -t          : structural to standard space transformation matrix"
-    echo "               (requires structural image)"
-    echo " --structout : (also) save the maps in structural space (for use with -t)"
-    echo " -S          : standard brain image - {default: MNI152_T1_2mm}"
+#    echo " -t          : structural to standard space transformation matrix"
+#    echo "               (requires structural image)"
+#    echo " --structout : (also) save the maps in structural space (for use with -t)"
+#    echo " -S          : standard brain image - {default: MNI152_T1_2mm}"
     echo " -r          : low resolution structural image (already BETed)"
 
     echo " Calibration"
@@ -268,8 +269,9 @@ Normalise_var() {
 
 Registration() {
 echo "Performing registration"
-regbase=$1 #the i/p to the function is the image to use as a base for registration
-extraoptions=""
+regbase=$1 #the i/p to the function is the image to use for registration
+transopt=$2 # other options to pass to asl_reg
+extraoptions=" "
 if [ ! -z $lowstrucflag ]; then
     extraoptions=$extraoptions"-r $tempdir/lowstruc"
 fi
@@ -277,24 +279,11 @@ if [ ! -z $debug ]; then
     extraoptions=$extraoptions" --debug"
 fi
 
-if [ ! -z $stdout ]; then
-# we have a struct2std transformation matrix to deal with
-transopt="-t $trans"
+if [ ! -z $reginit ]; then
+    extraoptions=$extraoptions" -c $reginit"
 fi
 
-#if [ ! -z $2 ]; then
-#    # use the BETed version of the structural image for registration
-#    # this is most approriate when we are using the perfusion image as the base (since there is no skull)
-#    Log "Using brain extracted structural as reference for registration"
-#    reg_struct=$tempdir/struc_bet
-#else
-#    Log "Using structural image as reference for registration"
-#    reg_struct=$tempdir/struc
-#fi
-
-reg_struct=$tempdir/struc
-
-$asl_reg -i $regbase -o $tempdir -s $reg_struct  $transopt $extraoptions
+$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
 }
 
 Calibration() {
@@ -854,13 +843,13 @@ echo "Pre-processing"
 if [ ! -z $struc ]; then
     ${FSLDIR}/bin/imcp $struc $tempdir/struc
     Log "Structural image is: $struc"
-#    if [ -z $strucbet ]; then
-#       #bet the structural for calibration and registration
-#	bet $struc $tempdir/struc_bet
-#	Log "BET on structural image"
-#    else
-#	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
-#    fi
+    if [ -z $strucbet ]; then
+       #bet the structural for calibration and registration
+	bet $struc $tempdir/struc_bet
+	Log "BET on structural image"
+    else
+	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
+    fi
 fi
 
 
@@ -923,7 +912,9 @@ else
     Log "Using mask: $mask"
 fi
 
-# Registration (1/2)
+### Registration (1/2)
+# Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
+# only 'initial' step in asl_reg is used here
 register=0
 if [ ! -z $strucflag ]; then # if structural image has not been suppled then skip the registration
     register=1
@@ -940,12 +931,57 @@ if [ -z $regfrom ]; then
 fi
 
 if [ $register -eq 1 ]; then
-# registration here if we are using an image provided (in case we need it for PV correction)
+# registration here using asl_reg (inital only)
     if [ ! -z $regfrom ]; then
 	Log "Performing registration"
-	Log "Using $regfrom as base for registration"
-	Registration $regfrom
+	Log "Using $regfrom as base for inital registration"
+
+	extraoptions=""
+	if [ ! -z $lowstrucflag ]; then
+	    extraoptions=$extraoptions"-r $tempdir/lowstruc"
+	fi
+
+	Registration $regfrom $extraoptions
     fi
+fi
+### End of: Registration (1/2)
+
+### Segmentation of structural image
+# Always do this if structural has been provided
+if [ ! -z $struc ]; then
+    echo "Segmenting the structural image"
+    Log "Segmenting the structural image"
+    ${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+    
+    #other things from the FAST output
+    fasthasrun=1 #this means that we have CSF PVE for calibration purposes
+
+    # create a tissseg (wmseg) image for BBR in asl_reg
+    $FSLDIR/bin/fslmaths $tempdir/seg_pve_2 -thr 0.5 -bin ${tempdir}/tissseg
+
+    # transform the bias field and invert to use for sensitivity correction in calibration
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_bias --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+
+    if [ ! -z $senscorr ]; then
+	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+    fi
+fi
+### End of: Segmentation
+
+### Partial Volume Estimates
+if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
+    # PVE in ASL space from strcutural segmentation results
+    # invert the transformation matrix
+    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    
+    # Gray matter - assume this will be PVE 1
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # white matter  - assume this will be PVE 2
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
+    pvexist=1
 fi
 
 if [ ! -z $pvgm ]; then
@@ -961,56 +997,20 @@ if [ ! -z $pvgm ]; then
 	pvexist=1
 fi
 
-# Segmentation of structural image
-if [ ! -z $pvcorr ] || [ ! -z $norm ] || [ ! -z $report ] || [ ! -z $needseg ]; then
-if [ -z $pvgm ]; then
-    # if we have structural image and we need PVE, then do segmentation and prepare GM and WM masks, unless these have been supplied separately
-    echo "Segmenting the structural image"
-    if [ -z $strucflag ]; then
-	echo "ERROR: Normalization/Reporting/PV correction cannot be performed without a structural image"
-	exit 1
-    fi
-    Log "Estimating partial volumes from structural image"
-    ${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc
-    
-        # invert the transformation matrix
-    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
-    
-        # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-        # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-# threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
-    pvexist=1
-
-    #other things from the FAST output
-    fasthasrun=1 #this means that we have CSF PVE for calibration purposes
-    # transform the bias field and invert to use for sensitivity correction in calibration
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_bias --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-
-    if [ ! -z $senscorr ]; then
-	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
-    fi
-    
-fi
-fi
+# make some masks 
+# these are currently used for masking after model fitting
+${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
+${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+# these are for calculating mean perfusion within tissue types
+${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
+${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+### End of: Partial Volume Estimates
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
     ${FSLDIR}/bin/imcp $isen $outdir/native_space/sensitivity
 fi
 
-if [ ! -z $pvexist ]; then
-# make some masks 
-# these are currently used for masking after model fitting
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
-# these are for calculating mean perfusion within tissue types
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
-fi
 
 #  - Partial volume correction (1/3) - setup the PV images
 # a cehck at this point as to wehther PV correction will be feasible
@@ -1345,17 +1345,16 @@ ecount=0
 #fslmerge -t  $tempdir/ftiss `ls $tempdir/epoch*/ftiss.nii.gz`
 fi
 
-# Registration (2/2)
-# NOTE: this is currently redundant as we always do registration earlier (using the mean timeseries if necessary)
-#if [ $register -eq 1 ]; then 
-## registration occurs here if we are using the estimated CBF as base
-#    if [ -z $regfromflag ]; then
-##use CBF map as base for registration
-#	echo "Performing registration"
-#	Log "Using estimated CBF as base for regstration"
-#	Registration $tempdir/ftiss 1
-#    fi
-#fi
+### Registration (2/2)
+# Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
+# use existing registration for initial aligment
+if [ $register -eq 1 ]; then 
+	echo "Performing final registration"
+	Log "Final registration"
+	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+    fi
+fi
+### End of: Registration (2/2)
 
 #OUTPUTS
 # Setup option outputs - anything that would be common to all epochs
