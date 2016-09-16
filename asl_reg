@@ -64,8 +64,10 @@ until [ -z $1 ]; do
 		shift;;
 	--tissseg) tissseg=$2
 		   shift;;
-	--finalonly) finalonly=1
+	--finalonly) finalonly=1 #only run the final BBR part
 		    ;;
+	--mainonly) mainonly=1 # only run the first flirt part (to get inital alignment)
+	    ;;
 	--flirtsch) flirtsch=$2
 	    shift;;
 	--debug) debug=1
@@ -135,7 +137,7 @@ if [ -z $sbet ]; then
     sbet=$tempdir/struc_brain
 fi
 
-# do the MAIN registration run - use the supplementary image for this
+# do the MAIN registration run - use the supplementary image for this if available
 if [ -z $finalonly ]; then
     echo "Registration MAIN stage (FLIRT)"
     if [ -z $lowstrucflag ]; then
@@ -162,9 +164,9 @@ if [ -z $finalonly ]; then
 fi
 
 
-# do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image (or something with decent tissue contrast) and we will only do this if we have been given an initilisation (either from supplmentary iamge above or on the command line)
+# do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image (or something with decent tissue contrast)
+if [ ! -z $mainonly ]; then
 echo "Registration FINAL stage (BBR)"
-if [ ! -z $epi_inittext ]; then
     if [ -z $tissseg ]; then
 	# Running FAST segmentation
 	$FSLDIR/bin/fast -o $tempdir/struct_fast $sbet

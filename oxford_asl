@@ -33,7 +33,7 @@ Usage() {
     echo ""
     echo "Structural image (see also Registration)"
     echo " -s          : structural image (whole head)"
-    echo " --sbet      : structural image (already BETed)"
+    echo " --sbrain      : structural image (already BETed)"
     echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
     echo ""
     echo " Output options"
@@ -595,7 +595,7 @@ takeargs=0;
 	    ;;
 	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
-	--strucbet) strucbet=$argument # user supplied BETed structural
+	--sbrain) strucbet=$argument # user supplied BETed structural
 	    takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
@@ -922,6 +922,7 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 	register=0
 	Log "Using existing asl to structural transform: $asl2struc"
 	cp $asl2struc $tempdir/asl2struct.mat
+	${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     fi
 fi
 
@@ -938,11 +939,12 @@ if [ $register -eq 1 ]; then
 
 	extraoptions=""
 	if [ ! -z $lowstrucflag ]; then
-	    extraoptions=$extraoptions"-r $tempdir/lowstruc "
+	    extraoptions=$extraoptions"-r $tempdir/lowstruc --mainonly"
 	fi
 
 	Registration $regfrom $extraoptions
     fi
+    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
 fi
 ### End of: Registration (1/2)
 
@@ -1260,10 +1262,9 @@ Dobasil $datafile $tempdir
 # Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
 # use existing registration for initial aligment
 if [ $register -eq 1 ]; then 
-	echo "Performing final registration"
-	Log "Final registration"
-	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
-    fi
+    echo "Performing final registration"
+    Log "Final registration"
+    Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
 fi
 ### End of: Registration (2/2)
 
