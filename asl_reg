@@ -162,9 +162,9 @@ if [ -z $finalonly ]; then
 fi
 
 
-# do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image (or something with decent tissue contrast) and we will only do this if we have been given a supplementary image to get the initialisation right above
+# do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image (or something with decent tissue contrast) and we will only do this if we have been given an initilisation (either from supplmentary iamge above or on the command line)
 echo "Registration FINAL stage (BBR)"
-if [ ! -z $cflag ]; then
+if [ ! -z $epi_inittext ]; then
     if [ -z $tissseg ]; then
 	# Running FAST segmentation
 	$FSLDIR/bin/fast -o $tempdir/struct_fast $sbet
@@ -189,12 +189,10 @@ if [ ! -z $cflag ]; then
     ${FSLDIR}/bin/imcp $mask $outdir/mask
     
     # do a final refinement of the registration using the perfusion and the white matter segmentation - using epi_reg to get BBR (and allow for fielmap correction in future)
-    $FSLDIR/bin/epi_reg --epi=$tempdir/asldata_brain --t1=$struc --t1brain=$sbet $inittext --out=$tempdir/low2high_final --wmseg=$tissseg $weigthinstr
+    $FSLDIR/bin/epi_reg --epi=$tempdir/asldata_brain --t1=$struc --t1brain=$sbet $epi_inittext --out=$tempdir/low2high_final --wmseg=$tissseg $weigthinstr
     
     #	$FSLDIR/bin/flirt -ref $sbet -in $infile -dof 6 -cost bbr -wmseg $wmseg -init $tempdir/low2high.mat -omat $tempdir/low2high.mat -out $tempdir/low2high_final -schedule ${FSLDIR}/etc/flirtsch/bbr.sch
 
-    # alignment of calibration and perfusion image - to allow for correction of any motion between the two
-    $FSLDIR/bin/flirt -ref $infile -dof $DOF -in $cfile -omat $tempdir/calib2asl.mat -schedule $flirtsch
     echo "BBR end"
 
     #OUTPUT

@@ -279,9 +279,9 @@ if [ ! -z $debug ]; then
     extraoptions=$extraoptions" --debug"
 fi
 
-if [ ! -z $reginit ]; then
-    extraoptions=$extraoptions" -c $reginit"
-fi
+#if [ ! -z $reginit ]; then
+#    extraoptions=$extraoptions" -c $reginit"
+#fi
 
 $asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
 }
@@ -938,7 +938,7 @@ if [ $register -eq 1 ]; then
 
 	extraoptions=""
 	if [ ! -z $lowstrucflag ]; then
-	    extraoptions=$extraoptions"-r $tempdir/lowstruc"
+	    extraoptions=$extraoptions"-r $tempdir/lowstruc "
 	fi
 
 	Registration $regfrom $extraoptions
