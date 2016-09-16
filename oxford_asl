@@ -950,9 +950,9 @@ if [ $register -eq 1 ]; then
 	Log "Performing registration"
 	Log "Using $regfrom as base for inital registration"
 
-	extraoptions=""
+	extraoptions="--mainonly " # to ensure we only do the initil flirt part
 	if [ ! -z $lowstrucflag ]; then
-	    extraoptions=$extraoptions"-r $tempdir/lowstruc --mainonly"
+	    extraoptions=$extraoptions"-r $tempdir/lowstruc"
 	fi
 
 	Registration $regfrom $extraoptions

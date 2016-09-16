@@ -165,7 +165,7 @@ fi
 
 
 # do the FINAL registration run using BBR - this ONLY makes sense when the input is a perfusion image (or something with decent tissue contrast)
-if [ ! -z $mainonly ]; then
+if [ -z $mainonly ]; then
 echo "Registration FINAL stage (BBR)"
     if [ -z $tissseg ]; then
 	# Running FAST segmentation
