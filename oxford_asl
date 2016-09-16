@@ -941,6 +941,7 @@ fi
 
 if [ -z $regfrom ]; then
 # no regfrom iamge supplied so we will use the mean of the asl timeseries
+# NB in the case of really good backgorund suppresion this might not be best option, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
     regfrom=$tempdir/meanasl
 fi
 
