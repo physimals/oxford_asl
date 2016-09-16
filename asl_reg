@@ -207,8 +207,6 @@ echo "Registration FINAL stage (BBR)"
     # copy the edge image from epi_reg output as that is good for visualisation
     ${FSLDIR}/bin/imcp $tissseg $outdir/tissseg
     ${FSLDIR}/bin/imcp $tempdir/low2high_final_fast_wmedge $outdir/tissedge
-    # output the calibration to ASL transformation
-    cp $tempdir/calib2asl.mat $outdir/calib2asl.mat
 fi
 
 ## ASL-->standard transformation (if specified)
