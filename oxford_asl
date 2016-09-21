@@ -893,38 +893,6 @@ fi
 # take mean of the asl data as we might need this later
 fslmaths $infile -Tmean $tempdir/meanasl
 
-# sort out the mask for processing the data
-if [ -z $mask ]; then
-echo "Creating mask"
-Log "Automatic mask generation"
-# preferred option is to use the regfrom image (should already be BETed)
-if [ ! -z $regfrom ]; then
-    fslmaths $regfrom -bin $tempdir/mask
-    Log "Mask generated from regfrom image"
-# next option is to use betted version of mean M0 calib image as mask
-elif [ ! -z $calib ]; then
-    bet $tempdir/calib $tempdir/calib_bet -f 0.2 
-    fslmaths $tempdir/calib_bet -bin $tempdir/mask
-    Log "Mask generated from calibration image (post BET)"
- # use the low resolution strucutral image to create mask (ahould already be BETed)
-elif [ ! -z $lowstrucflag ]; then
- # resample
-    flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $infile
- # make binary
-    fslmaths $tempdir/mask -bin $tempdir/mask
-    Log "Mask generated from low res. structural"
-# otherwise just use mean time series
-else
-    bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
-    fslmaths $tempdir/meanasl -bin $tempdir/mask
-    Log "Mask generated from mean time series"
-fi
-else
-# mask has been supplied
-    fslmaths $mask -bin $tempdir/mask # just to be sure binarise the mask here
-    Log "Using mask: $mask"
-fi
-
 ### Registration (1/2)
 # Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
 # only 'initial' step in asl_reg is used here
@@ -941,8 +909,10 @@ fi
 
 if [ -z $regfrom ]; then
 # no regfrom iamge supplied so we will use the mean of the asl timeseries
-# NB in the case of really good backgorund suppresion this might not be best option, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
-    regfrom=$tempdir/meanasl
+# NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
+    # brain extract the meanasl image
+    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+    regfrom=$tempdir/meanasl_brain
 fi
 
 if [ $register -eq 1 ]; then
@@ -984,7 +954,45 @@ if [ ! -z $struc ]; then
 fi
 ### End of: Segmentation
 
-
+### Generate mask for ASL data
+# sort out the mask for processing the data
+if [ -z $mask ]; then
+echo "Creating mask"
+Log "Automatic mask generation"
+# preferred option is to use brain extracted structural
+if [ ! -z $struc ]; then
+    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
+# otherwise use the regfrom image (should already be BETed) - note that regfrom may have been set in the Registration (1/2) section.
+elif [ ! -z $regfrom ]; then
+    ${FSLDIR}/bin/fslmaths $regfrom -bin $tempdir/mask
+    Log "Mask generated from regfrom image: $regfrom"
+# next option is to use betted version of mean M0 calib image as mask
+elif [ ! -z $calib ]; then
+    ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib_bet -f 0.2 
+    ${FSLDIR}/bin/fslmaths $tempdir/calib_bet -bin $tempdir/mask
+    Log "Mask generated from calibration image (post BET)"
+ # use the low resolution strucutral image to create mask (ahould already be BETed)
+elif [ ! -z $lowstrucflag ]; then
+ # resample
+    ${FSLDIR}/bin/flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $infile
+ # make binary
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -bin $tempdir/mask
+    Log "Mask generated from low res. structural"
+# otherwise just use mean time series
+else
+    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
+    ${FSLDIR}/bin/fslmaths $tempdir/meanasl -bin $tempdir/mask
+    Log "Mask generated from mean time series"
+fi
+else
+# mask has been supplied
+    fslmaths $mask -bin $tempdir/mask # just to be sure binarise the mask here
+    Log "Using mask: $mask"
+fi
+### End of: Generate mask
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
@@ -1309,6 +1317,7 @@ Dobasil $datafile $tempdir
 if [ $register -eq 1 ]; then 
     echo "Performing final registration"
     Log "Final registration"
+    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat
     Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
 fi
 ### End of: Registration (2/2)
@@ -1355,10 +1364,21 @@ ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
 ### Output main BASIL results
 # Note we do this here, as we have the registration done and masks created
 Dooutput
+
+# save the mask used to the (native space) output directory
+${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask
 ### End of: Output main BASIL results
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
+    # redo the mask now that we have a better registration - as this might matter for PV correction
+    # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
+    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
+    ${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
+
     # intructions for BASIL
     basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
     # Run BASIL
@@ -1439,8 +1459,7 @@ fi
 #fi
 
 
-# save the mask used to the (native space) output directory
-${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask
+
 
 if [ ! -z $pvcorr ]; then
 # copy PVE in ASL space to output directory
