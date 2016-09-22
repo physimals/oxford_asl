@@ -879,8 +879,7 @@ if [ ! -z $lowstrucflag ]; then
 #    Log "BET on low res. structural image"
 fi
 
-
-#deal with TIs
+### deal with TIs (as specified on the command line)
 count=0
 tislist=""
 thetis=`echo $tis | sed 's:,: :g'`
@@ -891,25 +890,7 @@ for ti in $thetis; do
     alltis[`expr ${count} - 1`]=$ti
 done
 Log "TIs list: $tislist"
-
-#deal with repeats
-tpoints=`fslinfo $infile | grep "^dim4" | sed 's:dim4[ ]*::'`
-repeats=`expr $tpoints / $count`
-
-echo "Number of inversion times: $count"
-echo "Number of timepoints in data: $tpoints"
-echo "Number of repeats in data: $repeats"
-
-
-# finish filling the alltis array
-for ((r=1; r<$repeats; r++)); do
-    for ((i=0; i<$count; i++)); do
-	idx=`expr $r \* $count + $i`
-	alltis[$idx]=${alltis[$i]}
-    done
-done
-echo ${alltis[*]}
-Log ${alltis[*]}
+### End of: Deal with the TIs
 
 ### label-control subtraction
 # We get data into correct block format for BASIL here
@@ -926,12 +907,12 @@ Log "Input block format is: $ibf"
 
 if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=diffdata_mean
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
     imcp $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=diffdata_mean
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
     # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
     #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
@@ -939,10 +920,21 @@ else
     if [ -z $regfrom ]; then
 	# take mean over all volumes as an option to use for (initial) registration and masking
 	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
-	regfrom=$tempdir/asldata_mean
+	# brain extract this
+	${FSLDIR}/bin/bet $tempdir/asldata_mean $tempdir/asldata_mean_brain -f 0.2
+	regfrom=$tempdir/asldata_mean_brain
     fi
 fi
 ### End of : Label-control subtraction
+
+### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
+tpoints=`fslinfo $tempdir/diffdata | grep "^dim4" | sed 's:dim4[ ]*::'`
+repeats=`expr $tpoints / $count`
+
+echo "Number of inversion times: $count"
+echo "Number of timepoints in data: $tpoints"
+echo "Number of repeats in data: $repeats"
+### End of: Establish number of repeats
 
 # Single or Multi TI setup
 if [ $count -lt 2 ]; then
@@ -968,6 +960,16 @@ else
     echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
     datafile=$tempdir/diffdata
 fi
+
+# finish filling the alltis array - after we have decided whether we are using all the repeats or not
+for ((r=1; r<$repeats; r++)); do
+    for ((i=0; i<$count; i++)); do
+	idx=`expr $r \* $count + $i`
+	alltis[$idx]=${alltis[$i]}
+    done
+done
+echo ${alltis[*]}
+Log `echo ${alltis[*]}`
 
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
@@ -1389,13 +1391,15 @@ if [ ! -z $pvgm ]; then
 	pvexist=1
 fi
 
-# make some masks 
-# these are currently used for masking after model fitting
-${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
-# these are for calculating mean perfusion within tissue types
-${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+if [ ! -z $pvexist ]; then
+    # make some masks 
+    # these are currently used for masking after model fitting
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+    # these are for calculating mean perfusion within tissue types
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+fi
 ### End of: Partial Volume Estimates
 
 ### Output main BASIL results
@@ -1514,7 +1518,7 @@ fi
 
 # clearup
 if [ ! -z $debug ]; then
-    mv $tempdir .
+    mv $tempdir $outdir
 else
     rm -r $tempdir
 fi
