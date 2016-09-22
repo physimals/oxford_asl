@@ -4,7 +4,7 @@
 #
 # Michael Chappell, FMRIB Image Analysis Group & IBME
 #
-# Copyright (c) 2008-2013 University of Oxford
+# Copyright (c) 2008-2016 University of Oxford
 #
 # SHCOPYRIGHT
 
@@ -21,7 +21,9 @@ Usage() {
     echo " --wp      : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
     echo " --more     : see extended options and usage notes"
     echo ""
-    echo " Acquisition specific"
+    echo " Acquisition/Data specific"
+    echo " --iaf       : input ASl format: diff,tc,ct {default: diff}"
+    echo " --ibf       : input block format (for multi-TI): rpt,tis {default: rpt}"
     echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
     echo " --casl      : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
     echo " --artsupp   : Arterial suppression (vascular crushing) was used"
@@ -590,6 +592,10 @@ takeargs=0;
 	    takeargs=1;;
 	-i) inflag=1 infile=$argument #input/data file
 	    takeargs=1;;
+	--iaf) iaf=$argument # input asl format (asl_file syntax)
+	       takeargs=1;;
+	--ibf) ibf=$argument # input block format (asl_file syntax)
+	       takeargs=1;;
 	-c) calibflag=1 calib=$argument #calibration image
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
@@ -873,6 +879,96 @@ if [ ! -z $lowstrucflag ]; then
 #    Log "BET on low res. structural image"
 fi
 
+
+#deal with TIs
+count=0
+tislist=""
+thetis=`echo $tis | sed 's:,: :g'`
+#echo $thetis
+for ti in $thetis; do
+    count=`expr ${count} + 1`
+    tislist=`echo $tislist --ti${count}=$ti`
+    alltis[`expr ${count} - 1`]=$ti
+done
+Log "TIs list: $tislist"
+
+#deal with repeats
+tpoints=`fslinfo $infile | grep "^dim4" | sed 's:dim4[ ]*::'`
+repeats=`expr $tpoints / $count`
+
+echo "Number of inversion times: $count"
+echo "Number of timepoints in data: $tpoints"
+echo "Number of repeats in data: $repeats"
+
+
+# finish filling the alltis array
+for ((r=1; r<$repeats; r++)); do
+    for ((i=0; i<$count; i++)); do
+	idx=`expr $r \* $count + $i`
+	alltis[$idx]=${alltis[$i]}
+    done
+done
+echo ${alltis[*]}
+Log ${alltis[*]}
+
+### label-control subtraction
+# We get data into correct block format for BASIL here
+if [ -z $iaf ]; then
+    # DEFAULT input ASL format is 'diff' (label-control difference data) - maintains backward compatibility
+    iaf="diff"
+fi
+Log "Input ASL format is: $iaf"
+if [ -z $ibf ]; then
+    # DEFAULT input block format is 'rpt' (data is as typically acquired) - maintains backward compatibility
+    ibf="rpt"
+fi
+Log "Input block format is: $ibf"
+
+if [ $iaf = 'diff' ]; then
+    # make sure the block format is correct for BASIL
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=diffdata_mean
+    Log "Label-control difference data provided: $infile"
+    imcp $infile $tempdir/diffdata
+else
+    # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=diffdata_mean
+    # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
+    # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
+    #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
+
+    if [ -z $regfrom ]; then
+	# take mean over all volumes as an option to use for (initial) registration and masking
+	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
+	regfrom=$tempdir/asldata_mean
+    fi
+fi
+### End of : Label-control subtraction
+
+# Single or Multi TI setup
+if [ $count -lt 2 ]; then
+# single TI data - dont average send to BASIL as-is (helps with noise estimation)
+    Log "Single TI data to be passed to BASIL"
+    datafile=$tempdir/diffdata
+    # OPERATE in 'single TI mode'
+    artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
+    Log "Operating in Single TI mode"
+    
+elif [ $repeats -gt 1 ]; then
+    if [ -z $fulldata ]; then
+        # take the mean over the TIs for faster analysis
+	Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
+	datafile=$tempdir/diffdata_mean
+	repeats=1
+    else
+	Log "Multi TI data, all data passed to BASIL for analysis"
+        datafile=$tempdir/diffdata
+    fi
+else
+    # if there is only one repeat it just gets passed stright to BASIL
+    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
+    datafile=$tempdir/diffdata
+fi
+
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
     tsize=`fslinfo $calib | grep "^dim4" | sed 's:dim4[ ]*::'`
@@ -1082,70 +1178,11 @@ elif [ ! -z $M0 ]; then
     Log "Using supplied M0 value: $Mo"
 fi
 
-#deal with TIs
-count=0
-tislist=""
-thetis=`echo $tis | sed 's:,: :g'`
-#echo $thetis
-for ti in $thetis; do
-    count=`expr ${count} + 1`
-    tislist=`echo $tislist --ti${count}=$ti`
-    alltis[`expr ${count} - 1`]=$ti
-done
-Log "TIs list: $tislist"
-
-#deal with repeats
-tpoints=`fslinfo $infile | grep "^dim4" | sed 's:dim4[ ]*::'`
-repeats=`expr $tpoints / $count`
-
-echo "Number of inversion times: $count"
-echo "Number of timepoints in data: $tpoints"
-echo "Number of repeats in data: $repeats"
-
-
-# finish filling the alltis array
-for ((r=1; r<$repeats; r++)); do
-    for ((i=0; i<$count; i++)); do
-	idx=`expr $r \* $count + $i`
-	alltis[$idx]=${alltis[$i]}
-    done
-done
-
-echo ${alltis[*]}
-
 #deal with bolus
 if [ -z $boluset ]; then
     boluslen=1;
 fi
 Log "Bolus duration: $boluslen"
-
-
-# the data should come in 'as acquired' which we assume is blocks of all TIs
-# However, this is not the form required by BASIL (blocks of TIs)
-if [ $count -lt 2 ]; then
-# single TI data - dont average send to basil as-is (helps with noise estimation)
-    Log "Single TI data to be passed to BASIL"
-    datafile=$infile
-    # OPERATE in 'single TI mode'
-    artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
-    Log "Operating in Single TI mode"
-elif [ $repeats -gt 1 ]; then
-     # use asl_file to get data into the correct format for basil/fabber
-    if [ -z $fulldata ]; then
-        # take the mean over the TIs for faster analysis
-	echo " Multi TI data, mean is being taken at each TI to pass to BASIL" >> $log
-	asl_file --data=$infile --ntis=$count --ibf=rpt --iaf=diff --mean=$tempdir/data
-	repeats=1
-    else
-        # just re-arrange data but keep all repeats
-	asl_file --data=infile --ntis=$count --ibf=rpt --iaf=diff --obf=tis --out=$tempdir/data
-    fi
-    datafile=$tempdir/data
-else
-    # if there is only one repeat we can take the data as it comes for the full analysis
-    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
-    datafile=$infile
-fi
 
 #pre-processing for epochwise analysis
 # separate data into epochs here
