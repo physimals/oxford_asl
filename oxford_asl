@@ -39,12 +39,6 @@ Usage() {
     echo " --sbrain      : structural image (already BETed)"
     echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
     echo ""
-    echo " Output options"
-    echo " --vars     : also save the parameter estimated variances"
-    echo "  If structural image is supplied:"
-    echo " --report    : Report mean perfusion within a GM mask"
-    echo " --norm      : Output perfusion maps normalised by GM mean (sets --report)"
-    echo ""
     echo " Calibration"
     echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
     echo " --alpha     : Inversion efficiency - {default: 0.98 (pASL); 0.85 (cASL)}"
@@ -204,31 +198,31 @@ fi
 }
 
 Report() {
-    if [ ! -z $report ]; then
-    # generate text reports on parameters - the parameter must have been output first for this to work
-    parname=$1
-    subdir=$2
-    masktype=$3
+    if [ ! -z $pvexist ]; then
+	# generate text reports on parameters - the parameter must have been output first for this to work
+	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
+	parname=$1
+	subdir=$2
+	masktype=$3
 
-    if [ ! -z $pvexist ]; then #NB e we only do this is the PVE are available (and thus the reqd masks will exist)
 	repval=`${FSLDIR}/bin/fslstats $outdir/$subdir/native_space/$parname -k $tempdir/${masktype}mask_pure -m`
 	echo $repval > $outdir/$subdir/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
-    fi
 
     fi
 }
 
 Normalise() {
-    if [ ! -z $norm ]; then
-    # also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
-    parname=$1
-    subdir=$2
-    masktype=$3
-
-    # get normalization from reported value in the output directory
-    normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
-
+    if [ ! -z $pvexist ]; then
+	# also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
+	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
+	parname=$1
+	subdir=$2
+	masktype=$3
+	
+	# get normalization from reported value in the output directory
+	normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
+	
 	if [ ! -z $stdout ]; then
 	    fslmaths $outdir/std_space/$subdir/$parname -div $normval $outdir/std_space/$subdir/${parname}_norm 
 	fi
@@ -243,7 +237,7 @@ Normalise() {
 }
 
 Normalise_var() {
-    if [ ! -z $norm ]; then
+    if [ ! -z $pvexist ]; then
     # normalisaiton for a variance image
     parname=$1
     subdir=$2
@@ -674,8 +668,6 @@ takeargs=0;
 	    ;;
 	--structout) structout=1
 	    ;;
-	--vars) varout=1
-	    ;;
 	--advout) advout=1
 	    ;;
 	--spatial) spatial=1
@@ -703,10 +695,6 @@ takeargs=0;
 	--pvwm) pvwm=$argument
 	    takeargs=1;;
 	--fulldata) fulldata=1
-	    ;;
-	--norm) norm=1; report=1 #note that if we want to normalize then we might as well report too
-	    ;;
-	--report) report=1
 	    ;;
 	--elen) epoch=1 elen=$argument
 	    takeargs=1;;
@@ -741,6 +729,7 @@ takeargs=0;
 done
 
 nativeout=1 #we always keep the native space images!!
+varout=1 # we always output the variance images
 
 if [ -z $verbose ]; then
     verbose=1
