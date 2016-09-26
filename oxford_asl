@@ -205,8 +205,8 @@ Report() {
 	subdir=$2
 	masktype=$3
 
-	repval=`${FSLDIR}/bin/fslstats $outdir/$subdir/native_space/$parname -k $tempdir/${masktype}mask_pure -m`
-	echo $repval > $outdir/$subdir/${parname}_${masktype}_mean.txt
+	repval=`${FSLDIR}/bin/fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure -m`
+	echo $repval > $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
 
     fi
