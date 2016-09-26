@@ -456,7 +456,7 @@ if [ -z $artoff ]; then
 fi
 
 # white matter values
-if [ ! -z $pvcorr ]; then
+if [ $subdir = "pvcorr" ]; then
     Output ftisswm perfusion_wm $subdir
     Report perfusion_wm $subdir wm
     Normalise perfusion_wm $subdir wm
@@ -473,7 +473,7 @@ else
 fi
 
 # Masked results (PVcorr)
-if [ ! -z $pvcorr ]; then
+if [ $subdir = "pvcorr" ]; then
     OutputMasked perfusion $subdir gm
     OutputMasked perfusion_wm $subdir wm
     if [ -z $fixbat ]; then
@@ -504,7 +504,7 @@ if [ ! -z $calibflag ]; then
     Calibrate perfusion $malpha 6000 $subdir
     Report perfusion_calib $subdir gm
    
-    if [ ! -z $pvcorr ]; then
+    if [ $subdir = "pvcorr" ]; then
 	OutputMasked perfusion_calib $subdir gm
 	Calibrate perfusion_wm $malpha 6000 $subdir
 	Report perfusion_wm_calib $subdir wm
@@ -1411,6 +1411,8 @@ if [ ! -z $pvcorr ]; then
 
     # intructions for BASIL
     basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
+    mkdir $tempdir/pvcorr
+    cp $tempdir/basil_options.txt $tempdir/pvcorr/basil_options.txt #Dobasil expects the options file to be in the subdirectory
     # Run BASIL
     Dobasil $datafile $tempdir/pvcorr
 
