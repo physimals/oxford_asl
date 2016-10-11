@@ -1164,6 +1164,7 @@ if [ ! -z $calib ]; then
     fi 
 elif [ ! -z $M0 ]; then
     # An M0 value has been supplied, use this
+    cmethod=single # we are in 'single' mode as a single value has been supplied
     Mo=$M0
     echo "M0: $Mo"
     Log "Using supplied M0 value: $Mo"
