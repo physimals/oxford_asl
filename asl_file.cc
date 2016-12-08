@@ -81,8 +81,8 @@ int main(int argc, char *argv[])
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
-    volume<float> mask(data.xsize(),data.ysize(),data.zsize());
-    mask.setdims(data.xdim(),data.ydim(),data.zdim());
+    // Create a mask from the data volume to ensure metadata is correct 
+    volume<float> mask = data[0]*0;
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
 
@@ -178,10 +178,10 @@ int main(int argc, char *argv[])
       else if (o==1) { asldataout=asldataodd; fsub="_odd"; cout << "Dealing with odd members of pairs"<<endl;}
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
 
-      //output data
+      //output data. Use input volume as basis for output volume to ensure consistent metadata
       if (opts.out.set()) {
 	Matrix outmtx;
-	volume4D<float> dataout;
+	volume4D<float> dataout = data*0;;
 	stdform2data(asldataout,outmtx,outblocked,outpairs);
 	dataout.setmatrix(outmtx,mask);
 	save_volume4D(dataout,opts.out.value()+fsub);
@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
 	  {
 	  meanti.Row(n+1)=mean(asldata[n],1);
 	  }
-	  volume4D<float> meanout;
+	  volume4D<float> meanout = data*0;;
 	  meanout.setmatrix(meanti,mask);
 	  save_volume4D(meanout,opts.meanout.value());*/
       }
@@ -205,7 +205,7 @@ int main(int argc, char *argv[])
       if (opts.splitout.set()) {
 	splitout(asldataout,mask,opts.splitout.value()+fsub);
 	/*cout << "Splitting ASL data into files for each TI" << endl;
-	  volume4D<float> blockout;
+	  volume4D<float> blockout = data*0;;
 	  for (int n=0; n<ntis; n++) 
 	  {
 	  char cstr [5];
@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
 
       int e=1;
       Matrix epoch_temp(ntis,nvox);
-      volume4D<float> epochout;
+      volume4D<float> epochout = data*0;;
       while (e*epadv<=nmeas)
 	{
 	  //Matrix ti_temp(eplen,nvox);
