@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
     ReadOptions& opts = ReadOptions::getInstance();
     opts.parse_command_line(argc,argv);
 
+
    //deal with input data type options
     bool isblocked=false; //indicates if data is in blocks of repeats rather than TIs
     bool ispairs=false; //indicates if data contains adjacent pairs of measurments
@@ -75,16 +76,66 @@ int main(int argc, char *argv[])
 
     //load data
     volume4D<float> data;
-    read_volume4D(data,opts.datafile.value());
+    if(!opts.par_rec_to_nifti_option.value()) {
+      read_volume4D(data,opts.datafile.value());
+    }
+
 
     // Partail volume correction variables
-    volume<float> pvmap;
-    read_volume(pvmap, opts.pvfile.value());
+    volume<float> pv_gm_map;
+    volume<float> pv_wm_map;
     int kernel;
-    kernel = opts.kernel.value(); // default kernel size is 5
     volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
-    string pvout_file_name; // partial volume corrected output file name
-    pvout_file_name = opts.pvout_file.value();
+    // Read partial volume map and kernel size
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set() && opts.kernel.set()) {
+      read_volume(pv_gm_map, opts.pv_gm_file.value());
+      read_volume(pv_wm_map, opts.pv_wm_file.value());
+      kernel = opts.kernel.value();
+    }
+
+    // PAR REC to Nifti file conversion variables
+    string file_type_par = ".PAR";
+    string file_type_rec = ".REC";
+    string file_par;
+    string file_rec;
+
+    int x_dim = 64, y_dim = 64, z_dim = 15; // ASL file single repeat
+    int phases = 7; // total number of phases
+    int shifts = 2; // whether increasing sampling rate
+    int repeats = 2; // total number of repeats in each TI (cardiac phase)
+    int tc_pairs = 2; // tag-control pairs
+    int tis = 11; // total number of TIs in each phase, this is represented by cardiac phase in PAR file
+    int t_dim = tis * phases * shifts * repeats * tc_pairs;
+    //int x_dim = 288, y_dim = 288, z_dim = 245, t_dim = 1; // Structure file
+    volume4D<float> data_nifti(x_dim, y_dim, z_dim, t_dim);
+    volume<float> mask_nifti(x_dim, y_dim, z_dim);
+
+    // Extrapolation variables
+    //volume<float> pv_gm_map;
+    //volume<float> pv_wm_map;
+    volume4D<float> data_extrapolated(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    // Extrapolation options
+    int neighbour_size;
+    if (opts.extrapolate_option.value()) {
+      // Get the neighbourhood size
+      neighbour_size = opts.neighbour.value();
+      //cout << neighbour_size << endl;
+    }
+
+    //string file_path_full;
+    if(opts.par_rec_to_nifti_option.value()) {
+      // File name manipulation
+      file_par = opts.datafile.value() + file_type_par;
+      file_rec = opts.datafile.value() + file_type_rec;
+
+      // Display dimension of the output file
+      cout << "x: " << x_dim << " y: " << y_dim << " z: " << z_dim << " t: " << t_dim << endl;
+
+    }
+    else {
+      // do nothing at the moment
+    }
+
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
@@ -92,7 +143,7 @@ int main(int argc, char *argv[])
     mask.setdims(data.xdim(),data.ydim(),data.zdim());
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
-
+    
     Matrix datamtx;
     datamtx = data.matrix(mask);
     int nvox=datamtx.Ncols();
@@ -130,44 +181,46 @@ int main(int argc, char *argv[])
     // int idx;
     
     if (opts.splitpairs.value() && opts.tcdiff.value()) {
-	// doesn't make sense to try and do both splitpairs and tcdifference
-	throw Exception("Cannot both split the pairs and difference them");
-      }
-
-
-  if (opts.splitpairs.value()) {
-    // need to split the data here if plit pairs has been requested
-      separatepairs(asldata,asldataodd,asldataeven);
+    	// doesn't make sense to try and do both splitpairs and tcdifference
+    	throw Exception("Cannot both split the pairs and difference them");
     }
 
-      //tag control difference
-      if (opts.tcdiff.value()) {
-	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
-	//overwrite asldata with differenced data
-	for (int ti=0; ti<ntis; ti++) {
-	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
-	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
-	}
-	outpairs=false;
 
-
-	/*	for (int ti=0; ti<ntis; ti++) {
-	  Matrix oddmtx;
-	  oddmtx = asldata[ti].Row(1);
-	  Matrix evenmtx;
-	  evenmtx = asldata[ti].Row(2);
-	  for (int r=2; r<=nrpts; r++) {
-	    idx=(r-1)*2+1;
-	    oddmtx &= asldata[ti].Row(idx);
-	    evenmtx &= asldata[ti].Row(idx+1);
-	  }
-	  
-	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
-	  asldata[ti] = diffmtx;
-	  outpairs=false;
-	}
-	*/
+    if (opts.splitpairs.value()) {
+      // need to split the data here if plit pairs has been requested
+        separatepairs(asldata,asldataodd,asldataeven);
       }
+
+    //tag control difference
+    if (opts.tcdiff.value()) {
+    	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
+    	//overwrite asldata with differenced data
+    	for (int ti=0; ti<ntis; ti++) {
+    	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
+    	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    	}
+    	outpairs=false;
+
+
+    	/*	for (int ti=0; ti<ntis; ti++) {
+    	  Matrix oddmtx;
+    	  oddmtx = asldata[ti].Row(1);
+    	  Matrix evenmtx;
+    	  evenmtx = asldata[ti].Row(2);
+    	  for (int r=2; r<=nrpts; r++) {
+    	    idx=(r-1)*2+1;
+    	    oddmtx &= asldata[ti].Row(idx);
+    	    evenmtx &= asldata[ti].Row(idx+1);
+    	  }
+    	  
+    	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
+    	  asldata[ti] = diffmtx;
+    	  outpairs=false;
+    	}
+    	*/
+    }
+
+
 
 
     vector<Matrix> asldataout; //the data we are about to use for output purposes
@@ -179,11 +232,126 @@ int main(int argc, char *argv[])
       outpairs=false;
     }
 
+    if (opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+      nout = 2;
+    }
+
     // OUTPUT: Main output section - anything that is compatible with the splitting of pairs (splitpairs) can go in here
     for (int o=1; o<=nout; o++) {
       if(!opts.splitpairs.value()) asldataout=asldata;
       else if (o==1) { asldataout=asldataodd; fsub="_odd"; cout << "Dealing with odd members of pairs"<<endl;}
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
+
+      // Partial volume correction on each TI
+      if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+
+        // Check mask file is specified
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
+          cout << "Start partial volume correction" << endl;
+
+
+          // Convert asldataout to volume4D<float>
+          Matrix aslmatrix_non_pvcorr;
+          volume4D<float> asldata_non_pvcorr;
+          stdform2data(asldataout, aslmatrix_non_pvcorr, outblocked, outpairs);
+          asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
+
+          if(o == 1) {
+            cout << "Dealing with GM PV Correction" << endl;
+            fsub = "_gm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+          }
+
+          if(o == 2) {
+            cout << "Dealing with WM PV Correction" << endl;
+            fsub = "_wm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_wm_map, pv_gm_map, kernel, data_pvcorr);
+          }
+          // function to perform partial volume correction by linear regression
+          //pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+
+          //covert data_pvcorr to vector<Matrix> aka stdform 
+          Matrix data_pvcorr_mtx;
+          vector<Matrix> asldataout_pvcorr;
+          data_pvcorr_mtx = data_pvcorr.matrix(mask);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+          asldataout = asldataout_pvcorr;
+
+          //save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else if(!opts.maskfile.set()) {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.out.set()) {
+          throw Exception("Missing output file. --out=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
+        }
+      }
+
+      // PAR REC to NifTI file conversion
+      if(opts.par_rec_to_nifti_option.value()) {
+        cout << "PAR file is " + file_par << endl;
+        cout << "REC file is " + file_rec << endl;
+        cout << "Start file conversion..." << endl;
+
+        // Make a default mask
+        create_default_mask(mask_nifti);
+        // Make a default nifti file
+        create_default_data_nifti(data_nifti);
+        // Start file conversion
+        convert_par_rec_to_nifti(file_par, file_rec, mask_nifti, data_nifti);
+
+        //covert data_pvcorr to vector<Matrix> aka stdform 
+        Matrix data_pvcorr_mtx;
+        vector<Matrix> asldataout_pvcorr;
+        data_pvcorr_mtx = data_nifti.matrix(mask_nifti);
+        ndata = data_nifti.tsize();
+        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+        asldataout = asldataout_pvcorr;
+        mask = mask_nifti;
+
+      }
+
+      // Extrapolation options
+      if (opts.extrapolate_option.value()) {
+        // Check mask and input file
+        if(opts.maskfile.set()) {
+          cout << "Start extrapolation!" << endl;
+
+              //volume<float> pv_gm_map;
+              //volume<float> pv_wm_map;
+              //int kernel;
+              //volume4D<float> data_pvcorr
+
+          // Define a matrix 
+          Matrix aslmatrix_non_extrapolated;
+          volume4D<float> asldata_non_extrapolated;
+          stdform2data(asldataout, aslmatrix_non_extrapolated, outblocked, outpairs);
+          asldata_non_extrapolated.setmatrix(aslmatrix_non_extrapolated, mask);
+
+          // Perform extrapolation
+          extrapolate(asldata_non_extrapolated, ndata, mask, neighbour_size, data_extrapolated);
+          //pvcorr_LR(asldata_non_extrapolated, ndata, mask, neighbour_size, data_extrapolated);
+
+
+          Matrix data_extrapolated_mtx;
+          vector<Matrix> asldataout_extrapolated;
+          data_extrapolated_mtx = data_extrapolated.matrix(mask);
+          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, isblocked, ispairs);
+          asldataout = asldataout_extrapolated;
+        }
+
+        else {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+      }
 
       //output data
       if (opts.out.set()) {
@@ -211,31 +379,6 @@ int main(int argc, char *argv[])
       //split data into separate file for each TI
       if (opts.splitout.set()) {
         splitout(asldataout,mask,opts.splitout.value()+fsub);
-      }
-
-      // Partial volume correction on each TI
-      if(opts.pvfile.set()) {
-
-        // Check mask file is specified
-        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.pvout_file.set()) )  {
-          cout << "Start partial volume correction" << endl;
-          // function to perform partial volume correction by linear regression
-          pvcorr_LR(data, ndata, mask, pvmap, kernel, data_pvcorr);
-          save_volume4D(data_pvcorr, pvout_file_name);
-          cout << "Partial volume correction done!" << endl;
-        }
-        else if(!opts.maskfile.set()) {
-          throw Exception("Missing mask file. --mask=<mask file>");
-        }
-        else if(!opts.kernel.set()) {
-          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
-        }
-        else if(!opts.pvout_file.set()) {
-          throw Exception("Missing output file. --pvout=<output file name>");
-        }
-        else {
-          throw Exception("Halt!");
-        }
       }
 
     //do epochwise output

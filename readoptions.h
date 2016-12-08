@@ -56,9 +56,18 @@ public:
   Option<string> aif;
 
   // Partial volume correction (linear regression method) parameters
-  Option<string> pvfile;
+  Option<string> pv_gm_file;
+  Option<string> pv_wm_file;
   Option<int> kernel;
-  Option<string> pvout_file;
+
+  // Covert PAR REC file to nifty format
+  Option<bool> par_rec_to_nifti_option;
+  //Option<string> par_rec_file_name; // file name for both PAR and REC (suppose they should have the same file name)
+
+  // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+  // Assumes an eroded brain
+  Option<bool> extrapolate_option;
+  Option<int> neighbour;
 
   void parse_command_line(int argc, char** argv);
 
@@ -155,14 +164,26 @@ help(string("-h,--help"), false,
       false,requires_argument),
 
     // Partial volume (linear regression) options
-    pvfile(string("--pvmap"), string(""), string("Partial volume map (GM, WM, or CSF)"),
+    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
       false, requires_argument),
-    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be integer between 3 and 9"),
+    pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
       false, requires_argument),
-    pvout_file(string("--pvout"), string(""), string("Partial volume output file name"),
+    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
       false, requires_argument),
 
+    // Covert PAR REC file to nifty format
+    par_rec_to_nifti_option(string("--parrec2nifti"), false, 
+      string("Option to convert PAR REC file to NIfTI format\n"), 
+      false, no_argument),
+    //par_rec_file_name(string("--parrec"), string(""), string("PAR REC file name without file type (assume they have the same file name)"), false, requires_argument),
 
+    // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+    // Assumes an eroded brain
+    extrapolate_option(string("--extrapolate"), false, 
+      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
+      false, no_argument),
+    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
 
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
       try {
@@ -193,9 +214,15 @@ help(string("-h,--help"), false,
        options.add(deconvout);
        options.add(aif);
 
-       options.add(pvfile);
+       options.add(pv_gm_file);
+       options.add(pv_wm_file);
        options.add(kernel);
-       options.add(pvout_file);
+
+       options.add(par_rec_to_nifti_option);
+       //options.add(par_rec_file_name);
+
+       options.add(extrapolate_option);
+       options.add(neighbour);
 
      }
 
