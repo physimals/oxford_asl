@@ -4,7 +4,7 @@
 #
 # Michael Chappell, FMRIB Image Analysis Group & IBME
 #
-# Copyright (c) 2008-2013 University of Oxford
+# Copyright (c) 2008-2016 University of Oxford
 #
 # SHCOPYRIGHT
 
@@ -21,25 +21,23 @@ Usage() {
     echo " --wp      : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
     echo " --more     : see extended options and usage notes"
     echo ""
-    echo " Acquisition specific"
-    echo " --tis     : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
-    echo " --casl    : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
-    echo " --artsupp : Arterial suppression (vascular crushing) was used"
-    echo " --bolus   : Bolus duration - {default: 1}"
-    echo " --bat     : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
-    echo " --t1      : Tissue T1 value - {default: 1.3}"
-    echo " --t1b     : Blood T1 value - {default: 1.65}"
-    echo " --slicedt : Timing difference between slices - {default: 0}"
+    echo " Acquisition/Data specific"
+    echo " --iaf       : input ASl format: diff,tc,ct {default: diff}"
+    echo " --ibf       : input block format (for multi-TI): rpt,tis {default: rpt}"
+    echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
+    echo " --casl      : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
+    echo " --artsupp   : Arterial suppression (vascular crushing) was used"
+    echo " --bolus     : Bolus duration - {default: 1}"
+    echo " --bat       : Bolus arrival time - {default: 0.7 (pASL); 1.3 (cASL)}"
+    echo " --t1        : Tissue T1 value - {default: 1.3}"
+    echo " --t1b       : Blood T1 value - {default: 1.65}"
+    echo " --slicedt   : Timing difference between slices - {default: 0}"
+    echo " --sliceband : Number of slices per band in a multi-band setup - {default: n/a}."
     echo ""
     echo "Structural image (see also Registration)"
-    echo " -s          : structural image (already BETed)"
+    echo " -s          : structural image (whole head)"
+    echo " --sbrain      : structural image (already BETed)"
     echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
-    echo ""
-    echo " Output options"
-    echo " --vars     : also save the parameter estimated variances"
-    echo "  If structural image is supplied:"
-    echo " --report    : Report mean perfusion within a GM mask"
-    echo " --norm      : Output perfusion maps normalised by GM mean (sets --report)"
     echo ""
     echo " Calibration"
     echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
@@ -62,9 +60,6 @@ Usage_extended() {
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
-    echo " --exch       : Set exchange model {default: mix}"
-    echo "                 mix - well mixed (see Buxton 1998)"
-    echo "                 simple - no exchange, single T1 (see Alsop at al. 2014)"
     echo " --fulldata   : Never average multiple measurements at each TI"
     echo " --noiseprior : Use an informative prior for the noise estimation"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
@@ -74,10 +69,10 @@ Usage_extended() {
     echo "                (skips registration)"
     echo " --regfrom   : image to use a basis for registration (already BETed)"
     echo "               (must be same resolution as ASL data)"
-    echo " -t          : structural to standard space transformation matrix"
-    echo "               (requires structural image)"
-    echo " --structout : (also) save the maps in structural space (for use with -t)"
-    echo " -S          : standard brain image - {default: MNI152_T1_2mm}"
+#    echo " -t          : structural to standard space transformation matrix"
+#    echo "               (requires structural image)"
+#    echo " --structout : (also) save the maps in structural space (for use with -t)"
+#    echo " -S          : standard brain image - {default: MNI152_T1_2mm}"
     echo " -r          : low resolution structural image (already BETed)"
 
     echo " Calibration"
@@ -134,7 +129,7 @@ Usage_extended() {
 }
 
 Version() {
-echo "$Id: oxford_asl,v 1.41 2014/11/26 14:07:24 chappell Exp $"
+echo "$Id: oxford_asl,v 1.43 2015/08/07 14:43:52 chappell Exp $"
 exit 0
 }
 
@@ -203,31 +198,31 @@ fi
 }
 
 Report() {
-    if [ ! -z $report ]; then
-    # generate text reports on parameters - the parameter must have been output first for this to work
-    parname=$1
-    subdir=$2
-    masktype=$3
+    if [ ! -z $pvexist ]; then
+	# generate text reports on parameters - the parameter must have been output first for this to work
+	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
+	parname=$1
+	subdir=$2
+	masktype=$3
 
-    if [ ! -z $pvexist ]; then #NB e we only do this is the PVE are available (and thus the reqd masks will exist)
-	repval=`${FSLDIR}/bin/fslstats $outdir/$subdir/native_space/$parname -k $tempdir/${masktype}mask_pure -m`
-	echo $repval > $outdir/$subdir/${parname}_${masktype}_mean.txt
+	repval=`${FSLDIR}/bin/fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure -m`
+	echo $repval > $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
-    fi
 
     fi
 }
 
 Normalise() {
-    if [ ! -z $norm ]; then
-    # also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
-    parname=$1
-    subdir=$2
-    masktype=$3
-
-    # get normalization from reported value in the output directory
-    normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
-
+    if [ ! -z $pvexist ]; then
+	# also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
+	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
+	parname=$1
+	subdir=$2
+	masktype=$3
+	
+	# get normalization from reported value in the output directory
+	normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
+	
 	if [ ! -z $stdout ]; then
 	    fslmaths $outdir/std_space/$subdir/$parname -div $normval $outdir/std_space/$subdir/${parname}_norm 
 	fi
@@ -242,7 +237,7 @@ Normalise() {
 }
 
 Normalise_var() {
-    if [ ! -z $norm ]; then
+    if [ ! -z $pvexist ]; then
     # normalisaiton for a variance image
     parname=$1
     subdir=$2
@@ -271,8 +266,9 @@ Normalise_var() {
 
 Registration() {
 echo "Performing registration"
-regbase=$1 #the i/p to the function is the image to use as a base for registration
-extraoptions=""
+regbase=$1 #the i/p to the function is the image to use for registration
+transopt=$2 # other options to pass to asl_reg
+extraoptions=" "
 if [ ! -z $lowstrucflag ]; then
     extraoptions=$extraoptions"-r $tempdir/lowstruc"
 fi
@@ -280,24 +276,11 @@ if [ ! -z $debug ]; then
     extraoptions=$extraoptions" --debug"
 fi
 
-if [ ! -z $stdout ]; then
-# we have a struct2std transformation matrix to deal with
-transopt="-t $trans"
-fi
-
-#if [ ! -z $2 ]; then
-#    # use the BETed version of the structural image for registration
-#    # this is most approriate when we are using the perfusion image as the base (since there is no skull)
-#    Log "Using brain extracted structural as reference for registration"
-#    reg_struct=$tempdir/struc_bet
-#else
-#    Log "Using structural image as reference for registration"
-#    reg_struct=$tempdir/struc
+#if [ ! -z $reginit ]; then
+#    extraoptions=$extraoptions" -c $reginit"
 #fi
 
-reg_struct=$tempdir/struc
-
-$asl_reg -i $regbase -o $tempdir -s $reg_struct  $transopt $extraoptions
+$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
 }
 
 Calibration() {
@@ -393,9 +376,9 @@ $basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $basil_o
 
 # work out which is the final step from BASIL
 finalstep=`ls -d $2/basil/step? | sed -n '$ p'`
-echo "Using BASIL step $finalstep" >> $log
+Log "Using BASIL step $finalstep"
 
-# extract image from BASIL results (and throw away values below zero)
+# extract images from BASIL results (and throw away values below zero)
 fslmaths ${finalstep}/mean_ftiss -thr 0 $2/ftiss
 if [ ! -z $senscorr ]; then
 # sensitivity correction
@@ -413,16 +396,16 @@ if [ -z $artoff ]; then
     fi
 fi
 
-#Partial volume correction (3/3) - sort out basil results when PV corrected
+#Partial volume correction - sort out basil results when PV corrected
 if [ ! -z $pvcorr ]; then
-fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
-if [ ! -z $senscorr ]; then
-# sensitivity correction
-    fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
-fi
-if [ -z $fixbat ]; then
-    fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
-fi
+    fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
+    if [ ! -z $senscorr ]; then
+        # sensitivity correction
+	fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
+    fi
+    if [ -z $fixbat ]; then
+	fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
+    fi
 
 fi
 
@@ -473,7 +456,7 @@ if [ -z $artoff ]; then
 fi
 
 # white matter values
-if [ ! -z $pvcorr ]; then
+if [ $subdir = "pvcorr" ]; then
     Output ftisswm perfusion_wm $subdir
     Report perfusion_wm $subdir wm
     Normalise perfusion_wm $subdir wm
@@ -490,7 +473,7 @@ else
 fi
 
 # Masked results (PVcorr)
-if [ ! -z $pvcorr ]; then
+if [ $subdir = "pvcorr" ]; then
     OutputMasked perfusion $subdir gm
     OutputMasked perfusion_wm $subdir wm
     if [ -z $fixbat ]; then
@@ -521,7 +504,7 @@ if [ ! -z $calibflag ]; then
     Calibrate perfusion $malpha 6000 $subdir
     Report perfusion_calib $subdir gm
    
-    if [ ! -z $pvcorr ]; then
+    if [ $subdir = "pvcorr" ]; then
 	OutputMasked perfusion_calib $subdir gm
 	Calibrate perfusion_wm $malpha 6000 $subdir
 	Report perfusion_wm_calib $subdir wm
@@ -603,13 +586,17 @@ takeargs=0;
 	    takeargs=1;;
 	-i) inflag=1 infile=$argument #input/data file
 	    takeargs=1;;
+	--iaf) iaf=$argument # input asl format (asl_file syntax)
+	       takeargs=1;;
+	--ibf) ibf=$argument # input block format (asl_file syntax)
+	       takeargs=1;;
 	-c) calibflag=1 calib=$argument #calibration image
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
 	    ;;
 	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
-	--strucbet) strucbet=$argument # user supplied BETed structural
+	--sbrain) strucbet=$argument # user supplied BETed structural
 	    takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
@@ -629,10 +616,16 @@ takeargs=0;
 	    takeargs=1;;
 	--slicedt) slicedt=$argument
 	    takeargs=1;;
+	--sliceband) sliceband=$argument
+	    takeargs=1;;
+	--fa) fa=$argument
+	    takeargs=1;;
 	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
 	    takeargs=1;;
 	--t1b) t1bset=$argument
-	    takeargs=1;;
+	       takeargs=1;;
+	--t1im) t1im=$argument # A T1 (of tissue) image
+		takeargs=1;;
 	--noiseprior) noiseprior=1
 	    ;;
 	--noisesd) noisesd=$argument
@@ -675,8 +668,6 @@ takeargs=0;
 	    ;;
 	--structout) structout=1
 	    ;;
-	--vars) varout=1
-	    ;;
 	--advout) advout=1
 	    ;;
 	--spatial) spatial=1
@@ -692,7 +683,9 @@ takeargs=0;
 	--fixbolus) fixbolus=1
 	    ;;
 	--casl) casl=1
-	    ;;
+		;;
+	--disp) disp=$argument
+	    takeargs=1;;
 	--exch) exch=$argument
 	    takeargs=1;;
 	--pvcorr) pvcorr=1
@@ -703,14 +696,12 @@ takeargs=0;
 	    takeargs=1;;
 	--fulldata) fulldata=1
 	    ;;
-	--norm) norm=1; report=1 #note that if we want to normalize then we might as well report too
-	    ;;
-	--report) report=1
-	    ;;
 	--elen) epoch=1 elen=$argument
 	    takeargs=1;;
 	--eol) eol=$argument
-	    takeargs=1;;
+	       takeargs=1;;
+	--fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
+		;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -738,6 +729,7 @@ takeargs=0;
 done
 
 nativeout=1 #we always keep the native space images!!
+varout=1 # we always output the variance images
 
 if [ -z $verbose ]; then
     verbose=1
@@ -849,7 +841,6 @@ fi
 if [ ! -z $whitepaper ]; then
     Log "Analysis in white paper mode"
     t1set=1.65
-    exch=simple
     cmethod=voxel
     bat=0 # the white paper model ignores BAT
     # note that other things related to the model will be set by single TI mode below
@@ -860,13 +851,13 @@ echo "Pre-processing"
 if [ ! -z $struc ]; then
     ${FSLDIR}/bin/imcp $struc $tempdir/struc
     Log "Structural image is: $struc"
-#    if [ -z $strucbet ]; then
-#       #bet the structural for calibration and registration
-#	bet $struc $tempdir/struc_bet
-#	Log "BET on structural image"
-#    else
-#	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
-#    fi
+    if [ -z $strucbet ]; then
+       #bet the structural for calibration and registration
+	bet $struc $tempdir/struc_bet
+	Log "BET on structural image"
+    else
+	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
+    fi
 fi
 
 
@@ -876,6 +867,98 @@ if [ ! -z $lowstrucflag ]; then
 #    bet $lowstruc $tempdir/lowstruc_bet
 #    Log "BET on low res. structural image"
 fi
+
+### deal with TIs (as specified on the command line)
+count=0
+tislist=""
+thetis=`echo $tis | sed 's:,: :g'`
+#echo $thetis
+for ti in $thetis; do
+    count=`expr ${count} + 1`
+    tislist=`echo $tislist --ti${count}=$ti`
+    alltis[`expr ${count} - 1`]=$ti
+done
+Log "TIs list: $tislist"
+### End of: Deal with the TIs
+
+### label-control subtraction
+# We get data into correct block format for BASIL here
+if [ -z $iaf ]; then
+    # DEFAULT input ASL format is 'diff' (label-control difference data) - maintains backward compatibility
+    iaf="diff"
+fi
+Log "Input ASL format is: $iaf"
+if [ -z $ibf ]; then
+    # DEFAULT input block format is 'rpt' (data is as typically acquired) - maintains backward compatibility
+    ibf="rpt"
+fi
+Log "Input block format is: $ibf"
+
+if [ $iaf = 'diff' ]; then
+    # make sure the block format is correct for BASIL
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    Log "Label-control difference data provided: $infile"
+    imcp $infile $tempdir/diffdata
+else
+    # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
+    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
+    # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
+    #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
+
+    if [ -z $regfrom ]; then
+	# take mean over all volumes as an option to use for (initial) registration and masking
+	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
+	# brain extract this
+	${FSLDIR}/bin/bet $tempdir/asldata_mean $tempdir/asldata_mean_brain -f 0.2
+	regfrom=$tempdir/asldata_mean_brain
+    fi
+fi
+### End of : Label-control subtraction
+
+### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
+tpoints=`fslinfo $tempdir/diffdata | grep "^dim4" | sed 's:dim4[ ]*::'`
+repeats=`expr $tpoints / $count`
+
+echo "Number of inversion times: $count"
+echo "Number of timepoints in data: $tpoints"
+echo "Number of repeats in data: $repeats"
+### End of: Establish number of repeats
+
+# Single or Multi TI setup
+if [ $count -lt 2 ]; then
+# single TI data - dont average send to BASIL as-is (helps with noise estimation)
+    Log "Single TI data to be passed to BASIL"
+    datafile=$tempdir/diffdata
+    # OPERATE in 'single TI mode'
+    artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
+    Log "Operating in Single TI mode"
+    
+elif [ $repeats -gt 1 ]; then
+    if [ -z $fulldata ]; then
+        # take the mean over the TIs for faster analysis
+	Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
+	datafile=$tempdir/diffdata_mean
+	repeats=1
+    else
+	Log "Multi TI data, all data passed to BASIL for analysis"
+        datafile=$tempdir/diffdata
+    fi
+else
+    # if there is only one repeat it just gets passed stright to BASIL
+    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
+    datafile=$tempdir/diffdata
+fi
+
+# finish filling the alltis array - after we have decided whether we are using all the repeats or not
+for ((r=1; r<$repeats; r++)); do
+    for ((i=0; i<$count; i++)); do
+	idx=`expr $r \* $count + $i`
+	alltis[$idx]=${alltis[$i]}
+    done
+done
+echo ${alltis[*]}
+Log `echo ${alltis[*]}`
 
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
@@ -897,39 +980,9 @@ fi
 # take mean of the asl data as we might need this later
 fslmaths $infile -Tmean $tempdir/meanasl
 
-# sort out the mask for processing the data
-if [ -z $mask ]; then
-echo "Creating mask"
-Log "Automatic mask generation"
-# preferred option is to use the regfrom image (should already be BETed)
-if [ ! -z $regfrom ]; then
-    fslmaths $regfrom -bin $tempdir/mask
-    Log "Mask generated from regfrom image"
-# next option is to use betted version of mean M0 calib image as mask
-elif [ ! -z $calib ]; then
-    bet $tempdir/calib $tempdir/calib_bet -f 0.2 
-    fslmaths $tempdir/calib_bet -bin $tempdir/mask
-    Log "Mask generated from calibration image (post BET)"
- # use the low resolution strucutral image to create mask (ahould already be BETed)
-elif [ ! -z $lowstrucflag ]; then
- # resample
-    flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $infile
- # make binary
-    fslmaths $tempdir/mask -bin $tempdir/mask
-    Log "Mask generated from low res. structural"
-# otherwise just use mean time series
-else
-    bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
-    fslmaths $tempdir/meanasl -bin $tempdir/mask
-    Log "Mask generated from mean time series"
-fi
-else
-# mask has been supplied
-    fslmaths $mask -bin $tempdir/mask # just to be sure binarise the mask here
-    Log "Using mask: $mask"
-fi
-
-# Registration (1/2)
+### Registration (1/2)
+# Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
+# only 'initial' step in asl_reg is used here
 register=0
 if [ ! -z $strucflag ]; then # if structural image has not been suppled then skip the registration
     register=1
@@ -937,94 +990,100 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 	register=0
 	Log "Using existing asl to structural transform: $asl2struc"
 	cp $asl2struc $tempdir/asl2struct.mat
+	${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     fi
 fi
 
 if [ -z $regfrom ]; then
 # no regfrom iamge supplied so we will use the mean of the asl timeseries
-    regfrom=$tempdir/meanasl
+# NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
+    # brain extract the meanasl image
+    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+    regfrom=$tempdir/meanasl_brain
 fi
 
 if [ $register -eq 1 ]; then
-# registration here if we are using an image provided (in case we need it for PV correction)
+# registration here using asl_reg (inital only)
     if [ ! -z $regfrom ]; then
 	Log "Performing registration"
-	Log "Using $regfrom as base for registration"
-	Registration $regfrom
-    fi
-fi
+	Log "Using $regfrom as base for inital registration"
 
-if [ ! -z $pvgm ]; then
-    #using supplied PV images
-	Log "Loading supplied PV images"
-	if [ -z $pvwm ]; then
-	    echo "ERROR: no WM PV image has been supplied"
+	extraoptions="--mainonly " # to ensure we only do the initil flirt part
+	if [ ! -z $lowstrucflag ]; then
+	    extraoptions=$extraoptions"-r $tempdir/lowstruc"
 	fi
-	Log "PV GM is: $pvgm"
-	${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
-	Log "PV WM is: $pvwm"
-	${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
-	pvexist=1
-fi
 
-# Segmentation of structural image
-if [ ! -z $pvcorr ] || [ ! -z $norm ] || [ ! -z $report ] || [ ! -z $needseg ]; then
-if [ -z $pvgm ]; then
-    # if we have structural image and we need PVE, then do segmentation and prepare GM and WM masks, unless these have been supplied separately
-    echo "Segmenting the structural image"
-    if [ -z $strucflag ]; then
-	echo "ERROR: Normalization/Reporting/PV correction cannot be performed without a structural image"
-	exit 1
+	Registration $regfrom $extraoptions
     fi
-    Log "Estimating partial volumes from structural image"
-    ${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc
-    
-        # invert the transformation matrix
     ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
-    
-        # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-        # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
-# threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
-    pvexist=1
+fi
+### End of: Registration (1/2)
 
+### Segmentation of structural image
+# Always do this if structural has been provided
+if [ ! -z $struc ]; then
+    echo "Segmenting the structural image"
+    Log "Segmenting the structural image"
+    ${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+    
     #other things from the FAST output
     fasthasrun=1 #this means that we have CSF PVE for calibration purposes
+
+    # create a tissseg (wmseg) image for BBR in asl_reg
+    $FSLDIR/bin/fslmaths $tempdir/seg_pve_2 -thr 0.5 -bin ${tempdir}/tissseg
+
     # transform the bias field and invert to use for sensitivity correction in calibration
     ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_bias --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
 
     if [ ! -z $senscorr ]; then
 	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
     fi
-    
 fi
+### End of: Segmentation
+
+### Generate mask for ASL data
+# sort out the mask for processing the data
+if [ -z $mask ]; then
+echo "Creating mask"
+Log "Automatic mask generation"
+# preferred option is to use brain extracted structural
+if [ ! -z $struc ]; then
+    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
+# otherwise use the regfrom image (should already be BETed) - note that regfrom may have been set in the Registration (1/2) section.
+elif [ ! -z $regfrom ]; then
+    ${FSLDIR}/bin/fslmaths $regfrom -bin $tempdir/mask
+    Log "Mask generated from regfrom image: $regfrom"
+# next option is to use betted version of mean M0 calib image as mask
+elif [ ! -z $calib ]; then
+    ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib_bet -f 0.2 
+    ${FSLDIR}/bin/fslmaths $tempdir/calib_bet -bin $tempdir/mask
+    Log "Mask generated from calibration image (post BET)"
+ # use the low resolution strucutral image to create mask (ahould already be BETed)
+elif [ ! -z $lowstrucflag ]; then
+ # resample
+    ${FSLDIR}/bin/flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $infile
+ # make binary
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -bin $tempdir/mask
+    Log "Mask generated from low res. structural"
+# otherwise just use mean time series
+else
+    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
+    ${FSLDIR}/bin/fslmaths $tempdir/meanasl -bin $tempdir/mask
+    Log "Mask generated from mean time series"
 fi
+else
+# mask has been supplied
+    fslmaths $mask -bin $tempdir/mask # just to be sure binarise the mask here
+    Log "Using mask: $mask"
+fi
+### End of: Generate mask
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
     ${FSLDIR}/bin/imcp $isen $outdir/native_space/sensitivity
-fi
-
-if [ ! -z $pvexist ]; then
-# make some masks 
-# these are currently used for masking after model fitting
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
-# these are for calculating mean perfusion within tissue types
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
-fi
-
-#  - Partial volume correction (1/3) - setup the PV images
-# a cehck at this point as to wehther PV correction will be feasible
-if [ ! -z $pvcorr ]; then
-    if [ `$FSLDIR/bin/imtest $tempdir/pvgm_inasl` -eq 0 ]; then
-	echo "ERROR: PV correction cannot be performed without either a structural image or supplied PVE"
-	exit 1
-    fi
 fi
 
 # Defaults for (some) parameters
@@ -1097,80 +1156,25 @@ if [ ! -z $calib ]; then
 	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
 	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
 	fi
+
+	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
+	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
     else
 	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 
 elif [ ! -z $M0 ]; then
     # An M0 value has been supplied, use this
+    cmethod=single # we are in 'single' mode as a single value has been supplied
     Mo=$M0
     echo "M0: $Mo"
     Log "Using supplied M0 value: $Mo"
 fi
-
-#deal with TIs
-count=0
-tislist=""
-thetis=`echo $tis | sed 's:,: :g'`
-#echo $thetis
-for ti in $thetis; do
-    count=`expr ${count} + 1`
-    tislist=`echo $tislist --ti${count}=$ti`
-    alltis[`expr ${count} - 1`]=$ti
-done
-Log "TIs list: $tislist"
-
-#deal with repeats
-tpoints=`fslinfo $infile | grep "^dim4" | sed 's:dim4[ ]*::'`
-repeats=`expr $tpoints / $count`
-
-echo "Number of inversion times: $count"
-echo "Number of timepoints in data: $tpoints"
-echo "Number of repeats in data: $repeats"
-
-
-# finish filling the alltis array
-for ((r=1; r<$repeats; r++)); do
-    for ((i=0; i<$count; i++)); do
-	idx=`expr $r \* $count + $i`
-	alltis[$idx]=${alltis[$i]}
-    done
-done
-
-echo ${alltis[*]}
 
 #deal with bolus
 if [ -z $boluset ]; then
     boluslen=1;
 fi
 Log "Bolus duration: $boluslen"
-
-
-# the data should come in 'as acquired' which we assume is blocks of all TIs
-# However, this is not the form required by BASIL (blocks of TIs)
-if [ $count -lt 2 ]; then
-# single TI data - dont average send to basil as-is (helps with noise estimation)
-    Log "Single TI data to be passed to BASIL"
-    datafile=$infile
-    # OPERATE in 'single TI mode'
-    artoff=1; fixbolus=1; fixbat=1; #fast=1; 
-    Log "Operating in Single TI mode"
-elif [ $repeats -gt 1 ]; then
-     # use asl_file to get data into the correct format for basil/fabber
-    if [ -z $fulldata ]; then
-        # take the mean over the TIs for faster analysis
-	echo " Multi TI data, mean is being taken at each TI to pass to BASIL" >> $log
-	asl_file --data=$infile --ntis=$count --ibf=rpt --iaf=diff --mean=$tempdir/data
-	repeats=1
-    else
-        # just re-arrange data but keep all repeats
-	asl_file --data=infile --ntis=$count --ibf=rpt --iaf=diff --obf=tis --out=$tempdir/data
-    fi
-    datafile=$tempdir/data
-else
-    # if there is only one repeat we can take the data as it comes for the full analysis
-    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
-    datafile=$infile
-fi
 
 #pre-processing for epochwise analysis
 # separate data into epochs here
@@ -1187,12 +1191,14 @@ fi
 echo "Setting up BASIL"
 Log "BASIL setup"
 
-# Partial volume correction (2/3) - instructions for basil
-if [ ! -z $pvcorr ]; then
-    basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
-fi
-
+# T1 values
 echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
+
+if [ ! -z $t1im ]; then
+    basil_options=$basil_options"--t1im=$t1im "
+    #echo "--t1im=$t1im" >> $tempdir/basil_options.txt
+    Log "Using supplied T1 (tissue) image in BASIL: $t1im"
+fi
 
 # data acquired using CASL?
 if [ ! -z $casl ]; then
@@ -1209,6 +1215,18 @@ echo "--tau=$boluslen" >> $tempdir/basil_options.txt
 if [ ! -z $slicedt ]; then
     echo "--slicedt=$slicedt" >> $tempdir/basil_options.txt
     Log "Slice timing correction with delta: $slicedt"
+fi
+
+# Flip anlge for look-locker readout
+if [ ! -z $fa ]; then
+    echo "--FA=$fa" >> $tempdir/basil_options.txt
+    Log "Flip angle (look-locker readout): $fa"
+fi
+
+# Multi-band setup (if not set then this is ignored)
+if [ ! -z $sliceband ]; then
+    echo "--sliceband=$sliceband" >> $tempdir/basil_options.txt
+    Log "Multi-band setup with number of slices per band: $slicedband"
 fi
 
 # Infer arterial component?
@@ -1287,10 +1305,17 @@ if [ ! -z $infert1 ]; then
     Log "Including T1 uncertainty"
 fi
 
+
 if [ ! -z $exch ]; then
     # use a specific exchange model in BASIL
     Log "Using exchange model: $exch"
     basil_options=$basil_options"--exch=$exch "
+fi
+
+if [ ! -z $disp ]; then
+    # use a specific dispersion model in BASIL
+    Log "Using dispersion model: $disp"
+    basil_options=$basil_options"--disp=$disp "
 fi
 
 if [ ! -z $devel ]; then
@@ -1305,26 +1330,110 @@ Log "----"
 
 cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of the core options accumulated thus far (we might need these again for the epoch analysis)
 
-# Analyse data using BASIL
-#if [ -z $epoch ]; then
-# normal single analysis of data
+
+##### Analyse data using BASIL
+### First analysis on whole data, normal perfusion image
 echo "--repeats=$repeats" >> $tempdir/basil_options.txt
 echo "$tislist" >> $tempdir/basil_options.txt
 
-echo "Calling BASIL on data"
+echo "Calling BASIL on data - conventional perusion image"
 Dobasil $datafile $tempdir
+### End of: First analysis on whole data
 
+### Registration (2/2)
+# Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
+# use existing registration for initial aligment
+if [ $register -eq 1 ]; then 
+    echo "Performing final registration"
+    Log "Final registration"
+    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat
+    Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+fi
+### End of: Registration (2/2)
+
+### Partial Volume Estimates
+# Note we do this here since we have the final registration now which we need to transform PV estimates into ASL space
+if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
+    # PVE in ASL space from strcutural segmentation results
+    # invert the transformation matrix
+    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    
+    # Gray matter - assume this will be PVE 1
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # white matter  - assume this will be PVE 2
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
+    pvexist=1
+fi
+
+if [ ! -z $pvgm ]; then
+    #using supplied PV images
+	Log "Loading supplied PV images"
+	if [ -z $pvwm ]; then
+	    echo "ERROR: no WM PV image has been supplied"
+	fi
+	Log "PV GM is: $pvgm"
+	${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
+	Log "PV WM is: $pvwm"
+	${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
+	pvexist=1
+fi
+
+if [ ! -z $pvexist ]; then
+    # make some masks 
+    # these are currently used for masking after model fitting
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+    # these are for calculating mean perfusion within tissue types
+    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
+    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+fi
+### End of: Partial Volume Estimates
+
+### Output main BASIL results
+# Note we do this here, as we have the registration done and masks created
+Dooutput
+
+# save the mask used to the (native space) output directory
+${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask
+### End of: Output main BASIL results
+
+### Partial Volume Correction BASIL
+if [ ! -z $pvcorr ]; then
+    # redo the mask now that we have a better registration - as this might matter for PV correction
+    # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
+    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
+    ${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
+
+    # intructions for BASIL
+    basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
+    mkdir $tempdir/pvcorr
+    cp $tempdir/basil_options.txt $tempdir/pvcorr/basil_options.txt #Dobasil expects the options file to be in the subdirectory
+    # Run BASIL
+    Dobasil $datafile $tempdir/pvcorr
+
+    #output the results
+    Dooutput pvcorr
+fi
+### End of: Partial Volume Correction
+
+### Epoch BASIL
 if [ ! -z $epoch ]; then
-# epochwise analysis
-echo "Epochwise analysis"
+    # epochwise analysis
+    echo "Epochwise analysis"
 
-#genereate a list of epochs
-currdir=`pwd`
-cd $tempdir
-epochlist=`imglob epoch*`
-cd $currdir
+    #genereate a list of epochs
+    currdir=`pwd`
+    cd $tempdir
+    epochlist=`imglob epoch*`
+    cd $currdir
 
-ecount=0
+    ecount=0
     for e in $epochlist; do
 	Log "Processing epoch: $e"
 	etislist=""
@@ -1347,24 +1456,16 @@ ecount=0
 	
 	Dobasil $tempdir/$e $tempdir/$e
 
+        #output 
+	Log "Saving results from epoch: $e"
+	Dooutput $e
+
 	ecount=`expr $ecount + 1`
     done
-
-# produce an ftiss image to use for registration - mean of all the ftiss images over the epochs
-#fslmerge -t  $tempdir/ftiss `ls $tempdir/epoch*/ftiss.nii.gz`
 fi
+### End of: Epoch BASIL
 
-# Registration (2/2)
-# NOTE: this is currently redundant as we always do registration earlier (using the mean timeseries if necessary)
-#if [ $register -eq 1 ]; then 
-## registration occurs here if we are using the estimated CBF as base
-#    if [ -z $regfromflag ]; then
-##use CBF map as base for registration
-#	echo "Performing registration"
-#	Log "Using estimated CBF as base for regstration"
-#	Registration $tempdir/ftiss 1
-#    fi
-#fi
+
 
 #OUTPUTS
 # Setup option outputs - anything that would be common to all epochs
@@ -1380,19 +1481,18 @@ fi
 
 #if [ -z $epoch ]; then
 # normal single analysis of data
-Dooutput
+#Dooutput
 
-if [ ! -z $epoch ]; then
+##if [ ! -z $epoch ]; then
 # epochwise analysis
-    for e in $epochlist; do
-	Log "Saving results from epoch: $e"
-	Dooutput $e
-    done
-fi
+#    for e in $epochlist; do
+#	Log "Saving results from epoch: $e"
+#	Dooutput $e
+ #   done
+#fi
 
 
-# save the mask used to the (native space) output directory
-${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask
+
 
 if [ ! -z $pvcorr ]; then
 # copy PVE in ASL space to output directory
@@ -1410,7 +1510,7 @@ fi
 
 # clearup
 if [ ! -z $debug ]; then
-    mv $tempdir .
+    mv $tempdir $outdir
 else
     rm -r $tempdir
 fi

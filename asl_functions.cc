@@ -12,7 +12,7 @@
 
 namespace OXASL {
 
-  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs) {
+  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs, bool blockpairs) {
     int nvox=datamtx.Ncols();
     int nmeas=datamtx.Nrows()/ntis;
     int nrpts;
@@ -32,8 +32,17 @@ namespace OXASL {
 	    for (int i=1; i<=nrpts; i++)
 	      {
 		if (ispairs) {
-		  thisti.Row(2*i-1) = datamtx.Row(2*(i-1)*ntis+2*ti-1);
-		  thisti.Row(2*i) = datamtx.Row(2*(i-1)*ntis+2*ti);
+		  if (blockpairs) {
+		    //we get all the tags for this repeat then all the controls (or vice versa)
+		    thisti.Row(i) = datamtx.Row(2*(i-1)*ntis+ti);
+		    thisti.Row(i+nrpts) = datamtx.Row(2*(i-1)*ntis+ntis+ti);
+		    // NOTE that we keep it internally in blockpair format
+		  }
+		  else {
+		    //tag controla pairs are adjacent volumes
+		    thisti.Row(2*i-1) = datamtx.Row(2*(i-1)*ntis+2*ti-1);
+		    thisti.Row(2*i) = datamtx.Row(2*(i-1)*ntis+2*ti);
+		  }
 		}
 		else {
 		  thisti.Row(i) = datamtx.Row((i-1)*ntis+ti);
@@ -122,7 +131,7 @@ namespace OXASL {
     }
   }
 
-  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven) {
+  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven, bool blockpairs) {
     int ntis = asldata.size();
     int nmeas = asldata[0].Nrows();
     int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
@@ -132,12 +141,23 @@ namespace OXASL {
     asldataeven.clear();
 
     int idx;
-
+    
     for (int ti=0; ti<ntis; ti++) {
+      
+      Matrix oddmtx;
+     
+      Matrix evenmtx;
+     
 
-	Matrix oddmtx;
+      if (blockpairs) {
+	// data is in the form of a block of all tag (control) followed by a block of control (tag)
+	oddmtx = asldata[ti].Rows(1,nrpts);
+	evenmtx = asldata[ti].Rows(nrpts+1,nmeas);
+	
+      }
+      else {
+	// data is in the form of adjacent tag control pairs
 	oddmtx = asldata[ti].Row(1);
-	Matrix evenmtx;
 	evenmtx = asldata[ti].Row(2);
 
 	for (int r=2; r<=nrpts; r++) {
@@ -145,10 +165,13 @@ namespace OXASL {
 	  oddmtx &= asldata[ti].Row(idx);
 	  evenmtx &= asldata[ti].Row(idx+1);
 	}
-	asldataodd.push_back(oddmtx);
-	asldataeven.push_back(evenmtx);
       }
+	
+      asldataodd.push_back(oddmtx);
+      asldataeven.push_back(evenmtx);
+    }
   }
+
 
   void mergepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>&asldataeven) {
     int ntis = asldataodd.size();
@@ -190,7 +213,7 @@ namespace OXASL {
 	//need to preserve pairs in the data - separate
 	vector<Matrix> asldataodd;
 	vector<Matrix> asldataeven;
-	separatepairs(asldata,asldataodd,asldataeven);
+	separatepairs(asldata,asldataodd,asldataeven,false);
 
 	//take mean of odds and evens
 	vector<Matrix> meanodd;
@@ -309,7 +332,7 @@ namespace OXASL {
       //need to preserve pairs in the data - separate
       vector<Matrix> asldataodd;
       vector<Matrix> asldataeven;
-      separatepairs(asldata,asldataodd,asldataeven);
+      separatepairs(asldata,asldataodd,asldataeven,false);
 
       vector<Matrix> oddepochs;
       if (!tiunit) {

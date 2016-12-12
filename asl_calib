@@ -43,6 +43,7 @@ Usage() {
     echo " --t2r      : T2(*) of reference tissue (defaults T2/T2*: csf 750/400, gm 100/60,  wm 50/50  ms)"
     echo " --t2b      : T2(*) of blood (default T2/T2*: 150/50 ms)"
     echo " --pc       : Partition co-efficient (defaults csf 1.15, gm 0.98,  wm 0.82)"
+    echo " --alpha    : Specify inversion efficiency - only applied to final CBF image calculation"
     echo ""
     echo " CSF masking options (only for --tissref csf)"
     echo "  By default asl_calib extracts CSF from the structural image by segmentation and"
@@ -65,6 +66,7 @@ Usage() {
     echo "   >> Look-Locker flip angle correction - to perform this provide:"
     echo " {--lfa}     : Lower flip angle (in degrees) for dual FA calibration"
     echo " {--nphases} : Number of phases (repetitions) of higher FA"
+    echo " {--fixa}    : Fix the saturation efficiency to 100% (useful if you have a low number of samples)"
     echo ""
     echo "Coil sensitivity correction:"
     echo " Calculate and apply a voxel-wise correction for coil sensitivity"
@@ -80,7 +82,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: asl_calib,v 1.26 2015/02/04 17:34:31 chappell Exp $"
+echo "$Id: asl_calib,v 1.27 2015/08/07 14:43:52 chappell Exp $"
 exit 0
 }
 
@@ -122,7 +124,9 @@ until [ -z $1 ]; do
 	--t2star) t2star=1
 	    ;;
 	--pc) pcin=$2
-	    shift;;
+	      shift;;
+	--alpha) alpha=$2
+		 shift;;
 	--tis) tis=$2
 	    shift;;
 	-m) maskflag=1 mask=$2
@@ -159,6 +163,8 @@ until [ -z $1 ]; do
 	    shift;;
 	--nphases) nphases=$2
 	    shift;;
+	--fixa) fixa=1
+	    ;;
 	--devel) devel=1
 	    ;;
 	--debug) debug=1
@@ -263,7 +269,7 @@ T2gm=100
 T1wm=1.0
 T2wm=50
 
-T2b=150
+T2b=150 # lu et a. 2012 MRM 67:42-49 have 154ms at 3T during normoxia
 
 # partition coeffs
 # based on Herscovitch and Raichle 1985
@@ -305,12 +311,24 @@ echo "Tissue reference : $tissref" >> $log
 
 # command line override of default T1 and T2
 if [ ! -z $T1rin ]; then
-    T1r=$T1rin
-    echo "Setting T1r from command line: $T1r" >> $log
+    if [ `${FSLDIR}/bin/imtest $T1rin` ]; then
+	# we have been supplied with a T1 image - record that here to process later
+	T1rim=$T1rin
+	echo "Loading T1 image for reference region: T1im" >> $log
+    else
+	T1r=$T1rin
+	echo "Setting T1r from command line: $T1r" >> $log
+    fi
 fi
 if [ ! -z $T2rin ]; then
-    T2r=$T2rin
-    echo "Setting T2r from command line: $T2r" >> $log
+    if [ `${FSLDIR}/bin/imtest $T2rin` ]; then
+	# we have been supplied with a T2 image - record that here to process later
+	T2rim=$T2rin
+	echo "Loading T2 image for reference region: T2im" >> $log
+    else
+	T2r=$T2rin
+	echo "Setting T2r from command line: $T2r" >> $log
+    fi
 fi
 if [ ! -z $T2bin ]; then
     T2b=$T2bin
@@ -527,6 +545,8 @@ if [ "$nzvox" -lt 1 ]; then
 fi
 mask=$temp_calib/refmask
 
+# ----
+
 if [ $mode = longtr ]; then
     echo "MODE: longtr" >> $log
 # Calibration data is a long TR acquisition - all we need to do here is take the mean 
@@ -550,7 +570,23 @@ if [ $mode = longtr ]; then
     fi
 
     #mask M0 map with tissue reference
-    fslmaths $temp_calib/calib -mas $mask $temp_calib/calib
+   fslmaths $temp_calib/calib -mas $mask $temp_calib/calib
+
+   # calcualte T1 of reference region (if a T1 image has been supplied)
+   if [ ! -z $T1rim ]; then
+       fslmaths $T1rim -mas $mask $temp_calib/T1r
+       T1r=`fslstats $temp_calib/T1r -M`
+       echo "Calculated T1 of reference tissue: $T1r"
+       echo "Calculated T1 of reference tissue: $T1r" >> $log
+   fi
+
+   # calcualte T2 of reference region (if a T2 image has been supplied)
+   if [ ! -z $T2rim ]; then
+       fslmaths $T2rim -mas $mask $temp_calib/T2r
+       T2r=`fslstats $temp_calib/T2r -M`
+       echo "Calculated T2 of reference tissue: $T2r"
+       echo "Calculated T2 of reference tissue: $T2r" >> $log
+   fi
 
     # calculate M0_ref value
     Moval=`fslstats $temp_calib/calib -M` # this is Mz of CSF
@@ -578,8 +614,7 @@ elif [ $mode = satrecov ]; then
     done
     echo "TIs: tislist" >> $log
 
-# Extra options for Look Locker
-
+    # Extra options for Look Locker
     if [ ! -z $fa ]; then
 	llopts="--FA=$fa"
 	if [ ! -z $nphases ]; then
@@ -591,14 +626,23 @@ elif [ $mode = satrecov ]; then
     fi
     echo "Look-Locker options: $llopts" >> $log
 
+    # Extra sat recovery options
+    if [ ! -z $fixa ]; then
+	sropts="--fixa"
+    fi
+    echo "Extra saturation recovery options: $sropts" >> $log
+
     # do fabber within the tissue reference mask with a sensible T1 prior mean
     if [ ! -z $senson ]; then
 	echo "Apply sensitivity image to data for reference tisse M0 estimation" >> $log
         # apply sensitivity map to calibration image - ONLY for the reference tissue calculations
-	fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
+	${FSLDIR}/bin/fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
+    else
+	# no sensitivity correction required, but copy image over ready for next command
+	${FSLDIR}/bin/imcp $calib $temp_calib/calib_senscorr
     fi
     echo "FABBER within reference tissue mask" >> $log
-    $fabber --data=$temp_calib/calib_senscorr --mask=$mask --output=$temp_calib/satrecov --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts --t1=$T1r
+    $fabber --data=$temp_calib/calib_senscorr --mask=$mask --output=$temp_calib/satrecov --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts $sropts --t1=$T1r
 
     # calculate M0 value
     Moval=`fslstats $temp_calib/satrecov/mean_M0t -M` # this is M0 of CSF at the TE of the sequence
@@ -614,7 +658,7 @@ elif [ $mode = satrecov ]; then
     # (note that we do not apply sensitivity correction to the data here - thius is 'built-into' the M0t map)
     echo "FABBER (again) within whole brain mask" >> $log
     if [ ! -z $outdir ]; then #NB we only bother with this if we have an output directory to put the results in
-	$fabber --data=$calib --mask=$bmask --output=$temp_calib/satrecovT --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts
+	$fabber --data=$calib --mask=$bmask --output=$temp_calib/satrecovT --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts $sropts 
 
 
         # save useful results to specified output directory
@@ -645,6 +689,12 @@ if [ ! -z $inflag ]; then
 	fslmaths $infile -div $temp_calib/sens $temp_calib/infile
     else
 	imcp $infile $temp_calib/infile
+    fi
+
+    if [ ! -z $alpha ]; then
+	echo "Applying inversion efficiency of: $alpha" >> $log
+	# apply the inversion efficiency supplied to M0 prior to final calculation
+	Moval=`echo "scale=2; $Moval * $alpha" | bc`
     fi
 
     fslmaths $temp_calib/infile -mul 60 -mul 100 -div $Moval $outfile

@@ -40,6 +40,7 @@ public:
 
   Option<bool> splitpairs;
   Option<bool> tcdiff;
+  Option<bool> surrtcdiff;
   
   Option<string> outblockform;
   Option<string> out;
@@ -102,34 +103,41 @@ help(string("-h,--help"), false,
     maskfile(string("--mask"), string("maskfile\n"),
 	    string("mask"),
 	    false, requires_argument),
-    //input file information
-    ntis(string("--ntis"),0,
-      string("Number of TIs in file"), true, requires_argument),
-    inblockform(string("--ibf,--inblockform"),string("rpt"),
-      string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
-      false,requires_argument),
-    inaslform(string("--iaf,--inaslform"),string("diff"),
-      string("ASL data form:\n          diff - differenced data {default}\n          tc - Tag-Control pairs\n          ct - Control-Tag pairs\n"),
-      false,requires_argument),
-    ispairs(string("--pairs,--inpairs"),false,
-      string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control)"),
-      false,no_argument),
 
-    //asaq(string("--asaq"),false,
-    //  string("Data is as aquired: same as --blocked --pairs"),
-    //  false,no_argument),
+   //input file information
+   ntis(string("--ntis"),0,
+	string("Number of TIs in file"),
+	true, requires_argument),
+   inblockform(string("--ibf,--inblockform"),string("rpt"),
+	       string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
+	       false,requires_argument),
+   inaslform(string("--iaf,--inaslform"),string("diff"),
+	     string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block\n"),
+	     false,requires_argument),
 
-    // manipulation options
-    splitpairs(string("--spairs"),false,
-      string("Split the pairs within the data, e.g. to separate tag and control images in output"),
-      false,no_argument),
-    tcdiff(string("--diff"), false,
-      string("Take the difference between the pairs, i.e. Tag control difference\n"),
-      false,no_argument),
+   ispairs(string("--pairs,--inpairs"),false,
+	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead"),
+	   false,no_argument),
+   
 
-    //basic output
-    outblockform(string("--obf,--outblockform"),string("notset"),
-      string("Output block format (for --out=):\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI\n          Default is same as input block format (--ibf)"),
+   //asaq(string("--asaq"),false,
+   //	string("Data is as aquired: same as --blocked --pairs"),
+   //	false,no_argument),
+
+   // manipulation options
+   splitpairs(string("--spairs"),false,
+	      string("Split the pairs within the data, e.g. to separate tag and control images in output"),
+	      false,no_argument),
+   tcdiff(string("--diff"), false,
+	   string("Take the difference between the pairs, i.e. Tag control difference"),
+	   false,no_argument),
+   surrtcdiff(string("--surrdiff"), false,
+	      string("Do surround subtraction on the pairs\n"),
+	      false,no_argument),
+
+   //basic output
+   outblockform(string("--obf,--outblockform"),string("notset"),
+	       string("Output block format (for --out=):\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI\n          Default is same as input block format (--ibf)"),
 		  false,requires_argument),
     out(string("--out"),string("Out filename"),
       string("Output data file"),
@@ -199,6 +207,7 @@ help(string("-h,--help"), false,
  
        options.add(splitpairs);
        options.add(tcdiff);
+       options.add(surrtcdiff);
 
        options.add(out);
        options.add(outblockform);

@@ -27,11 +27,11 @@ using namespace NEWIMAGE;
 
 namespace OXASL {
  
-  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs);
+  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs, bool blockpairs);
   void stdform2data(vector<Matrix>& asldata, Matrix& datareturn, bool outblocked, bool outpairs);
 
   // separate the pairs in the data (into seprate standard form items)
-  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven);
+  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven, bool blockpairs);
   void mergepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>&asldataeven);
 
   // mean the data at each TI

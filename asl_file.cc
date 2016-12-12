@@ -42,6 +42,7 @@ int main(int argc, char *argv[])
     bool ispairs=false; //indicates if data contains adjacent pairs of measurments
     bool isdiff=false; //indicates if we have differenced data
     bool tagfirst=true; //indicates that tag comes first in tag-control pairs
+    bool blockpairs=false; //indicates that the tag-control pairs are grouped separelty within the blocks, not in adacent volumes of tag then control
     //ispairs=opts.ispairs.value();
     
     // block format: isblocked indicates if data are in *blocks of repeats*
@@ -51,9 +52,11 @@ int main(int argc, char *argv[])
     else    throw Exception("Unrecognised input block format");
     
     string iaf=opts.inaslform.value();
-    if      (iaf.compare("diff")==0) isdiff=true;
-    else if (iaf.compare("tc")==0)   isdiff=false;
-    else if (iaf.compare("ct")==0)  { isdiff=false; tagfirst=false;}
+    if      (iaf.compare("diff")==0) isdiff=true; // differenced data
+    else if (iaf.compare("tc")==0)   isdiff=false; //tag control pairs, tag first
+    else if (iaf.compare("ct")==0)  { isdiff=false; tagfirst=false; } //tag control pairs, control first
+    else if (iaf.compare("tcb")==0) { isdiff=false; blockpairs=true; } // tag control pairs, tag first, all the tags and controls are sepratedly grouped together (not adjacent to each other)
+    else if (iaf.compare("ctb")==0) { isdiff=false; blockpairs=true; tagfirst=false; } // ditto, control first
     else    throw Exception("Unrecognised input asl form");
     
     ispairs=!isdiff; //convienient to have ispairs as a bool
@@ -139,8 +142,8 @@ int main(int argc, char *argv[])
 
     // load mask
     // if a mask is not supplied then default to processing whole volume
-    volume<float> mask(data.xsize(),data.ysize(),data.zsize());
-    mask.setdims(data.xdim(),data.ydim(),data.zdim());
+    // Create a mask from the data volume to ensure metadata is correct 
+    volume<float> mask = data[0]*0;
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
     
@@ -173,7 +176,7 @@ int main(int argc, char *argv[])
 
     //get data into 'standard' format
     vector<Matrix> asldata;
-    data2stdform(datamtx,asldata,ntis,isblocked,ispairs);
+    data2stdform(datamtx,asldata,ntis,isblocked,ispairs,blockpairs);
 
     //deal with the splitting of pairs
     vector<Matrix> asldataodd;
@@ -186,41 +189,39 @@ int main(int argc, char *argv[])
     }
 
 
-    if (opts.splitpairs.value()) {
-      // need to split the data here if plit pairs has been requested
-        separatepairs(asldata,asldataodd,asldataeven);
-      }
-
-    //tag control difference
-    if (opts.tcdiff.value()) {
-    	separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
-    	//overwrite asldata with differenced data
-    	for (int ti=0; ti<ntis; ti++) {
-    	  asldata[ti] = asldataeven[ti] - asldataodd[ti];
-    	  if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
-    	}
-    	outpairs=false;
-
-
-    	/*	for (int ti=0; ti<ntis; ti++) {
-    	  Matrix oddmtx;
-    	  oddmtx = asldata[ti].Row(1);
-    	  Matrix evenmtx;
-    	  evenmtx = asldata[ti].Row(2);
-    	  for (int r=2; r<=nrpts; r++) {
-    	    idx=(r-1)*2+1;
-    	    oddmtx &= asldata[ti].Row(idx);
-    	    evenmtx &= asldata[ti].Row(idx+1);
-    	  }
-    	  
-    	  Matrix diffmtx=evenmtx-oddmtx; //assumes that tag is first
-    	  asldata[ti] = diffmtx;
-    	  outpairs=false;
-    	}
-    	*/
+  if (opts.splitpairs.value()) {
+    // need to split the data here if split pairs has been requested
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs);
     }
 
+  //tag control difference
+  if (opts.tcdiff.value()) {
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
+    //overwrite asldata with differenced data
+    for (int ti=0; ti<ntis; ti++) {
+      asldata[ti] = asldataeven[ti] - asldataodd[ti];
+      if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    }
+	outpairs=false;
+  }
 
+  // surround tag-control difference
+  if (opts.surrtcdiff.value()) {
+    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
+    //overwrite asldata with differenced data
+    for (int ti=0; ti<ntis; ti++) {
+      //Matrix tempindata;
+      //tempindata=asldata[ti];
+      Matrix tempdata(asldata[ti].Nrows()-1,asldata[ti].Ncols()); //surr diff data will have one fewer measurement than non-differenced data
+      for (int aq=1; aq<tempdata.Nrows(); aq = aq + 2) {
+	tempdata.Row(aq) = asldataeven[ti].Row(aq) - asldataodd[ti].Row(aq);
+	tempdata.Row(aq+1) = asldataeven[ti].Row(aq) - asldataodd[ti].Row(aq+1);
+      }
+      asldata[ti] = tempdata;
+      if (!tagfirst) asldata[ti] *= -1.0; //if control image is first then the sign will be wrong here
+    }
+	outpairs=false;
+  }
 
 
     vector<Matrix> asldataout; //the data we are about to use for output purposes
@@ -275,7 +276,7 @@ int main(int argc, char *argv[])
           Matrix data_pvcorr_mtx;
           vector<Matrix> asldataout_pvcorr;
           data_pvcorr_mtx = data_pvcorr.matrix(mask);
-          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs,blockpairs);
           asldataout = asldataout_pvcorr;
 
           //save_volume4D(data_pvcorr, pvout_file_name);
@@ -313,7 +314,7 @@ int main(int argc, char *argv[])
         vector<Matrix> asldataout_pvcorr;
         data_pvcorr_mtx = data_nifti.matrix(mask_nifti);
         ndata = data_nifti.tsize();
-        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs);
+        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs,blockpairs);
         asldataout = asldataout_pvcorr;
         mask = mask_nifti;
 
@@ -344,7 +345,7 @@ int main(int argc, char *argv[])
           Matrix data_extrapolated_mtx;
           vector<Matrix> asldataout_extrapolated;
           data_extrapolated_mtx = data_extrapolated.matrix(mask);
-          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, isblocked, ispairs);
+          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, isblocked, ispairs,blockpairs);
           asldataout = asldataout_extrapolated;
         }
 
@@ -353,10 +354,10 @@ int main(int argc, char *argv[])
         }
       }
 
-      //output data
+      //output data. Use input volume as basis for output volume to ensure consistent metadata
       if (opts.out.set()) {
 	Matrix outmtx;
-	volume4D<float> dataout;
+	volume4D<float> dataout = data*0;;
 	stdform2data(asldataout,outmtx,outblocked,outpairs);
 	dataout.setmatrix(outmtx,mask);
 	save_volume4D(dataout,opts.out.value()+fsub);
@@ -371,14 +372,16 @@ int main(int argc, char *argv[])
 	  {
 	  meanti.Row(n+1)=mean(asldata[n],1);
 	  }
-	  volume4D<float> meanout;
+	  volume4D<float> meanout = data*0;;
 	  meanout.setmatrix(meanti,mask);
 	  save_volume4D(meanout,opts.meanout.value());*/
       }
     
       //split data into separate file for each TI
       if (opts.splitout.set()) {
+
         splitout(asldataout,mask,opts.splitout.value()+fsub);
+
       }
 
     //do epochwise output
@@ -416,7 +419,7 @@ int main(int argc, char *argv[])
 
       int e=1;
       Matrix epoch_temp(ntis,nvox);
-      volume4D<float> epochout;
+      volume4D<float> epochout = data*0;;
       while (e*epadv<=nmeas)
 	{
 	  //Matrix ti_temp(eplen,nvox);
