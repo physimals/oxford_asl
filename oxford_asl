@@ -221,7 +221,7 @@ Normalise() {
 	masktype=$3
 	
 	# get normalization from reported value in the output directory
-	normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
+	normval=`cat $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt`
 	
 	if [ ! -z $stdout ]; then
 	    fslmaths $outdir/std_space/$subdir/$parname -div $normval $outdir/std_space/$subdir/${parname}_norm 
@@ -244,7 +244,7 @@ Normalise_var() {
     masktype=$3
 
     # get normalization from reported value in the output directory
-    normval=`cat $outdir/$subdir/${parname}_${masktype}_mean.txt`
+    normval=`cat $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt`
     #need to square the value as we are outputting a variance
     normval=`echo "$normval * $normval" | bc`
     
@@ -360,7 +360,7 @@ Calibration() {
 }
 
 Dobasil() {
-# inputs: datafile tempdir_subdir
+# inputs: datafile tempdir_subdir initmvn
 
 if [ -z $fast ]; then
     fast=""
@@ -372,7 +372,13 @@ Log "Run time basil options:"
 Log "$basil_options"
 Log "---"
 
-$basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $basil_options
+if [ ! -z $3 ]; then
+    # we are being supplied with an intial MVN - pass to BASIL
+    initmvn="--init $3"
+    Log "Initial MVN for BASIL is: $3"
+fi
+
+$basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $initmvn $basil_options
 
 # work out which is the final step from BASIL
 finalstep=`ls -d $2/basil/step? | sed -n '$ p'`
@@ -423,11 +429,10 @@ fi
     fi
 fi
 
-# advanced output
-if [ ! -z $advout ]; then
-    ${FSLDIR}/bin/imcp ${finalstep}/finalMVN $2/finalMVN
-   cp ${finalstep}/paramnames.txt $2/paramnames.txt
-fi
+#copy the final MVN to the temp directory for future use
+${FSLDIR}/bin/imcp ${finalstep}/finalMVN $2/finalMVN
+cp ${finalstep}/paramnames.txt $2/paramnames.txt
+
 
 }
 
@@ -1099,76 +1104,6 @@ if [ -z $t1bset ]; then
 fi
 Log "T1b: $t1bset"
 
-if [ -z $t1tset ]; then
-    t1tset=1.3;
-fi
-Log "T1t (for calibration): $t1tset"
-
-# TR (for calibration image)
-if [ -z $tr ]; then
-    tr=3.2
-fi
-
-
-# calibration image gain
-if [ -z $cgain ]; then
-    cgain=1;
-fi
-
-# Calibration if reqd
-if [ -z $alpha ]; then
-        # based on the ASL white paper
-    if [ -z $casl ]; then
-	alpha=0.98;
-    else
-	alpha=0.85;
-    fi
-fi
-
-if [ -z $cmethod ]; then
-# default calibration method is 'voxelwise' unless a structural image (or CSF mask) is supplied
-    if [ ! -z $struc ] || [ ! -z $csf ]; then
-	cmethod=single
-    else
-	cmethod=voxel
-    fi
-fi
-
-if [ ! -z $calib ]; then
-    if [ $cmethod = 'single' ]; then
-	Log "Calibration is using a single M0 value with a CSF reference"
-	if [ -z $csf ] && [ -z $struc ]; then
-	    echo "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
-	    exit 1
-	fi
-       # calcualte M0a from CSF
-	Calibration
-	Mo=`cat $outdir/calib/M0.txt`
-    elif [ $cmethod = 'voxel' ]; then
-	Log "Calibration is voxelwise"
-	mkdir $outdir/calib
-        # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
-	${FSLDIR}/bin/fslmaths $calib -mul $cgain $outdir/calib/M0
-	Mo=$outdir/calib/M0 
-	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
-	 # correct the M0 image for short TR using the equation from the white paper
-	    Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
-	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
-	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
-	fi
-
-	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
-	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
-    else
-	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
-    fi 
-elif [ ! -z $M0 ]; then
-    # An M0 value has been supplied, use this
-    cmethod=single # we are in 'single' mode as a single value has been supplied
-    Mo=$M0
-    echo "M0: $Mo"
-    Log "Using supplied M0 value: $Mo"
-fi
 
 #deal with bolus
 if [ -z $boluset ]; then
@@ -1182,7 +1117,7 @@ if [ ! -z $epoch ]; then
 if [ -z $eol ]; then
     eol=0
 fi
-    asl_file --data=$infile --ntis=$count --ibf=rpt --iaf=diff --epoch=$tempdir/epoch --elen=$elen --eol=$eol --eunit=tis
+    asl_file --data=$tempdir/diffdata --ntis=$count --ibf=tis --iaf=diff --epoch=$tempdir/epoch --elen=$elen --eol=$eol --eunit=tis
     eadv=`expr $elen - $eol`
 fi
 
@@ -1346,7 +1281,7 @@ Dobasil $datafile $tempdir
 if [ $register -eq 1 ]; then 
     echo "Performing final registration"
     Log "Final registration"
-    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat
+    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
     Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
 fi
 ### End of: Registration (2/2)
@@ -1392,8 +1327,84 @@ if [ ! -z $pvexist ]; then
 fi
 ### End of: Partial Volume Estimates
 
+### Calibration
+# Do calibration here becuase we do not need if before this point & if we are generating a CSF mask we have a better registration at this point
+if [ -z $t1tset ]; then
+    t1tset=1.3;
+fi
+Log "T1t (for calibration): $t1tset"
+
+# TR (for calibration image)
+if [ -z $tr ]; then
+    tr=3.2
+fi
+
+
+# calibration image gain
+if [ -z $cgain ]; then
+    cgain=1;
+fi
+
+# Calibration if reqd
+if [ -z $alpha ]; then
+        # based on the ASL white paper
+    if [ -z $casl ]; then
+	alpha=0.98;
+    else
+	alpha=0.85;
+    fi
+fi
+
+if [ -z $cmethod ]; then
+# default calibration method is 'voxelwise' unless a structural image (or CSF mask) is supplied
+    if [ ! -z $struc ] || [ ! -z $csf ]; then
+	cmethod=single
+    else
+	cmethod=voxel
+    fi
+fi
+
+if [ ! -z $calib ]; then
+    if [ $cmethod = 'single' ]; then
+	Log "Calibration is using a single M0 value with a CSF reference"
+	if [ -z $csf ] && [ -z $struc ]; then
+	    echo "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
+	    exit 1
+	fi
+       # calcualte M0a from CSF
+	Calibration
+	Mo=`cat $outdir/calib/M0.txt`
+    elif [ $cmethod = 'voxel' ]; then
+	Log "Calibration is voxelwise"
+	mkdir $outdir/calib
+        # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
+	${FSLDIR}/bin/fslmaths $calib -mul $cgain $outdir/calib/M0
+	Mo=$outdir/calib/M0 
+	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
+	 # correct the M0 image for short TR using the equation from the white paper
+	    Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
+	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
+	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
+	fi
+
+	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
+	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
+    else
+	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
+    fi 
+elif [ ! -z $M0 ]; then
+    # An M0 value has been supplied, use this
+    cmethod=single # we are in 'single' mode as a single value has been supplied
+    Mo=$M0
+    echo "M0: $Mo"
+    Log "Using supplied M0 value: $Mo"
+fi
+
+### End of: Calibration
+
+
 ### Output main BASIL results
-# Note we do this here, as we have the registration done and masks created
+# Note we do this here, as we have the registration done and masks created and calibration complete
 Dooutput
 
 # save the mask used to the (native space) output directory
@@ -1416,6 +1427,8 @@ if [ ! -z $pvcorr ]; then
     cp $tempdir/basil_options.txt $tempdir/pvcorr/basil_options.txt #Dobasil expects the options file to be in the subdirectory
     # Run BASIL
     Dobasil $datafile $tempdir/pvcorr
+
+    ${FSLDIR}/bin/imcp $tempdir/pvcorr/finalMVN $tempdir/finalMVN #just in case we are about to do a epochwise analysis
 
     #output the results
     Dooutput pvcorr
@@ -1453,8 +1466,10 @@ if [ ! -z $epoch ]; then
 	cp $tempdir/basil_options_core.txt $tempdir/$e/basil_options.txt # get the 'core' options and make a new basil_options file jsut for this TI
 	echo "--repeats=1" >> $tempdir/$e/basil_options.txt #for epochs we specify all the TIs explicitly
 	echo $etislist >>  $tempdir/$e/basil_options.txt #these are the basil options for this epoch
+
+	fast=2 #we now switch BASIL to fast level '2' - this means it will only do analysis in a single step from here on in, but we will use our existing analysis for initialisation.
 	
-	Dobasil $tempdir/$e $tempdir/$e
+	Dobasil $tempdir/$e $tempdir/$e $tempdir/finalMVN # init with results of first basil run
 
         #output 
 	Log "Saving results from epoch: $e"
@@ -1464,6 +1479,7 @@ if [ ! -z $epoch ]; then
     done
 fi
 ### End of: Epoch BASIL
+
 
 
 
