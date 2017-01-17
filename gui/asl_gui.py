@@ -8,10 +8,6 @@ import os
 import wx
 import props
 
-def cb_pair(p1, p2):
-    return props.HGroup(
-        children=(p1, props.Widget(p2, visibleWhen=lambda i: getattr(i, p1))))
-
 def conditional(p1, p2):
     return props.Widget(p1, visibleWhen=lambda i: getattr(i, p2))
 
@@ -65,10 +61,10 @@ class AslOptions(props.HasProperties):
     seqTR = props.Real(default=3.2, minval=0, maxval=100)
     seqTE = props.Real(default=0.0, minval=0, maxval=100)
 
-    def setOutputImage(self, value, valid, *a):
-        if not valid: return
-        value = removeExt(value, ['.nii.gz', '.nii'])
-        self.outputImage = value + '_brain'
+    #def setOutputImage(self, value, valid, *a):
+    #    if not valid: return
+    #    value = removeExt(value, ['.nii.gz', '.nii'])
+    #    self.outputImage = value + '_brain'
 
     def writableDir(self, d):
         if os.path.isdir(d):
@@ -89,182 +85,188 @@ class AslOptions(props.HasProperties):
         return ret == 1
 
     def runcmd(self, c):
+        """
+        Run a command
+        """
         print(c)
         ret = os.system(c)
         if ret != 0:
-            raise RuntimeError("Error executing %s" % c)
+            raise RuntimeError("Error executing command:\n%s" % c)
+
+    def warn(self, message, caption="Warning"):
+        dlg = wx.MessageDialog(None, message, caption, wx.OK | wx.ICON_WARNING)
+        dlg.ShowModal()
+        dlg.Destroy()
 
     def runAsl(self):
-        errors = self.validateAll()
-        if len(errors) > 0:
-            print 'Options are not valid'
-            for prop, msg in errors:
-                print '  {}: {}'.format(prop, msg)
-            raise RuntimeError('Options are not valid')
+        try:
+            errors = self.validateAll()
+            if len(errors) > 0:
+                errs = ["{}: {}".format(prop, msg) for prop, msg in errors]
+                raise RuntimeError("\n".join(errs))
 
-            # If no input file
-        #    "You have not specified an input file!"
-        #    return
-        # If no inversionTimes
-        #    "You have not specified an input file!"
-        #    return
+            # Make output dir FIXME what if already exists? Currently overwrite
+            self.writableDir(self.outputDir)
+            nativeSpaceDir = os.path.join(self.outputDir, "native_space")
+            self.writableDir(nativeSpaceDir)
 
-        # Make output dir FIXME what if none given?
-        self.writableDir(self.outputDir)
-        nativeSpaceDir = os.path.join(self.outputDir, "native_space")
-        self.writableDir(nativeSpaceDir)
+            # Inversion times is a list, FIXME comma or space separated? FIXME check all numbers
+            if self.inversionTimes is None or self.inversionTimes.strip() == "":
+                raise RuntimeError("No inversion times specified")
 
-        # Inversion times is a list, FIXME space separated? FIXME check all numbers
-        tis = self.inversionTimes.replace(",", " ").split()
-        # FIXME check num tis against input image?
-        print tis
+            # FIXME check num tis against input image?
+            tis = self.inversionTimes.replace(",", " ").split()
+            print(tis)
 
-        aslFileCommand = [self.fslProg("asl_file"),]
-        aslFileCommand.append("--data=%s" % self.inputImage)
-        aslFileCommand.append("--out=%s/diffData" % nativeSpaceDir)
-        aslFileCommand.append("--obf=rpt --ntis=%i" % len(tis))
+            aslFileCommand = [self.fslProg("asl_file"),]
+            aslFileCommand.append("--data=%s" % self.inputImage)
+            aslFileCommand.append("--out=%s/diffData" % nativeSpaceDir)
+            aslFileCommand.append("--obf=rpt --ntis=%i" % len(tis))
 
-        if self.dataOrder == "Repeats":
-            aslFileCommand.append("--ibf=rpt")
-        else:
-            aslFileCommand.append("--ibf=tis")
-
-        if self.controlFirst:
-            aslDataForm = "--iaf=ct"
-        else:
-            aslDataForm = "--iaf=tc"
-
-        # 0 "none" 1 "pairwise"
-        if self.tagControlPairs:
-            aslFileCommand.append("%s --diff" % aslDataForm)
-        else:
-            aslFileCommand.append("--iaf=diff")
-
-        self.runcmd(" ".join(aslFileCommand))
-
-        aslCommand = [self.fslProg("oxford_asl"),]
-        aslCommand.append("-i %s/diffData" % nativeSpaceDir)
-        aslCommand.append("-o %s" % self.outputDir)
-        aslCommand.append("--tis %s" % self.inversionTimes)
-        if self.paramVariance: aslCommand.append("--vars")
-        aslCommand.append("--bolus %f" % self.bolusDuration)
-        aslCommand.append("--bat %f" % self.bolusArrivalTime)
-        aslCommand.append("--t1 %f" % self.t1)
-        aslCommand.append("--t1b %f" % self.t1b)
-        aslCommand.append("--alpha %f" % self.inversionEffic)
-        if self.spatialSmoothing: aslCommand.append("--spatial")
-        if self.inferT1: aslCommand.append("--infert1")
-        if not self.includeVascular: aslCommand.append("--artoff")
-        if self.fixBolusDuration: aslCommand.append("--fixbolus")
-
-        if self.brainMask: aslCommand.append("-m %s" % self.brainMask)
-        if self.labelling != "pASL": aslCommand.append("--casl")
-
-        if self.useStructuralImage:
-            if runBet:
-                strucProg = self.fslProg("bet")
+            if self.dataOrder == "Repeats":
+                aslFileCommand.append("--ibf=rpt")
             else:
-                strucProg = self.fslProg("imcp")
-            strucCmd = "%s %s %s/structural_brain" % (strucProg, self.structuralImage, self.outputDir)
-            self.runcmd(strucCmd)
-            aslCommand.append("-s %d/structural_brain" % self.outputDir)
+                aslFileCommand.append("--ibf=tis")
+
+            if self.controlFirst:
+                aslDataForm = "--iaf=ct"
+            else:
+                aslDataForm = "--iaf=tc"
+
+            # 0 "none" 1 "pairwise"
+            if self.tagControlPairs:
+                aslFileCommand.append("%s --diff" % aslDataForm)
+            else:
+                aslFileCommand.append("--iaf=diff")
+
+            self.runcmd(" ".join(aslFileCommand))
+
+            aslCommand = [self.fslProg("oxford_asl"),]
+            aslCommand.append("-i %s/diffData" % nativeSpaceDir)
+            aslCommand.append("-o %s" % self.outputDir)
+            aslCommand.append("--tis %s" % self.inversionTimes)
+            if self.paramVariance: aslCommand.append("--vars")
+            aslCommand.append("--bolus %f" % self.bolusDuration)
+            aslCommand.append("--bat %f" % self.bolusArrivalTime)
+            aslCommand.append("--t1 %f" % self.t1)
+            aslCommand.append("--t1b %f" % self.t1b)
+            aslCommand.append("--alpha %f" % self.inversionEffic)
+            if self.spatialSmoothing: aslCommand.append("--spatial")
+            if self.inferT1: aslCommand.append("--infert1")
+            if not self.includeVascular: aslCommand.append("--artoff")
+            if self.fixBolusDuration: aslCommand.append("--fixbolus")
+
+            if self.brainMask: aslCommand.append("-m %s" % self.brainMask)
+            if self.labelling != "pASL": aslCommand.append("--casl")
+
+            if self.useStructuralImage:
+                if runBet:
+                    strucProg = self.fslProg("bet")
+                else:
+                    strucProg = self.fslProg("imcp")
+                strucCmd = "%s %s %s/structural_brain" % (strucProg, self.structuralImage, self.outputDir)
+                self.runcmd(strucCmd)
+                aslCommand.append("-s %d/structural_brain" % self.outputDir)
+
+                if self.useAlternateStandardImage:
+                    aslCommand.append("-t %s -S %s" % (self.spaceTransform, self.alternateStandardImage))
+
+            foundRegTarget = False
+            if self.tagControlPairs and self.staticTissue in  ("pre-saturation", "background suppressed"):
+                aslFileCmd = [self.fslProg("asl_file"),]
+                aslFileCmd.append("--data=%s" % self.inputImage)
+                aslFileCmd.append("--ntis=%i" % len(tis))
+                aslFileCmd.append("--spairs")
+                aslFileCmd.append(aslDataForm)
+                aslFileCmd.append("--out=%s/asldata_mc" % self.outputDir)
+                self.runcmd(" ".join(aslFileCmd))
+
+                mode = self.tagControlPairs and self.staticTissue == "normal"
+
+                if self.staticTissue == "pre-saturation":
+                    self.runcmd("%s %s/asldata_mc_odd %s/asldata_mc_odd_brain" % (self.fslProg("bet"), self.outputDir, self.outputDir))
+                    aslCommand.append("--regfrom %s/asldata_mc_odd_brain" % self.outputDir)
+                else:
+                    self.runcmd("%s %s/asldata_mc_even %s/asldata_mc_even_brain" % (self.fslProg("bet"), self.outputDir, self.outputDir))
+                    aslCommand.append("--regfrom %s/asldata_mc_even_brain" % self.outputDir)
+                foundRegTarget = True
+
+
+            if self.doCalibration and not foundRegTarget:
+                self.runcmd("%s %s %s/MOimage_brain" % (
+                self.fslProg("bet"), self.m0Image, self.outputDir))
+                aslCommand.append("--regfrom  %s/MOimage_brain" % self.outputDir)
+
+            self.runcmd(" ".join(aslCommand))
+
+            if self.doCalibration:
+                aslCalibCommand = [self.fslProg("asl_calib"),]
+                aslCalibCommmand.append("-i %s/native_space/perfusion" % self.outputDir)
+                aslCalibCommand.append("--tissref %s" % self.tissueType)
+                aslCalibCommand.append("--t1r %f" % self.referenceT1)
+                aslCalibCommand.append("--t2r %s " % self.referenceT2)
+                aslCalibCommand.append("--t2b %f" % self.bloodT2)
+                aslCalibCommand.append("--te %f" % self.seqTE)
+                aslCalibCommand.append("-o %s/calibration" % self.outputDir)
+
+                if self.useRefTissueMask: aslCalibCommand.append("-m %s" % self.refTissueMask)
+                else:
+                    aslCalibCommand.append("-s %s/structural_brain" % self.outputDir)
+                    aslCalibCommand.append("-t %s/native_space/asl2struct.mat" % self.outputDir)
+
+                if self.brainMask:
+                    aslCalibCommand.append("--bmask %s" % self.brainMask)
+                if self.calibrateMode == 0: # long TR
+                    calibImage = self.m0Image
+                    if self.tagControlPairs and staticTissue == "normal":
+                        calibImage = self.outputDir + "/asldata_mc_even"
+                    aslCalibCommand.append("-c %s" % calibImage)
+                    aslCalibCommand.append("--mode longtr --tr %f" % self.seqTR)
+                    aslCalibCommand.append("--cgain %f" % self.calibrateGain)
+                    if self.useCoil: aslCalibCommand.append("--cref %s" % self.coilSensitivityRefImage)
+                elif self.calibrateMode == 1: # Saturation Recovery - maybe change aslcalib -c option to even - for MC to think about!!!
+                    aslCalibCommand.append("--tis %s" % self.inversionTimes)
+                    aslCalibCommand.append("-c %s/asldata_mc_odd" % self.outputDir)
+
+                    self.runcmd(" ".join(aslCalibCommand))
+
+            if self.useCoilSensitivityRefImage:
+                aslDivCommand = "-div %s" % self.coilSensitivityRefImage
+            else:
+                aslDivCommand = ""
+
+            if self.imtest(self.outputDir + "/perfusion"):
+                M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
+                self.runcmd("%s %s/perfusion -div %s %s -mul 6000 %s/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
+
+            if self.imtest(self.outputDir + "/standard_space/perfusion"):
+                M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
+                self.runcmd("%s %s/standard_space/perfusion -div %s %s -mul 6000 %s/standard_space/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
+
+            if self.imtest(self.outputDir + "/structural_space/perfusion"):
+                M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
+                self.runcmd("%s %s/structural_space/perfusion -div %s %s -mul 6000 %s/structural_space/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
 
             if self.useAlternateStandardImage:
-                aslCommand.append("-t %s -S %s" % (self.spaceTransform, self.alternateStandardImage))
+                regOptions = "--prefix=%s/native_space/asl2struct.mat -r %s " % (self.outputDir, self.alternateStandardImage)
+                if self.imtest(self.spaceTransform):
+                    regOptions += "-w %s" % self.spaceTransform
+                else:
+                    regOptions += "--postmat=%s" % self.spaceTransform
 
-        foundRegTarget = False
-        if self.calibrateMode == 1 or (self.tagControlPairs and self.staticTissue != "background suppressed"):
-            aslFileCmd = [self.fslProg("asl_file"),]
-            aslFileCmd.append("--data=%s" % self.inputImage)
-            aslFileCmd.append("--ntis=%i" % len(tis))
-            aslFileCmd.append("--spairs")
-            aslFileCmd.append(aslDataForm)
-            aslFileCmd.append("--out=%s/asldata_mc" % self.outputDir)
-            self.runcmd(" ".join(aslFileCmd))
-
-            if self.calibrateMode == 1:
-                self.runcmd("%s %s/asldata_mc_odd %s/asldata_mc_odd_brain" % (self.fslProg("bet"), self.outputDir, self.outputDir))
-                aslCommand.append("--regfrom %s/asldata_mc_odd_brain" % self.outputDir)
-            else:
-                self.runcmd("%s %s/asldata_mc_even %s/asldata_mc_even_brain" % (self.fslProg("bet"), self.outputDir, self.outputDir))
-                aslCommand.append("--regfrom %s/asldata_mc_even_brain" % self.outputDir)
-            foundRegTarget = True
-
-
-        if self.doCalibration and not foundRegTarget:
-            self.runcmd("%s %s %s/MOimage_brain" % (
-            self.fslProg("bet"), self.m0Image, self.outputDir))
-            aslCommand.append("--regfrom  %s/MOimage_brain" % self.outputDir)
-
-        self.runcmd(" ".join(aslCommand))
-
-        if self.doCalibration:
-            aslCalibCommand = [self.fslProg("asl_calib"),]
-            aslCalibCommmand.append("-i %s/native_space/perfusion" % self.outputDir)
-            aslCalibCommand.append("--tissref %s" % self.tissueType)
-            aslCalibCommand.append("--t1r %f" % self.referenceT1)
-            aslCalibCommand.append("--t2r %s " % self.referenceT2)
-            aslCalibCommand.append("--t2b %f" % self.bloodT2)
-            aslCalibCommand.append("--te %f" % self.seqTE)
-            aslCalibCommand.append("-o %s/calibration" % self.outputDir)
-
-            if self.useRefTissueMask: aslCalibCommand.append("-m %s" % self.refTissueMask)
-            else:
-                aslCalibCommand.append("-s %s/structural_brain" % self.outputDir)
-                aslCalibCommand.append("-t %s/native_space/asl2struct.mat" % self.outputDir)
-
-            if self.brainMask:
-                aslCalibCommand.append("--bmask %s" % self.brainMask)
-            if self.calibrateMode == 0: # long TR
-                calibImage = self.m0Image
-                if self.tagControlPairs and staticTissue == "normal":
-                    calibImage = self.outputDir + "/asldata_mc_even"
-                aslCalibCommand.append("-c %s" % calibImage)
-                aslCalibCommand.append("--mode longtr --tr %f" % self.seqTR)
-                aslCalibCommand.append("--cgain %f" % self.calibrateGain)
-                if self.useCoil: aslCalibCommand.append("--cref %s" % self.coilSensitivityRefImage)
-            elif self.calibrateMode == 1: # Saturation Recovery - maybe change aslcalib -c option to even - for MC to think about!!!
-                aslCalibCommand.append("--tis %s" % self.inversionTimes)
-                aslCalibCommand.append("-c %s/asldata_mc_odd" % self.outputDir)
-
-                self.runcmd(" ".join(aslCalibCommand))
-
-        if self.useCoilSensitivityRefImage:
-            aslDivCommand = "-div %s" % self.coilSensitivityRefImage
-        else:
-            aslDivCommand = ""
-
-        if self.imtest(self.outputDir + "/perfusion"):
-            M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
-            self.runcmd("%s %s/perfusion -div %s %s -mul 6000 %s/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
-
-        if self.imtest(self.outputDir + "/standard_space/perfusion"):
-            M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
-            self.runcmd("%s %s/standard_space/perfusion -div %s %s -mul 6000 %s/standard_space/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
-
-        if self.imtest(self.outputDir + "/structural_space/perfusion"):
-            M0 = self.fileContents("%s/calibration/M0.txt" % self.outputDir)
-            self.runcmd("%s %s/structural_space/perfusion -div %s %s -mul 6000 %s/structural_space/perfusion_calib" % (self.fslProg("fslmaths"), M0, self.aslDivCommand, self.outputDir))
-
-        if self.useAlternateStandardImage:
-            regOptions = "--prefix=%s/native_space/asl2struct.mat -r %s " % (self.outputDir, self.alternateStandardImage)
-            if self.imtest(self.spaceTransform):
-                regOptions += "-w %s" % self.spaceTransform
-            else:
-                regOptions += "--postmat=%s" % self.spaceTransform
-
-            if self.imtest(self.outputDir + "/native_space/perfusion_calib"):
-                self.runcmd("%s %s -i %s/native_space/perfusion_calib -a %s/native_space/perfusion_calib_standard" %
-                          (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
-            else:
-                self.runcmd("%s %s -i %s/native_space/perfusion -a %s/native_space/perfusion_standard" %
-                          (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
-            self.runcmd("%s %s -i %s/native_space/arrival -a %s/native_space/arrival_standard" %
-                  (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
+                if self.imtest(self.outputDir + "/native_space/perfusion_calib"):
+                    self.runcmd("%s %s -i %s/native_space/perfusion_calib -a %s/native_space/perfusion_calib_standard" %
+                              (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
+                else:
+                    self.runcmd("%s %s -i %s/native_space/perfusion -a %s/native_space/perfusion_standard" %
+                              (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
+                self.runcmd("%s %s -i %s/native_space/arrival -a %s/native_space/arrival_standard" %
+                      (self.fslProg("applywarp"), regOptions, self.outputDir, self.outputDir))
+        except RuntimeError, e:
+            self.warn(str(e), "Options are not valid")
 
     def __init__(self):
         #self.addListener('inputImage', 'setOutputImage', self.setOutputImage)
-        #self.addListener('runChoice',  'clearT2Image',   self.clearT2Image)
         pass
 
 
@@ -331,7 +333,7 @@ aslView = props.VGroup(
                     'tagControlPairs',
                     'controlFirst',
                     'dataOrder',
-                    'staticTissue',
+                    conditional('staticTissue','tagControlPairs'),
                     'useStructuralImage',
                     conditional('structuralImage','useStructuralImage'),
                     conditional('runBet', 'useStructuralImage'),
@@ -366,18 +368,23 @@ aslView = props.VGroup(
                 label='Calibration',
                 children=(
                     'doCalibration',
-                    'calibrateMode',
-                    'm0Image',
-                    'useCoilSensitivityRefImage',
-                    conditional('coilSensitivityRefImage','useCoilSensitivityRefImage'),
-                    'calibrateGain',
-                    'refTissueType',
-                    't1b',
-                    'refT1',
-                    'refT2',
-                    'bloodT2',
-                    'seqTR',
-                    'seqTE',
+                    props.VGroup(
+                        children=(
+                            'calibrateMode',
+                            'm0Image',
+                            'useCoilSensitivityRefImage',
+                            conditional('coilSensitivityRefImage','useCoilSensitivityRefImage'),
+                            'calibrateGain',
+                            'refTissueType',
+                            't1b',
+                            'refT1',
+                            'refT2',
+                            'bloodT2',
+                            'seqTR',
+                            'seqTE',
+                        ),
+                        visibleWhen=lambda i: getattr(i, 'doCalibration')
+                    ),
                 )
             )
         )),
