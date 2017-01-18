@@ -1000,7 +1000,7 @@ namespace OXASL {
         int y_index_on_matrix = y_index + y_offset;
 
         // Only work on eroded voxels
-        if (mask_in.element(x_index_on_matrix, y_index_on_matrix) != 0 && data_in.element(x_index_on_matrix, y_index_on_matrix) == 0 ){
+	if (mask_in.element(y_index_on_matrix, x_index_on_matrix) != 0 && data_in.element(y_index_on_matrix, x_index_on_matrix) == 0 ){
           // Create a square matrix of size neighbourhood and centered at the current postion
           int off_set = floor(neighbour_size / 2);
 
@@ -1032,7 +1032,6 @@ namespace OXASL {
           }
 
         }
-
       }
 
       if( (x_index == y_index) || ((x_index < 0) && (x_index == (-1) * y_index)) || ((x_index > 0) && (x_index == 1 - y_index))  ) {
