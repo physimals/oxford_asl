@@ -946,29 +946,30 @@ echo "Number of repeats in data: $repeats"
 # Single or Multi TI setup
 if [ $count -lt 2 ]; then
 # single TI data - dont average send to BASIL as-is (helps with noise estimation)
-    Log "Single TI data to be passed to BASIL"
-    datafile=$tempdir/diffdata
+#    Log "Single TI data to be passed to BASIL"
+    #datafile=$tempdir/diffdata
     # OPERATE in 'single TI mode'
     artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
     Log "Operating in Single TI mode"
     
-elif [ $repeats -gt 1 ]; then
-    if [ -z $fulldata ]; then
+#elif [ $repeats -gt 1 ]; then
+ #   if [ -z $fulldata ]; then
         # take the mean over the TIs for faster analysis
-	Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
-	datafile=$tempdir/diffdata_mean
-	repeats=1
-    else
-	Log "Multi TI data, all data passed to BASIL for analysis"
-        datafile=$tempdir/diffdata
-    fi
-else
+#	Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
+#	datafile=$tempdir/diffdata_mean
+#	repeats=1
+ #   else
+#	Log "Multi TI data, all data passed to BASIL for analysis"
+ #       datafile=$tempdir/diffdata
+ #   fi
+#else
     # if there is only one repeat it just gets passed stright to BASIL
-    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
-    datafile=$tempdir/diffdata
+#    echo " Multi-TI data (single measurment at each TI) to be passed to BASIL" >> $log
+    #    datafile=$tempdir/diffdata
 fi
 
 # finish filling the alltis array - after we have decided whether we are using all the repeats or not
+# this is for epochwise analysis, we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
     for ((i=0; i<$count; i++)); do
 	idx=`expr $r \* $count + $i`
@@ -1310,11 +1311,27 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 
 ##### Analyse data using BASIL
 ### First analysis on whole data, normal perfusion image
+echo "Calling BASIL on data - conventional perusion image"
+initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
+if [ $repeats -gt 1 ]; then
+    # do an initial analysis using the data averaged at each TI
+    Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
+    datafile=$tempdir/diffdata
+    cat $tempdir/basil_options_core.txt > $tempdir/basil_options_init.txt
+    echo "--repeats=1" >> $tempdir/basil_options_init.txt
+    echo "$tislist" >> $tempdir/basil_options_init.txt
+    echo "Calling BASIL on data - conventional perusion image - INIT (average at each TI)"
+    Dobasil $datafile $tempdir/init
+    initbasil=$tempdir/init/finalMVN
+fi
+
+# main analysis using full data
+datafile=$tempdir/diffdata
 echo "--repeats=$repeats" >> $tempdir/basil_options.txt
 echo "$tislist" >> $tempdir/basil_options.txt
 
-echo "Calling BASIL on data - conventional perusion image"
-Dobasil $datafile $tempdir
+Log "Main run of BASIL on ASL data"
+Dobasil $datafile $tempdir $initbasil
 ### End of: First analysis on whole data
 
 ### Registration (2/2)
