@@ -462,7 +462,7 @@ if [ -z $maskflag ]; then
         # do std space masking with FLIRT registration
 	    
 	    convert_xfm -omat $temp_calib/std2struc.mat -inverse $temp_calib/struc2std.mat
-	    flirt -in $temp_calib/VentricleMask -applyxfm -init $temp_calib/std2struc.mat -ref $struc -out $temp_calib/mask
+	    flirt -in $temp_calib/VentricleMask -applyxfm -init $temp_calib/std2struc.mat -ref $temp_calib/refpve -out $temp_calib/mask
 	else
             # do std space masking using FNIRT registration
             # Register the structural image to standard space using FNIRT
@@ -479,8 +479,8 @@ if [ -z $maskflag ]; then
 	    fi
             # Calculate the inverse warp using INVWARP and apply to standard space ventricle mask
 	    invwarp --ref=$struc --warp=$temp_calib/coef_struc2MNI152 --out=$temp_calib/coef_MNI2struc
-	    applywarp --ref=$struc --in=$temp_calib/VentricleMask --warp=$temp_calib/coef_MNI2struc --out=$temp_calib/mask --interp=nn
-	    
+	    applywarp --ref=$temp_calib/refpve --in=$temp_calib/VentricleMask --warp=$temp_calib/coef_MNI2struc --out=$temp_calib/mask --interp=nn
+	    # using refpve as reference for applywarp as this is the image we apply the mask to, nit the structural
 	fi
 	
 	echo "Masking FAST output with standard space derrived ventricle mask" >> $log

@@ -325,7 +325,10 @@ Calibration() {
 	extraoptions=$extraoptions" --t2b $t2bl"
     fi
 
-
+    if [ ! -z $debug ]; then
+	#run asl_calib in debug mode
+	extraoptions=$extraoptions" --debug"
+    fi
 
     # setup the main options that we will pass to aslcalib regardless of whether we are auot generating reference mask
     maincaliboptions="--cgain $cgain --te $te --tr $tr"
@@ -343,12 +346,12 @@ Calibration() {
 #	    usetrans=$tempdir/asl2lowstruct.mat
 #	fi
 
-	usestruc=$tempdir/struc
+	usestruc=$tempdir/struc_bet
 	usetrans=$tempdir/asl2struct.mat
 
 	if [ ! -z $fasthasrun ]; then
 	    # we have already run FAST so we can pass the PVE for CSF to asl_calib (to save running FAST again)
-	    extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struc"
+	    extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struct"
 	fi
    
 	$asl_calib -c $calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
@@ -603,8 +606,10 @@ takeargs=0;
 	    takeargs=1;;
 	--sbrain) strucbet=$argument # user supplied BETed structural
 		  takeargs=1;;
-	--fslanat) fslanat=$argument # suer supplied fslanat dir (overrides the structural image inputs)
-		   tageargs=1;;
+	--fslanat) fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
+		   takeargs=1;;
+	--fastsrc) fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
+		   takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
 	-t) transflag=1 trans=$argument
