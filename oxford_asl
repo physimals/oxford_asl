@@ -1274,7 +1274,7 @@ if [ ! -z $spatial ]; then
 # if we are using spatial smoothing on CBF then we will also do the analysis in a single step
     echo "Instructing BASIL to use automated spatial smoothing"
     basil_options=$basil_options"--spatial "
-    Log "Employing (fast) spatail VB"
+    Log "Employing spatail VB"
 fi
 
 if [ ! -z $infert1 ]; then
@@ -1313,16 +1313,16 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 ### First analysis on whole data, normal perfusion image
 echo "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
-if [ $repeats -gt 1 ]; then
+if [ 0 -eq 1 ]; then # DISABLED!! [ $repeats -gt 1 ]; then
     # do an initial analysis using the data averaged at each TI
     Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
-    datafile=$tempdir/diffdata
-    cat $tempdir/basil_options_core.txt > $tempdir/basil_options_init.txt
-    echo "--repeats=1" >> $tempdir/basil_options_init.txt
-    echo "$tislist" >> $tempdir/basil_options_init.txt
-    echo "Calling BASIL on data - conventional perusion image - INIT (average at each TI)"
+    datafile=$tempdir/diffdata_mean
+    mkdir $tempdir/init
+    cat $tempdir/basil_options_core.txt > $tempdir/init/basil_options.txt
+    echo "--repeats=1" >> $tempdir/init/basil_options.txt
+    echo "$tislist" >> $tempdir/init/basil_options.txt
     Dobasil $datafile $tempdir/init
-    initbasil=$tempdir/init/finalMVN
+    initbasil=$tempdir/init/basil/finalMVN
 fi
 
 # main analysis using full data
@@ -1539,7 +1539,7 @@ if [ ! -z $epoch ]; then
 
 	fast=2 #we now switch BASIL to fast level '2' - this means it will only do analysis in a single step from here on in, but we will use our existing analysis for initialisation.
 	
-	Dobasil $tempdir/$e $tempdir/$e $tempdir/finalMVN # init with results of first basil run
+	Dobasil $tempdir/$e $tempdir/$e $tempdir/basil/finalMVN # init with results of first basil run
 
         #output 
 	Log "Saving results from epoch: $e"
