@@ -325,7 +325,10 @@ Calibration() {
 	extraoptions=$extraoptions" --t2b $t2bl"
     fi
 
-
+    if [ ! -z $debug ]; then
+	#run asl_calib in debug mode
+	extraoptions=$extraoptions" --debug"
+    fi
 
     # setup the main options that we will pass to aslcalib regardless of whether we are auot generating reference mask
     maincaliboptions="--cgain $cgain --te $te --tr $tr"
@@ -343,12 +346,12 @@ Calibration() {
 #	    usetrans=$tempdir/asl2lowstruct.mat
 #	fi
 
-	usestruc=$tempdir/struc
+	usestruc=$tempdir/struc_bet
 	usetrans=$tempdir/asl2struct.mat
 
 	if [ ! -z $fasthasrun ]; then
 	    # we have already run FAST so we can pass the PVE for CSF to asl_calib (to save running FAST again)
-	    extraoptions=$extraoptions" --refpve $tempdir/seg_pve_0"
+	    extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struct"
 	fi
    
 	$asl_calib -c $calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
@@ -602,7 +605,11 @@ takeargs=0;
 	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
 	--sbrain) strucbet=$argument # user supplied BETed structural
-	    takeargs=1;;
+		  takeargs=1;;
+	--fslanat) fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
+		   takeargs=1;;
+	--fastsrc) fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
+		   takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
 	-t) transflag=1 trans=$argument
@@ -853,7 +860,13 @@ fi
 
 # general pre-processing
 echo "Pre-processing"
-if [ ! -z $struc ]; then
+if [ ! -z $fslanat ]; then
+    # we are being supplied with an fslanat directory
+    # copy over the structural and brain extracted strucutral so that we can use them
+    ${FSLDIR}/bin/imcp $fslanat/T1biascorr $tempdir/struc
+    ${FSLDIR}/bin/imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    
+elif [ ! -z $struc ]; then
     ${FSLDIR}/bin/imcp $struc $tempdir/struc
     Log "Structural image is: $struc"
     if [ -z $strucbet ]; then
@@ -1024,26 +1037,55 @@ if [ $register -eq 1 ]; then
 fi
 ### End of: Registration (1/2)
 
-### Segmentation of structural image
-# Always do this if structural has been provided
-if [ ! -z $struc ]; then
-    echo "Segmenting the structural image"
-    Log "Segmenting the structural image"
-    ${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+### Segmentation of structural image - if we have a structural image we ALWAYS ensure we have a segmentation
+if [ ! -z $fslanat ]; then
+    # we are being supplied with an fslanat directory
+    fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
     
-    #other things from the FAST output
-    fasthasrun=1 #this means that we have CSF PVE for calibration purposes
+    # copy over the things we need and place them using the names used elsewhere
+    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
+    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
 
+    $FSLDIR/bin/imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+    
+elif [ ! -z $struc ]; then
+    # do we have the results from FAST already? If not run it
+    if [ -z $fastsrc ]; then
+	echo "Segmenting the structural image"
+	Log "Segmenting the structural image"
+	${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+	fastsrc=$tempdir/seg
+    else
+	# FAST has been run externally
+	Log "Using FAST outputs at: $fastsrc"
+    fi
+	
+    # we are not sure we have FAST outputs
+    fasthasrun=1
+
+     # copy over the things we need and place them using the names used elsewhere
+    ${FSLDIR}/bin/imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    ${FSLDIR}/bin/imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
+    ${FSLDIR}/bin/imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
+
+    $FSLDIR/bin/imcp ${fastsrc}_bias $tempdir/biasfield_struct
+     
+fi
+
+# some useful preproc to do with FAST outputs
+if [ ! -z $fasthasrun ]; then
     # create a tissseg (wmseg) image for BBR in asl_reg
-    $FSLDIR/bin/fslmaths $tempdir/seg_pve_2 -thr 0.5 -bin ${tempdir}/tissseg
+    $FSLDIR/bin/fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
 
     # transform the bias field and invert to use for sensitivity correction in calibration
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_bias --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
 
     if [ ! -z $senscorr ]; then
 	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
     fi
 fi
+    
 ### End of: Segmentation
 
 ### Generate mask for ASL data
@@ -1294,9 +1336,9 @@ if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
     ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     
     # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_1 --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/seg_pve_2 --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
     ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
     ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
