@@ -951,6 +951,7 @@ if [ $count -lt 2 ]; then
     # OPERATE in 'single TI mode'
     artoff=1; fixbolus=1; #fixbat=1; #fast=1; 
     Log "Operating in Single TI mode"
+    singleti=1;
     
 #elif [ $repeats -gt 1 ]; then
  #   if [ -z $fulldata ]; then
@@ -1232,10 +1233,20 @@ echo "--bat=$bat" >> $tempdir/basil_options.txt
 
 if [ -z $fixbat ]; then
     Log "Variable arterial arrival time"
-    Log "Setting prior/initial bolus arrival time to $bat"
+    Log "Setting prior/initial (tissue/gray matter) bolus arrival time to $bat"
+
+    # Tissue BAT SD
+    #defaults
+    if [ -z $singleti ]; then
+	# multi TI/PLD data, set a more liberal prior for tissue ATT since we should be able to determine from data
+	# NB this leave the arterial BAT alone.
+	batsd=1;
+    fi
+
+    # if required add batsd option for basil
     if [ ! -z $batsd ]; then
-	Log "Setting std dev of the BAT prior to $batsd"
-	echo "--batsd=$batsd" >> $tempdir/basil_options.txt 
+	Log "Setting std dev of the (tissue) BAT prior to $batsd"
+	echo "--batsd=$batsd" >> $tempdir/basil_options.txt
     fi
 else
     basil_options=$basil_options"--fixbat " 
