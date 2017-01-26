@@ -147,7 +147,7 @@ if [ ! -z $nativeout ]; then
 fi
 if [ ! -z $structout ]; then
     if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $struc -out $outdir/struct_space/$subdir/$parname
+    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/$struc -out $outdir/struct_space/$subdir/$parname
 fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
@@ -576,6 +576,7 @@ asl_calib=${FSLDIR}/bin/asl_calib
 
 # defaults that (boolean) command line options can overide
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
+finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
 
 # parse command line here
 until [ -z $1 ]; do
@@ -609,9 +610,11 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--sbrain) strucbet=$argument # user supplied BETed structural
 		  takeargs=1;;
-	--fslanat) fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
+	--fslanat) strucflag=1;
+		   fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
 		   takeargs=1;;
-	--fastsrc) fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
+	--fastsrc) strucflag=1;
+		   fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
 		   takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
@@ -672,7 +675,10 @@ takeargs=0;boolarg="";isbool="";
 	--t2bl) t2bl=$argument #custom T2 of blood
 	    takeargs=1;;
 	--regfrom) regfromflag=1 regfrom=$argument
-	    takeargs=1;;
+		   takeargs=1;;
+	--finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
+		    boolarg=finalreg;
+		    ;;
 	--asl2struc) asl2struc=$argument
 	    takeargs=1;;
 	--cgain) cgain=$argument
@@ -837,8 +843,9 @@ if [ ! -z $strucflag ]; then
 	    echo "ERROR: $struc is not an image/has not been found"
 	    exit 1
 	fi
+	Log "Structural image: $struc"
     fi
-    Log "Structural image: $struc"
+    
 fi
 
 
@@ -891,7 +898,7 @@ echo "Pre-processing"
 if [ ! -z $fslanat ]; then
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
-    ${FSLDIR}/bin/imcp $fslanat/T1biascorr $tempdir/struc
+    ${FSLDIR}/bin/imcp $fslanat/T1_biascorr $tempdir/struc
     ${FSLDIR}/bin/imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     
 elif [ ! -z $struc ]; then
@@ -952,13 +959,13 @@ else
     # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
     #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
 
-    if [ -z $regfrom ]; then
-	# take mean over all volumes as an option to use for (initial) registration and masking
-	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
-	# brain extract this
-	${FSLDIR}/bin/bet $tempdir/asldata_mean $tempdir/asldata_mean_brain -f 0.2
-	regfrom=$tempdir/asldata_mean_brain
-    fi
+#    if [ -z $regfrom ]; then
+#	# take mean over all volumes as an option to use for (initial) registration and masking
+#	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
+#	# brain extract this
+#	${FSLDIR}/bin/bet $tempdir/asldata_mean $tempdir/asldata_mean_brain -f 0.2
+#	regfrom=$tempdir/asldata_mean_brain
+#    fi
 fi
 ### End of : Label-control subtraction
 
@@ -1376,11 +1383,13 @@ Dobasil $datafile $tempdir $initbasil
 ### Registration (2/2)
 # Revisit the registration now that we have a pefusion image (with good GM/WM contrast) using BBR
 # use existing registration for initial aligment
-if [ $register -eq 1 ]; then 
-    echo "Performing final registration"
-    Log "Final registration"
-    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
-    Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+if [ $register -eq 1 ]; then
+    if [ $finalreg -eq 1 ]; then
+	echo "Performing final registration"
+	Log "Final registration"
+	cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
+	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+    fi
 fi
 ### End of: Registration (2/2)
 
@@ -1465,7 +1474,7 @@ fi
 if [ ! -z $calib ]; then
     if [ $cmethod = 'single' ]; then
 	Log "Calibration is using a single M0 value with a CSF reference"
-	if [ -z $csf ] && [ -z $struc ]; then
+	if [ -z $csf ] && [ -z $fasthasrun ]; then
 	    echo "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
 	    exit 1
 	fi
