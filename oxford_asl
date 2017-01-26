@@ -895,20 +895,20 @@ if [ ! -z $fslanat ]; then
     ${FSLDIR}/bin/imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     
 elif [ ! -z $struc ]; then
-    ${FSLDIR}/bin/imcp $struc $tempdir/struc
+    ${FSLDIR}/bin/fslmaths $struc $tempdir/struc
     Log "Structural image is: $struc"
     if [ -z $strucbet ]; then
        #bet the structural for calibration and registration
 	bet $struc $tempdir/struc_bet
 	Log "BET on structural image"
     else
-	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
+	${FSLDIR}/bin/fslmaths $strucbet $tempdir/struc_bet
     fi
 fi
 
 
 if [ ! -z $lowstrucflag ]; then
-    ${FSLDIR}/bin/imcp $lowstruc $tempdir/lowstruc
+    ${FSLDIR}/bin/fslmaths $lowstruc $tempdir/lowstruc
 ## bet the low res. struc (if present)
 #    bet $lowstruc $tempdir/lowstruc_bet
 #    Log "BET on low res. structural image"
@@ -944,7 +944,7 @@ if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
-    imcp $infile $tempdir/diffdata
+    ${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
@@ -1017,7 +1017,7 @@ if [ ! -z $calib ]; then
 	tsize=`expr $tsize - 1`
 	fslroi $calib $tempdir/calib 1 $tsize
     else
-	${FSLDIR}/bin/imcp $calib $tempdir/calib
+	${FSLDIR}/bin/fslmaths $calib $tempdir/calib
     fi
     # take the mean
     fslmaths $tempdir/calib -Tmean $tempdir/calib
@@ -1091,7 +1091,7 @@ elif [ ! -z $struc ]; then
 	Log "Using FAST outputs at: $fastsrc"
     fi
 	
-    # we are not sure we have FAST outputs
+    # we are now sure we have FAST outputs
     fasthasrun=1
 
      # copy over the things we need and place them using the names used elsewhere
@@ -1160,7 +1160,7 @@ fi
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
-    ${FSLDIR}/bin/imcp $isen $outdir/native_space/sensitivity
+    ${FSLDIR}/bin/fslmaths $isen $outdir/native_space/sensitivity
 fi
 
 # Defaults for (some) parameters
@@ -1454,8 +1454,8 @@ if [ -z $alpha ]; then
 fi
 
 if [ -z $cmethod ]; then
-# default calibration method is 'voxelwise' unless a structural image (or CSF mask) is supplied
-    if [ ! -z $struc ] || [ ! -z $csf ]; then
+# default calibration method is 'voxelwise' unless we have CSF PV estimates or CSF mask has been supplied
+    if [ ! -z $fasthasrun ] || [ ! -z $csf ]; then
 	cmethod=single
     else
 	cmethod=voxel
