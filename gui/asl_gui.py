@@ -53,7 +53,7 @@ class AslOptions(props.HasProperties):
     coilSensitivityRefImage = props.FilePath(exists=True, required=False) # Only if useCoilSensitivityRefImage
     calibrateGain = props.Real(default=1.0, minval=0, maxval=100)
     refTissueType = props.Choice(["CSF", "White matter", "Grey matter", "none"])
-    useRefTissueMask = props.Boolean(default=True) #?? Only if refTissueType != none???
+    useRefTissueMask = props.Boolean(default=True)
     refTissueMask = props.FilePath(exists=True, required=False)
     refT1 = props.Real(default=4.3, minval=0, maxval=100)
     refT2 = props.Real(default=0.75, minval=0, maxval=100)
@@ -146,11 +146,11 @@ class AslOptions(props.HasProperties):
             aslCommand.append("-o %s" % self.outputDir)
             aslCommand.append("--tis %s" % self.inversionTimes)
             if self.paramVariance: aslCommand.append("--vars")
-            aslCommand.append("--bolus %f" % self.bolusDuration)
-            aslCommand.append("--bat %f" % self.bolusArrivalTime)
-            aslCommand.append("--t1 %f" % self.t1)
-            aslCommand.append("--t1b %f" % self.t1b)
-            aslCommand.append("--alpha %f" % self.inversionEffic)
+            aslCommand.append("--bolus %.3f" % self.bolusDuration)
+            aslCommand.append("--bat %.3f" % self.bolusArrivalTime)
+            aslCommand.append("--t1 %.3f" % self.t1)
+            aslCommand.append("--t1b %.3f" % self.t1b)
+            aslCommand.append("--alpha %.3f" % self.inversionEffic)
             if self.spatialSmoothing: aslCommand.append("--spatial")
             if self.inferT1: aslCommand.append("--infert1")
             if not self.includeVascular: aslCommand.append("--artoff")
@@ -172,7 +172,7 @@ class AslOptions(props.HasProperties):
                     aslCommand.append("-t %s -S %s" % (self.spaceTransform, self.alternateStandardImage))
 
             foundRegTarget = False
-            if self.tagControlPairs and self.staticTissue in  ("pre-saturation", "background suppressed"):
+            if self.tagControlPairs and self.staticTissue != "background suppressed":
                 aslFileCmd = [self.fslProg("asl_file"),]
                 aslFileCmd.append("--data=%s" % self.inputImage)
                 aslFileCmd.append("--ntis=%i" % len(tis))
@@ -199,36 +199,41 @@ class AslOptions(props.HasProperties):
 
             self.runcmd(" ".join(aslCommand))
 
+            print("calib", self.doCalibration)
             if self.doCalibration:
+                print("doing calib")
                 aslCalibCommand = [self.fslProg("asl_calib"),]
-                aslCalibCommmand.append("-i %s/native_space/perfusion" % self.outputDir)
-                aslCalibCommand.append("--tissref %s" % self.tissueType)
-                aslCalibCommand.append("--t1r %f" % self.referenceT1)
-                aslCalibCommand.append("--t2r %s " % self.referenceT2)
-                aslCalibCommand.append("--t2b %f" % self.bloodT2)
-                aslCalibCommand.append("--te %f" % self.seqTE)
+                aslCalibCommand.append("-i %s/native_space/perfusion" % self.outputDir)
+                aslCalibCommand.append("--tissref %s" % self.refTissueType.lower())
+                aslCalibCommand.append("--t1r %.3f" % self.refT1)
+                aslCalibCommand.append("--t2r %s " % self.refT2)
+                aslCalibCommand.append("--t2b %.3f" % self.bloodT2)
+                aslCalibCommand.append("--te %.3f" % self.seqTE)
                 aslCalibCommand.append("-o %s/calibration" % self.outputDir)
 
-                if self.useRefTissueMask: aslCalibCommand.append("-m %s" % self.refTissueMask)
+                if self.useRefTissueMask:
+                    if not self.refTissueMask:
+                        raise RuntimeError("Reference tissue mask enabled but no image provided")
+                    aslCalibCommand.append("-m %s" % self.refTissueMask)
                 else:
                     aslCalibCommand.append("-s %s/structural_brain" % self.outputDir)
                     aslCalibCommand.append("-t %s/native_space/asl2struct.mat" % self.outputDir)
 
                 if self.brainMask:
                     aslCalibCommand.append("--bmask %s" % self.brainMask)
-                if self.calibrateMode == 0: # long TR
+                if self.calibrateMode == 'Long TR':
                     calibImage = self.m0Image
-                    if self.tagControlPairs and staticTissue == "normal":
+                    if self.tagControlPairs and self.staticTissue == "normal":
                         calibImage = self.outputDir + "/asldata_mc_even"
                     aslCalibCommand.append("-c %s" % calibImage)
-                    aslCalibCommand.append("--mode longtr --tr %f" % self.seqTR)
-                    aslCalibCommand.append("--cgain %f" % self.calibrateGain)
-                    if self.useCoil: aslCalibCommand.append("--cref %s" % self.coilSensitivityRefImage)
-                elif self.calibrateMode == 1: # Saturation Recovery - maybe change aslcalib -c option to even - for MC to think about!!!
+                    aslCalibCommand.append("--mode longtr --tr %.3f" % self.seqTR)
+                    aslCalibCommand.append("--cgain %.3f" % self.calibrateGain)
+                    if self.useCoilSensitivityRefImage: aslCalibCommand.append("--cref %s" % self.coilSensitivityRefImage)
+                elif self.calibrateMode == 'Saturation Recovery': # Maybe change aslcalib -c option to even - for MC to think about!!!
                     aslCalibCommand.append("--tis %s" % self.inversionTimes)
                     aslCalibCommand.append("-c %s/asldata_mc_odd" % self.outputDir)
 
-                    self.runcmd(" ".join(aslCalibCommand))
+                self.runcmd(" ".join(aslCalibCommand))
 
             if self.useCoilSensitivityRefImage:
                 aslDivCommand = "-div %s" % self.coilSensitivityRefImage
@@ -371,11 +376,13 @@ aslView = props.VGroup(
                     props.VGroup(
                         children=(
                             'calibrateMode',
-                            'm0Image',
+                            props.Widget('m0Image', visibleWhen=lambda i: getattr(i, 'staticTissue') == 'background suppressed'  or not getattr(i, 'tagControlPairs')),
                             'useCoilSensitivityRefImage',
                             conditional('coilSensitivityRefImage','useCoilSensitivityRefImage'),
                             'calibrateGain',
                             'refTissueType',
+                            'useRefTissueMask',
+                            conditional('refTissueMask', 'useRefTissueMask'),
                             't1b',
                             'refT1',
                             'refT2',

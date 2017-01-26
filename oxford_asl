@@ -16,9 +16,9 @@ Usage() {
     echo ""
     echo ""
     echo " Main options:"
-    echo " -m        : mask (in native space of ASL data) - {default: automatically generated}"
-    echo " --spatial    : Perform ASL analysis with automatic spatial smoothing of CBF"
-    echo " --wp      : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
+    echo " -m         : mask (in native space of ASL data) - {default: automatically generated}"
+    echo " --spatial  : Use adaptive spatial smoothing on perfusion {default: on}"
+    echo " --wp       : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
     echo " --more     : see extended options and usage notes"
     echo ""
     echo " Acquisition/Data specific"
@@ -574,6 +574,9 @@ basil=${FSLDIR}/bin/basil
 asl_reg=${FSLDIR}/bin/asl_reg
 asl_calib=${FSLDIR}/bin/asl_calib
 
+# defaults that (boolean) command line options can overide
+spatial=1; # we always use spatial priors, use --spatial=off to turn off.
+
 # parse command line here
 until [ -z $1 ]; do
 
@@ -588,7 +591,7 @@ else
     arg=1
     argument=`echo $1 | sed s/.*=//`
 fi
-takeargs=0;
+takeargs=0;boolarg="";isbool="";
     case $option in
 	-o) outflag=1 outdir=$argument
 	    takeargs=1;;
@@ -682,7 +685,9 @@ takeargs=0;
 	    ;;
 	--advout) advout=1
 	    ;;
-	--spatial) spatial=1
+	--spatial) #spatial=1
+		   isbool=1;
+		   boolarg=spatial;
 	    ;;
 	--infert1) infert1=1
 	    ;;
@@ -731,8 +736,31 @@ takeargs=0;
 
     # sort out a shift required by a command line option that takes arguments
     if [ -z $arg ]; then
+	# an argument has been supplied on the command NOT using an =
 	if [ $takeargs -eq 1 ]; then
 	    shift;
+	fi
+    fi
+    
+    if [ ! -z $isbool ]; then
+	    # this is an (explicit) boolean setting
+	if [ ! -z $arg ]; then
+	    # an argument has been supplied on the command not using an =
+	    # set the variable based on the argument
+	    case $argument in
+		on) eval $boolarg=1
+		    ;;
+		off) eval $boolarg=""
+		     ;;
+		1) eval $boolarg=1
+		   ;;
+		0) eval $boolarg=""
+		   ;;
+	    esac
+	else
+	    # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
+	    # this sets the variable to true
+	    eval $boolarg=1;
 	fi
     fi
 
@@ -867,20 +895,20 @@ if [ ! -z $fslanat ]; then
     ${FSLDIR}/bin/imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     
 elif [ ! -z $struc ]; then
-    ${FSLDIR}/bin/imcp $struc $tempdir/struc
+    ${FSLDIR}/bin/fslmaths $struc $tempdir/struc
     Log "Structural image is: $struc"
     if [ -z $strucbet ]; then
        #bet the structural for calibration and registration
 	bet $struc $tempdir/struc_bet
 	Log "BET on structural image"
     else
-	${FSLDIR}/bin/imcp $strucbet $tempdir/struc_bet
+	${FSLDIR}/bin/fslmaths $strucbet $tempdir/struc_bet
     fi
 fi
 
 
 if [ ! -z $lowstrucflag ]; then
-    ${FSLDIR}/bin/imcp $lowstruc $tempdir/lowstruc
+    ${FSLDIR}/bin/fslmaths $lowstruc $tempdir/lowstruc
 ## bet the low res. struc (if present)
 #    bet $lowstruc $tempdir/lowstruc_bet
 #    Log "BET on low res. structural image"
@@ -916,7 +944,7 @@ if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
-    imcp $infile $tempdir/diffdata
+    ${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
@@ -1063,7 +1091,7 @@ elif [ ! -z $struc ]; then
 	Log "Using FAST outputs at: $fastsrc"
     fi
 	
-    # we are not sure we have FAST outputs
+    # we are now sure we have FAST outputs
     fasthasrun=1
 
      # copy over the things we need and place them using the names used elsewhere
@@ -1132,7 +1160,7 @@ fi
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
-    ${FSLDIR}/bin/imcp $isen $outdir/native_space/sensitivity
+    ${FSLDIR}/bin/fslmaths $isen $outdir/native_space/sensitivity
 fi
 
 # Defaults for (some) parameters
@@ -1285,7 +1313,8 @@ if [ ! -z $spatial ]; then
 # if we are using spatial smoothing on CBF then we will also do the analysis in a single step
     echo "Instructing BASIL to use automated spatial smoothing"
     basil_options=$basil_options"--spatial "
-    Log "Employing spatail VB"
+    Log "Employing spatial VB"
+
 fi
 
 if [ ! -z $infert1 ]; then
@@ -1426,8 +1455,8 @@ if [ -z $alpha ]; then
 fi
 
 if [ -z $cmethod ]; then
-# default calibration method is 'voxelwise' unless a structural image (or CSF mask) is supplied
-    if [ ! -z $struc ] || [ ! -z $csf ]; then
+# default calibration method is 'voxelwise' unless we have CSF PV estimates or CSF mask has been supplied
+    if [ ! -z $fasthasrun ] || [ ! -z $csf ]; then
 	cmethod=single
     else
 	cmethod=voxel
