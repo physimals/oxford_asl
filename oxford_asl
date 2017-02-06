@@ -147,7 +147,7 @@ if [ ! -z $nativeout ]; then
 fi
 if [ ! -z $structout ]; then
     if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/$struc -out $outdir/struct_space/$subdir/$parname
+    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname
 fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
@@ -656,8 +656,8 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--isen) isen=$argument; senscorr=1;
 	    takeargs=1;;
-	#--senscorr) needseg=1; senscorr=1; #disbale 
-	#    ;;
+	--senscorr) needseg=1; senscorr=1; #disbale 
+	    ;;
 	--M0) M0=$argument; calibflag=1;
 	    takeargs=1;;
 	--t1t) t1tset=$argument; #the T1 of tissue to be used in calibration
