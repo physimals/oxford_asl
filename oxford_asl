@@ -751,7 +751,7 @@ takeargs=0;boolarg="";isbool="";
     if [ ! -z $isbool ]; then
 	    # this is an (explicit) boolean setting
 	if [ ! -z $arg ]; then
-	    # an argument has been supplied on the command not using an =
+	    # an argument has been supplied on the command using an =
 	    # set the variable based on the argument
 	    case $argument in
 		on) eval $boolarg=1
@@ -762,6 +762,10 @@ takeargs=0;boolarg="";isbool="";
 		   ;;
 		0) eval $boolarg=""
 		   ;;
+		*)  Usage
+		    echo "Error! Unrecognised setting for boolean option: $1"
+		    echo ""
+		    exit 1;;
 	    esac
 	else
 	    # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
@@ -769,6 +773,7 @@ takeargs=0;boolarg="";isbool="";
 	    eval $boolarg=1;
 	fi
     fi
+
 
     # shift to move on to next parameter
     shift
