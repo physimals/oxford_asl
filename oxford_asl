@@ -87,6 +87,16 @@ Usage_extended() {
     echo "    --t2csf    : T2 of CSF (ms) - {for default see asl_calib}"
     echo "    --t2bl     : T2 of blood (ms) - {for default see asl_calib}"
     echo "    --cref     : Supply a reference image for sensitivity correction"
+
+    echo " Distortion correction using fieldmap (see epi_reg):"
+    echo " --fmap=<image>         : fieldmap image (in rad/s)"
+    echo " --fmapmag=<image>      : fieldmap magnitude image - wholehead extracted"
+    echo " --fmapmagbrain=<image> : fieldmap magnitude image - brain extracted"
+    echo " --wmseg=<image>        : white matter segmentation of T1 image"
+    echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
+    echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
+    echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already registered) "
+    echo ""
  
     echo "Partial volume correction"
     echo " --pvcorr    : Do partial volume correction"
@@ -265,22 +275,34 @@ Normalise_var() {
 
 
 Registration() {
-echo "Performing registration"
-regbase=$1 #the i/p to the function is the image to use for registration
-transopt=$2 # other options to pass to asl_reg
-extraoptions=" "
-if [ ! -z $lowstrucflag ]; then
-    extraoptions=$extraoptions"-r $tempdir/lowstruc"
-fi
-if [ ! -z $debug ]; then
-    extraoptions=$extraoptions" --debug"
-fi
-
-#if [ ! -z $reginit ]; then
-#    extraoptions=$extraoptions" -c $reginit"
-#fi
-
-$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
+    echo "Performing registration"
+    regbase=$1 #the i/p to the function is the image to use for registration
+    transopt=$2 # other options to pass to asl_reg
+    distout=$3 # we want to do distortion correction and save in the subdir distout
+    
+    extraoptions=" "
+    if [ ! -z $lowstrucflag ]; then
+	extraoptions=$extraoptions"-r $tempdir/lowstruc"
+    fi
+    if [ ! -z $debug ]; then
+	extraoptions=$extraoptions" --debug"
+    fi
+    
+    #if [ ! -z $reginit ]; then
+    #    extraoptions=$extraoptions" -c $reginit"
+    #fi
+    
+    if [ -z $disout ]; then
+	# normal registration
+	$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
+    else
+	# registration for distortion correction
+	fmapregstr=""
+	if [ ! -z $nofmapreg ]; then
+	    fmapregstr="--nofmapreg"
+	fi
+	$asl_reg -i $regbase -o $tempdir/$disout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
+    fi
 }
 
 Calibration() {
@@ -725,6 +747,22 @@ takeargs=0;boolarg="";isbool="";
 	       takeargs=1;;
 	--fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
 		;;
+
+	# fieldmap/distorition correction related arguments
+	--fmap) fmap=$argument
+		takeargs=1;;
+	--fmapmag) fmapmag=$argument
+		   takeargs=1;;
+	--fmapmagbrain) fmapmagbrain=$argument
+			takeargs=1;;
+	--echospacing) echospacing=$argument
+		       takeargs=1;;
+	--pedir) pedir=$argument
+		 takeargs=1;;
+	--nofmapreg) isbool=1
+		     boolarg=nofmapreg
+		     ;;
+	# 
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -939,7 +977,7 @@ done
 Log "TIs list: $tislist"
 ### End of: Deal with the TIs
 
-### label-control subtraction
+### Label-control subtraction (we repeat subtraction after doing distortion correction - when applicable)
 # We get data into correct block format for BASIL here
 if [ -z $iaf ]; then
     # DEFAULT input ASL format is 'diff' (label-control difference data) - maintains backward compatibility
@@ -956,21 +994,15 @@ if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
-    ${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
+    #${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
     asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    
     # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
     # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
     #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
 
-#    if [ -z $regfrom ]; then
-#	# take mean over all volumes as an option to use for (initial) registration and masking
-#	${FSLDIR}/bin/fslmaths $infile -Tmean $tempdir/asldata_mean
-#	# brain extract this
-#	${FSLDIR}/bin/bet $tempdir/asldata_mean $tempdir/asldata_mean_brain -f 0.2
-#	regfrom=$tempdir/asldata_mean_brain
-#    fi
 fi
 ### End of : Label-control subtraction
 
@@ -1039,6 +1071,8 @@ fi
 
 # take mean of the asl data as we might need this later
 fslmaths $infile -Tmean $tempdir/meanasl
+# generate a perfusion-weighted image by taking the mean over all TIs
+fslmaths $tempdir/diffdata_mean -Tmean $tempdir/pwi
 
 ### Registration (1/2)
 # Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
@@ -1169,6 +1203,40 @@ else
     Log "Using mask: $mask"
 fi
 ### End of: Generate mask
+
+### Distortion Correction
+echo 'Distortion Correction'
+
+# Do registration to T1 to get distortion correction warp
+# use whatever registration matrix we already have to initialise here 
+distbase=$tempdir/pwi # use the perfusion-weighted image (mean over all TIs) as the best basis we have for registration at this point
+if [ -z finalreg ]; then
+    distbase=$regfrom # use whatever image we have been using for (inital) registration
+fi
+Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
+
+# generate the correction warp
+${FSLDIR}/bin/convert_xfm -omat $tempdir/distcorr/asl2struct.mat -inverse $tempdir/distcorr/strcut2asl.mat
+${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/discorr/asl2struct.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+
+# Now apply the correction to the data
+${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/distcorr/asldist_warp --rel --interp=spline --paddingsize=1
+${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
+# Repeat the label-control subtraction on the corrected data
+if [ $iaf = 'diff' ]; then
+    # make sure the block format is correct for BASIL
+    asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+else
+    # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
+    asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+fi
+
+# Now apply the correction to the calibration image
+${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/distcorr/asldist_warp --rel --interp=spline --paddingsize=1
+${FSLDIR}/bin/fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
+
+### End of: Distortion Correction
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
