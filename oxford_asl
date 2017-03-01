@@ -1205,36 +1205,37 @@ fi
 ### End of: Generate mask
 
 ### Distortion Correction
-echo 'Distortion Correction'
-
-# Do registration to T1 to get distortion correction warp
-# use whatever registration matrix we already have to initialise here 
-distbase=$tempdir/pwi # use the perfusion-weighted image (mean over all TIs) as the best basis we have for registration at this point
-if [ -z finalreg ]; then
-    distbase=$regfrom # use whatever image we have been using for (inital) registration
+if [ ! -z $fmap ]; then
+    echo 'Distortion Correction'
+    
+    # Do registration to T1 to get distortion correction warp
+    # use whatever registration matrix we already have to initialise here 
+    distbase=$tempdir/pwi # use the perfusion-weighted image (mean over all TIs) as the best basis we have for registration at this point
+    if [ -z finalreg ]; then
+	distbase=$regfrom # use whatever image we have been using for (inital) registration
+    fi
+    Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
+    
+    # generate the correction warp
+    ${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+    ${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    
+    # Now apply the correction to the data
+    ${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    ${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
+    # Repeat the label-control subtraction on the corrected data
+    if [ $iaf = 'diff' ]; then
+	# make sure the block format is correct for BASIL
+	asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    else
+	# create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
+	asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    fi
+    
+    # Now apply the correction to the calibration image
+    ${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    ${FSLDIR}/bin/fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
 fi
-Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
-
-# generate the correction warp
-${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
-${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
-
-# Now apply the correction to the data
-${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
-# Repeat the label-control subtraction on the corrected data
-if [ $iaf = 'diff' ]; then
-    # make sure the block format is correct for BASIL
-    asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
-else
-    # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-    asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
-fi
-
-# Now apply the correction to the calibration image
-${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-${FSLDIR}/bin/fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
-
 ### End of: Distortion Correction
 
 if [ ! -z $isen ]; then
