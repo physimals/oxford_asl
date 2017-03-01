@@ -298,8 +298,9 @@ echo "Registration FINAL stage (BBR)"
     echo "Saving FINAL output"
     cp $outdir/asl2struct.mat $outdir/asl2struct_init.mat # save the initial transformation matrix to allow chekcing if this part failed
     cp $tempdir/low2high_final.mat $outdir/asl2struct.mat #the transformation matrix from epi_reg - this overwrites the version from MAIN registration
-    if [ -z $fmap ]; then
-	$FSLDIR/bin/imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
+    ${FSLDIR}/bin/convert_xfm -omat $outdir/struct2asl.mat -inverse $outdir/asl2struct.mat #often useful to have the inverse transform, so calcuate it
+    if [ ! -z $fmap ]; then
+	${FSLDIR}/bin/imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
     fi
     ${FSLDIR}/bin/imcp $tempdir/low2high_final $outdir/asl2struct # save the transformed image to check on the registration
     

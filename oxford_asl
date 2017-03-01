@@ -292,7 +292,7 @@ Registration() {
     #    extraoptions=$extraoptions" -c $reginit"
     #fi
     
-    if [ -z $disout ]; then
+    if [ -z $distout ]; then
 	# normal registration
 	$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
     else
@@ -301,7 +301,7 @@ Registration() {
 	if [ ! -z $nofmapreg ]; then
 	    fmapregstr="--nofmapreg"
 	fi
-	$asl_reg -i $regbase -o $tempdir/$disout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
+	$asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
     fi
 }
 
@@ -1216,12 +1216,11 @@ fi
 Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
 
 # generate the correction warp
-${FSLDIR}/bin/convert_xfm -omat $tempdir/distcorr/asl2struct.mat -inverse $tempdir/distcorr/strcut2asl.mat
-${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/discorr/asl2struct.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
 ${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
 
 # Now apply the correction to the data
-${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/distcorr/asldist_warp --rel --interp=spline --paddingsize=1
+${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
 ${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
 # Repeat the label-control subtraction on the corrected data
 if [ $iaf = 'diff' ]; then
@@ -1233,7 +1232,7 @@ else
 fi
 
 # Now apply the correction to the calibration image
-${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/distcorr/asldist_warp --rel --interp=spline --paddingsize=1
+${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
 ${FSLDIR}/bin/fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
 
 ### End of: Distortion Correction
