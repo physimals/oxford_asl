@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
 
    //deal with input data type options
-    bool isblocked=false; //indicates if data is in blocks of repeats rather than TIs
+    bool isblocked=false; //indicates if data is in blocks of repeats (of all TIs) rather than TIs
     bool ispairs=false; //indicates if data contains adjacent pairs of measurments
     bool isdiff=false; //indicates if we have differenced data
     bool tagfirst=true; //indicates that tag comes first in tag-control pairs
@@ -191,12 +191,12 @@ int main(int argc, char *argv[])
 
   if (opts.splitpairs.value()) {
     // need to split the data here if split pairs has been requested
-    separatepairs(asldata,asldataodd,asldataeven,blockpairs);
+    separatepairs(asldata,asldataodd,asldataeven);
     }
 
   //tag control difference
   if (opts.tcdiff.value()) {
-    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
+    separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
     //overwrite asldata with differenced data
     for (int ti=0; ti<ntis; ti++) {
       asldata[ti] = asldataeven[ti] - asldataodd[ti];
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
   // surround tag-control difference
   if (opts.surrtcdiff.value()) {
-    separatepairs(asldata,asldataodd,asldataeven,blockpairs); //split pairs ready for differencing
+    separatepairs(asldata,asldataodd,asldataeven); //split pairs ready for differencing
     //overwrite asldata with differenced data
     for (int ti=0; ti<ntis; ti++) {
       //Matrix tempindata;
