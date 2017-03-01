@@ -86,11 +86,13 @@ namespace OXASL {
 	
 	for (int ti=1; ti<=ntis; ti++) {
 	  if (blockpairs) {
+
 	    Matrix thisti(nmeas,nvox);
 	    thisti=0;
 	    //extract the measurements for this TI
 	    for (int i=1; i<=nrpts; i++)
 	      {
+
 		thisti.Row(2*i-1) = datamtx.Row((ti-1)*2*nrpts + i);
 		thisti.Row(2*i)   = datamtx.Row((ti-1)*2*nrpts + i + nrpts);
 	      }
