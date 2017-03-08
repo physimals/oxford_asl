@@ -1432,7 +1432,7 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 ### First analysis on whole data, normal perfusion image
 echo "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
-if [ 0 -eq 1 ]; then # DISABLED!! [ $repeats -gt 1 ]; then
+if [ $repeats -gt 1 ]; then
     # do an initial analysis using the data averaged at each TI
     Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
     datafile=$tempdir/diffdata_mean
@@ -1441,7 +1441,7 @@ if [ 0 -eq 1 ]; then # DISABLED!! [ $repeats -gt 1 ]; then
     echo "--repeats=1" >> $tempdir/init/basil_options.txt
     echo "$tislist" >> $tempdir/init/basil_options.txt
     Dobasil $datafile $tempdir/init
-    initbasil=$tempdir/init/basil/finalMVN
+    initbasil=$tempdir/init/finalMVN
 fi
 
 # main analysis using full data
