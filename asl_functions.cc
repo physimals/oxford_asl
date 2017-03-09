@@ -93,7 +93,7 @@ namespace OXASL {
 
 	int startvol=1;
 	for (int ti=1; ti<=ntis; ti++) {
-	  cout << ti << endl;
+	  //cout << ti << endl;
 	  if (nrpts.size() > 1) {
 	    // variable number of repeats at each TI
 	    if (ispairs) nmeas = nrpts[ti-1]*2;
@@ -105,7 +105,7 @@ namespace OXASL {
 	  }
 	  Matrix thisti(nmeas,nvox);
 
-	  cout << thisnrpts << "   " << nmeas << endl;
+	  //cout << thisnrpts << "   " << nmeas << endl;
 	  
 	  if (blockpairs) {
 	    Matrix thisti(nmeas,nvox);
@@ -125,11 +125,11 @@ namespace OXASL {
 	  }
 
 	  startvol += nmeas;
-	  cout << startvol << endl;
+	  //cout << startvol << endl;
 	  nvols += nmeas;
 	}
 
-	cout << nvols << endl;
+	//cout << nvols << endl;
 	if (datamtx.Nrows() > nvols) throw Exception("Orphaned data found at end of file - this is not logical when data is in TI blocks");
       }
   }

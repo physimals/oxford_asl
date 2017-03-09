@@ -629,6 +629,8 @@ takeargs=0;boolarg="";isbool="";
 	       takeargs=1;;
 	--ibf) ibf=$argument # input block format (asl_file syntax)
 	       takeargs=1;;
+	--rpts) rpts=$argument # the number of repeats at each TI (when --ibf=tis) - to be passed to asl_file
+		takeargs=1;;
 	-c) calibflag=1 calib=$argument #calibration image
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
@@ -1010,14 +1012,22 @@ if [ -z $ibf ]; then
 fi
 Log "Input block format is: $ibf"
 
+afrptstr=""
+if [ $ibf == "tis" ]; then
+    if [ ! -z $rpts ]; then
+	# the repeats at each TI have been specified
+	afrptstr="--rpts=$rpts"
+    fi
+fi
+
 if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    asl_file --data=$infile --ntis=$count --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
     #${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    asl_file --data=$infile --ntis=$count --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     
     # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
     # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
@@ -1028,11 +1038,16 @@ fi
 
 ### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
 tpoints=`fslinfo $tempdir/diffdata | grep "^dim4" | sed 's:dim4[ ]*::'`
-repeats=`expr $tpoints / $count`
 
 echo "Number of inversion times: $count"
 echo "Number of timepoints in data: $tpoints"
-echo "Number of repeats in data: $repeats"
+
+if [ -z $afrptstr ]; then
+    repeats=`expr $tpoints / $count`
+    echo "Number of repeats in data: $repeats"
+else
+    repeats=0 #variable number of repeats at each TI - have to handle specially
+fi
 ### End of: Establish number of repeats
 
 # Single or Multi TI setup
@@ -1070,9 +1085,9 @@ for ((r=1; r<$repeats; r++)); do
 	idx=`expr $r \* $count + $i`
 	alltis[$idx]=${alltis[$i]}
     done
-done
-echo ${alltis[*]}
+    echo ${alltis[*]}
 Log `echo ${alltis[*]}`
+fi
 
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
