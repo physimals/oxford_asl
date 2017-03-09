@@ -20,7 +20,9 @@ namespace OXASL {
     //cout << nmeas << " " << nrpts << " " << endl;
 
     if (isblocked)
+      // blocks of repateed measurements - each block contains one version of each TI
       {
+
 	Matrix thisti(nmeas,nvox);
 	for (int ti=1; ti<=ntis; ti++) 
 	  {
@@ -32,14 +34,19 @@ namespace OXASL {
 		if (ispairs) {
 		  if (blockpairs) {
 		    //we get all the tags for this repeat then all the controls (or vice versa)
-		    thisti.Row(i) = datamtx.Row(2*(i-1)*ntis+ti);
-		    thisti.Row(i+nrpts) = datamtx.Row(2*(i-1)*ntis+ntis+ti);
+		    // but we want to assmebl them into alternating tag-control
+		    
+		    thisti.Row(2*i-1) = datamtx.Row(2*(i-1)*ntis+ti);
+		    thisti.Row(2*i)   = datamtx.Row(2*(i-1)*ntis+ti + ntis);
+		    
+		    //thisti.Row(i) = datamtx.Row(2*(i-1)*ntis+ti);
+		    // thisti.Row(i+nrpts) = datamtx.Row(2*(i-1)*ntis+ntis+ti);
 		    // NOTE that we keep it internally in blockpair format
 		  }
 		  else {
 		    //tag controla pairs are adjacent volumes
 		    thisti.Row(2*i-1) = datamtx.Row(2*(i-1)*ntis+2*ti-1);
-		    thisti.Row(2*i) = datamtx.Row(2*(i-1)*ntis+2*ti);
+		    thisti.Row(2*i)   = datamtx.Row(2*(i-1)*ntis+2*ti);
 		  }
 		}
 		else {
@@ -74,12 +81,28 @@ namespace OXASL {
       }
     else 
       {
-
-	for (int ti=1; ti<=ntis; ti++) 
-	  //asldata[ti-1].ReSize(nvox,nmeas);
-	  asldata.push_back(datamtx.Rows((ti-1)*nmeas+1,ti*nmeas));
-
-	if (datamtx.Nrows() > nmeas*ntis) throw Exception("Orphaned data found at end of file - this is not logical when data is in TI blocks");
+	
+	for (int ti=1; ti<=ntis; ti++) {
+	  if (blockpairs) {
+	    Matrix thisti(nmeas,nvox);
+	    thisti=0;
+	    //extract the measurements for this TI
+	    for (int i=1; i<=nrpts; i++)
+	      {
+		thisti.Row(2*i-1) = datamtx.Row((ti-1)*2*nrpts + i);
+		thisti.Row(2*i)   = datamtx.Row((ti-1)*2*nrpts + i + nrpts);
+	      }
+	    
+	    asldata.push_back(thisti);
+	    
+	  }
+	  else {
+	    asldata.push_back(datamtx.Rows((ti-1)*nmeas+1,ti*nmeas));
+	  }
+	  
+	  if (datamtx.Nrows() > nmeas*ntis) throw Exception("Orphaned data found at end of file - this is not logical when data is in TI blocks");
+	}
+	
       }
   }
 
@@ -89,6 +112,7 @@ namespace OXASL {
     int nmeas = asldata.back().Nrows(); //safer to determine this from the very last TI (in case of orphan measurements when nodiscard is turned on)
     int ninc=1;
     if (outpairs) ninc=2;
+
     
     if (outblocked) {
       datareturn.ReSize(ntis*nmeas,nvox);
@@ -103,6 +127,7 @@ namespace OXASL {
 	  }
 	}
       assert(idx-1==ntis*nmeas);
+    
 
       /*
       //deal with orphans
@@ -129,7 +154,7 @@ namespace OXASL {
     }
   }
 
-  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven, bool blockpairs) {
+  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven) {
     int ntis = asldata.size();
     int nmeas = asldata[0].Nrows();
     int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
@@ -147,13 +172,13 @@ namespace OXASL {
       Matrix evenmtx;
      
 
-      if (blockpairs) {
+      /*if (blockpairs) {
 	// data is in the form of a block of all tag (control) followed by a block of control (tag)
 	oddmtx = asldata[ti].Rows(1,nrpts);
 	evenmtx = asldata[ti].Rows(nrpts+1,nmeas);
 	
       }
-      else {
+      else {*/
 	// data is in the form of adjacent tag control pairs
 	oddmtx = asldata[ti].Row(1);
 	evenmtx = asldata[ti].Row(2);
@@ -163,7 +188,7 @@ namespace OXASL {
 	  oddmtx &= asldata[ti].Row(idx);
 	  evenmtx &= asldata[ti].Row(idx+1);
 	}
-      }
+	//}
 	
       asldataodd.push_back(oddmtx);
       asldataeven.push_back(evenmtx);
@@ -211,7 +236,7 @@ namespace OXASL {
 	//need to preserve pairs in the data - separate
 	vector<Matrix> asldataodd;
 	vector<Matrix> asldataeven;
-	separatepairs(asldata,asldataodd,asldataeven,false);
+	separatepairs(asldata,asldataodd,asldataeven);
 
 	//take mean of odds and evens
 	vector<Matrix> meanodd;
@@ -330,7 +355,7 @@ namespace OXASL {
       //need to preserve pairs in the data - separate
       vector<Matrix> asldataodd;
       vector<Matrix> asldataeven;
-      separatepairs(asldata,asldataodd,asldataeven,false);
+      separatepairs(asldata,asldataodd,asldataeven);
 
       vector<Matrix> oddepochs;
       if (!tiunit) {

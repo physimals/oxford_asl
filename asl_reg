@@ -2,7 +2,7 @@
 
 # ASL_REG: Registration for ASL data
 #
-# Michael Chappell & Brad MacIntosh, FMRIB Image Analysis & Physics Groups
+# Michael Chappell, IBME QuBIc & FMRIB Image Analysis Groups
 #
 # Copyright (c) 2008-2016 University of Oxford
 #
@@ -18,19 +18,32 @@ Usage() {
     echo " {-o}       : specify output directory - {default: pwd}"
     echo " -s         : specify structural brain image - wholehead"
     echo " {--sbet}   : specify structural brain image - brain extracted"
+    echo " {--init}   : specify initial transformation matrix for input to structural image"
+    echo ""
     echo " Extra 'final' registration refinement (optional parameters in {}):"
     echo "  -c            : specify an ASL control/calibration image for initial registration - brain extracted"
     echo "  {-m}          : specify a brain mask for brain extraction of the input image"
     echo "  {--tissseg}   : specify tissue segmenation image for bbr (in structural image space)"
     echo "  {--finalonly} : only run the 'final' registration step"
-    echo " Extended options (all optional):"
-#    echo " -t         : specify structural-->standard brain transformation matrix"
-    echo " -r         : specify extra low resolution structural image - brain extracted"
-    echo " --imat     : specify initial transformation matrix for input to structural image"
-    echo "                if supplying a low res. structural this matrix should refer to that image"
-    echo " --inweight : specify weights for input image"
-    echo "                same functionality as the flirt -inweight option"
     echo ""
+    echo " Distortion correction using fieldmap (see epi_reg):"
+    echo " --fmap=<image>         : fieldmap image (in rad/s)"
+    echo " --fmapmag=<image>      : fieldmap magnitude image - wholehead extracted"
+    echo " --fmapmagbrain=<image> : fieldmap magnitude image - brain extracted"
+    echo " --wmseg=<image>        : white matter segmentation of T1 image"
+    echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
+    echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
+    echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already registered) "
+    echo ""
+
+    # The following functionality has not bee removed altogether but has been depreceated or changed
+    #echo " Extended options (all optional):"
+    #echo " -r         : specify extra low resolution structural image - brain extracted"
+    #echo " --init     : specify initial transformation matrix for input to structural image"
+    #echo "                if supplying a low res. structural this matrix should refer to that image"
+    #echo " --inweight : specify weights for input image"
+    #echo "                same functionality as the flirt -inweight option"
+    #echo ""
 }
 
 #deal with options
@@ -40,36 +53,73 @@ if [ -z $1 ]; then
    exit 1
 fi
 
+#parse command line
 until [ -z $1 ]; do
-    case $1 in
-	-o) outflag=1 outdir=$2
-	    shift;;
-	-i) inflag=1 infile=$2
-	    shift;;
-	-s) strucflag=1 struc=$2
-	    shift;;
-	-m) mask=$2
-	    shift;;
-#	-t) transflag=1 trans=$2
-#	    shift;;
-	-r) lowstrucflag=1 lowstruc=$2
-	    shift;;
-	--imat) init=1 inmat=$2
-		shift;;
-	--inweight) inweight=$2
-		    shift;;
-	-c) cflag=1 cfile=$2
-	    shift;;
-	--sbet) sbet=$2
-		shift;;
-	--tissseg) tissseg=$2
-		   shift;;
-	--finalonly) finalonly=1 #only run the final BBR part
+
+# look at this option and determine if has an argument specified by an =
+option=`echo $1 | sed s/=.*//`
+arg="" #specifies if an argument is to be read from next item on command line (=1 is is when = is used)
+if [ $option = $1 ]; then
+# no argument to this command has been found with it (i.e. after an =)
+# if there is an argument it will be the next option
+    argument=$2
+else
+    arg=1
+    argument=`echo $1 | sed s/.*=//`
+fi
+
+takeargs=0;boolarg="";isbool="";
+    
+    case $option in
+	-o) outflag=1 outdir=$argument
+	    takeargs=1;;
+	--out) outflag=1 outdir=$argument
+	    takeargs=1;;
+	-i) inflag=1 infile=$argument
+	    takeargs=1;;
+	-s) strucflag=1 struc=$argument
+	    takeargs=1;;
+	-t1) strucflag=1 struc=$argument
+	    takeargs=1;;
+	-m) mask=$argument
+	    takeargs=1;;
+	-r) lowstrucflag=1 lowstruc=$argument
+	    takeargs=1;;
+	--imat) init=1 inmat=$argument
+		takeargs=1;;
+	--init) init=1 inmat=$argument
+		takeargs=1;;
+	--inweight) inweight=$argument
+		    takeargs=1;;
+	-c) cflag=1 cfile=$argument
+	    takeargs=1;;
+	--sbet) sbet=$argument
+		takeargs=1;;
+	--t1brain) sbet=$argument
+		takeargs=1;;
+	--tissseg) tissseg=$argument
+		   takeargs=1;;
+	--finalonly) isbool=1;
+		     boolarg=finalonly #only run the final BBR part
 		    ;;
-	--mainonly) mainonly=1 # only run the first flirt part (to get inital alignment)
+	--mainonly) isbool=1;
+		    boolarg=mainonly # only run the first flirt part (to get inital alignment)
 	    ;;
-	--flirtsch) flirtsch=$2
-	    shift;;
+	--flirtsch) flirtsch=$argument
+		    takeargs=1;;
+	--fmap) fmap=$argument
+		takeargs=1;;
+	--fmapmag) fmapmag=$argument
+		   takeargs=1;;
+	--fmapmagbrain) fmapmagbrain=$argument
+			takeargs=1;;
+	--echospacing) echospacing=$argument
+		       takeargs=1;;
+	--pedir) pedir=$argument
+		 takeargs=1;;
+	--nofmapreg) isbool=1
+		     boolarg=nofmapreg
+		     ;;
 	--debug) debug=1
 	    ;;
 	*)  Usage
@@ -77,7 +127,43 @@ until [ -z $1 ]; do
 	    echo ""
 	    exit 1;;
     esac
-    shift
+
+    # sort out a shift required by a command line option that takes arguments
+    if [ -z $arg ]; then
+	# an argument has been supplied on the command NOT using an =
+	if [ $takeargs -eq 1 ]; then
+	    shift;
+	fi
+    fi
+
+     if [ ! -z $isbool ]; then
+	    # this is an (explicit) boolean setting
+	if [ ! -z $arg ]; then
+	    # an argument has been supplied on the command using an =
+	    # set the variable based on the argument
+	    case $argument in
+		on) eval $boolarg=1
+		    ;;
+		off) eval $boolarg=""
+		     ;;
+		1) eval $boolarg=1
+		   ;;
+		0) eval $boolarg=""
+		   ;;
+		*)  Usage
+		    echo "Error! Unrecognised setting for boolean option: $1"
+		    echo ""
+		    exit 1;;
+	    esac
+	else
+	    # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
+	    # this sets the variable to true
+	    eval $boolarg=1;
+	fi
+     fi
+     
+     # shift to move on to next parameter
+     shift
 done
 
 echo "ASL_REG"
@@ -191,7 +277,18 @@ echo "Registration FINAL stage (BBR)"
     ${FSLDIR}/bin/imcp $mask $outdir/mask
     
     # do a final refinement of the registration using the perfusion and the white matter segmentation - using epi_reg to get BBR (and allow for fielmap correction in future)
+
+    if [ -z $fmap ]; then
+    # Without fieldmap
     $FSLDIR/bin/epi_reg --epi=$tempdir/asldata_brain --t1=$struc --t1brain=$sbet $epi_inittext --out=$tempdir/low2high_final --wmseg=$tissseg $weigthinstr
+    else
+	# With fieldmap
+	fmapregstr=""
+	if [ ! -z $nofmapreg ]; then
+	   fmapregstr="--nofmapreg"
+	fi
+    $FSLDIR/bin/epi_reg --epi=$tempdir/asldata_brain --t1=$struc --t1brain=$sbet $epi_inittext --out=$tempdir/low2high_final --wmseg=$tissseg $weigthinstr --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
+    fi
     
     #	$FSLDIR/bin/flirt -ref $sbet -in $infile -dof 6 -cost bbr -wmseg $wmseg -init $tempdir/low2high.mat -omat $tempdir/low2high.mat -out $tempdir/low2high_final -schedule ${FSLDIR}/etc/flirtsch/bbr.sch
 
@@ -201,7 +298,10 @@ echo "Registration FINAL stage (BBR)"
     echo "Saving FINAL output"
     cp $outdir/asl2struct.mat $outdir/asl2struct_init.mat # save the initial transformation matrix to allow chekcing if this part failed
     cp $tempdir/low2high_final.mat $outdir/asl2struct.mat #the transformation matrix from epi_reg - this overwrites the version from MAIN registration
-    #$FSLDIR/bin/imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
+    ${FSLDIR}/bin/convert_xfm -omat $outdir/struct2asl.mat -inverse $outdir/asl2struct.mat #often useful to have the inverse transform, so calcuate it
+    if [ ! -z $fmap ]; then
+	${FSLDIR}/bin/imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
+    fi
     ${FSLDIR}/bin/imcp $tempdir/low2high_final $outdir/asl2struct # save the transformed image to check on the registration
     
     # copy the edge image from epi_reg output as that is good for visualisation

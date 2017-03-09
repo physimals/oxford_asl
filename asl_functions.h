@@ -22,7 +22,7 @@ namespace OXASL {
   void stdform2data(vector<Matrix>& asldata, Matrix& datareturn, bool outblocked, bool outpairs);
 
   // separate the pairs in the data (into seprate standard form items)
-  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven, bool blockpairs);
+  void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven);
   void mergepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>&asldataeven);
 
   // mean the data at each TI
