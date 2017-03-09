@@ -1017,6 +1017,11 @@ if [ $ibf == "tis" ]; then
     if [ ! -z $rpts ]; then
 	# the repeats at each TI have been specified
 	afrptstr="--rpts=$rpts"
+
+	if [ ! -z $epoch ]; then
+	    echo "ERROR: cannot do epochwise analysis when there are not the same number of repeats for each TI"
+	    exit 1
+	fi
     fi
 fi
 
