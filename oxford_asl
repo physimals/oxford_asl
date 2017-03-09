@@ -129,7 +129,7 @@ Usage_extended() {
 }
 
 Version() {
-echo "$Id: oxford_asl,v 1.43 2015/08/07 14:43:52 chappell Exp $"
+echo "$Id$"
 exit 0
 }
 
@@ -773,7 +773,7 @@ else
 fi
 
 echo "OXFORD_ASL - running"
-
+echo "File ID: $Id$"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
