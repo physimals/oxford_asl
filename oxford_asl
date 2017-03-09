@@ -1039,8 +1039,10 @@ if [ $count -lt 2 ]; then
     #    datafile=$tempdir/diffdata
 fi
 
-# finish filling the alltis array - after we have decided whether we are using all the repeats or not
-# this is for epochwise analysis, we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
+# finish filling the alltis array - this is for epochwise analysis - this only works when there are the same number of repeats at each TI
+# Epochwise analysis presume that the data was acquired in blocks of all TIs (even if that is not how is supplied to oxford_asl)
+# Otherwise epoch analysis doens't make sense
+# NB: we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
     for ((i=0; i<$count; i++)); do
 	idx=`expr $r \* $count + $i`
