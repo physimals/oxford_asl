@@ -1089,11 +1089,16 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 fi
 
 if [ -z $regfrom ]; then
-# no regfrom iamge supplied so we will use the mean of the asl timeseries
-# NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
-    # brain extract the meanasl image
-    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
-    regfrom=$tempdir/meanasl_brain
+# no regfrom iamge supplied so we will use the mean of the asl timeseries - unless it was diff data
+    # NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
+    if [ $iaf = "diff" ] && [ ! -z $calib ]; then
+	#if available use calibration image
+	regfrom=$tempdir/calib
+    else
+	# brain extract the meanasl image
+	${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+	regfrom=$tempdir/meanasl_brain
+    fi
 fi
 
 if [ $register -eq 1 ]; then
