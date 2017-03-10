@@ -67,7 +67,7 @@ Usage_extended() {
     echo " Registration (requires structural image)"
     echo " --asl2struc : transformation matrix from asl data to structural image"
     echo "                (skips registration)"
-    echo " --regfrom   : image to use a basis for registration (already BETed)"
+    echo " --regfrom   : image to use a basis for inital registration (already BETed)"
     echo "               (must be same resolution as ASL data)"
 #    echo " -t          : structural to standard space transformation matrix"
 #    echo "               (requires structural image)"
@@ -113,33 +113,31 @@ Usage_extended() {
     echo ""
     echo ""
     echo " Notes:"
-    echo " Input data - Should be tag-control differenced and 'as acquired': repeated blocks of all TIs."
-    echo "              By default for multi-TI data mulitple measurements at each TI will be averaged"
-    echo "              prior to analysis. Overwride with --fulldata, useful for small numbers of TIs."
+    echo " Input data - Any combination of label (tag) control images is accepted, see asl_file for more detailed"
+    echo "              usage of the input options"
     echo " Analysis  -  If only one TI is specified then the following options are set:"
     echo "              --fixbat --fixbolus --artoff --fulldata"
     echo "              White Paper mode - to conform to the 'white paper' the follow options are also set:"
     echo "              --t1=1.65 --exch=simple --cmethod=voxel"
     echo " Registration - Results are saved in native space by default in case you need to revisit this."
-    echo "                By default the mean ASL timeseries is used for registration, which is oftefn sub optimal"
-    echo "                An alternative base image for registration can be supplied with --regfrom"
-    echo "                More robust results may be found using:"
-    echo "                > the mean (over all mesurements) of the *undifferenced* ASL data"
-    echo "                > the mean (over all measurments) of the calibration image"
-    echo "                  assuming there was no signficant motion between main and calibration data."
+    echo "                By default the perfusion image is used with BBR for the final registration"
+    echo "                An inital registration is performed using mean of the ASL data"
+    echo "                An alternative base image for (inital) registration can be supplied with --regfrom"
+    echo "                Final (BBR) registration can be turned off using --finalonly"
     echo "                For custom registration: use asl_reg with native space results."
-    echo " Calibration - Basic calibration performed using asl_calib using CSF as a reference ('longtr' mode)."
+    echo " Calibration - Performed using asl_calib using CSF as a reference ('longtr' mode) where structural image is supplied"
+    echo "               Voxelwise calibration is performed in 'white paper' mode or in the absence of structural image"
     echo "               For custom calibration: do not set M0 image and then use asl_calib separately"
     echo " Masking - for processing purposes a brain mask is applied to the data, this will be"
     echo "            derrived from (in order of preference):"
-    echo "            > 'regfrom' image"
-    echo "            > calibration image"
-    echo "            > low resolution structural"
-    echo "            > data (mean over all TIs)"
+    echo "            > Brain extracted structural and (inital) registration"
+    echo "            > mean ASL data"
+    echo "            > 'regfrom' image if supplied"
+
 }
 
 Version() {
-echo "$Id: oxford_asl,v 1.43 2015/08/07 14:43:52 chappell Exp $"
+echo "$Id$"
 exit 0
 }
 
@@ -850,7 +848,7 @@ else
 fi
 
 echo "OXFORD_ASL - running"
-
+echo "File ID: $Id$"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
@@ -1041,8 +1039,10 @@ if [ $count -lt 2 ]; then
     #    datafile=$tempdir/diffdata
 fi
 
-# finish filling the alltis array - after we have decided whether we are using all the repeats or not
-# this is for epochwise analysis, we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
+# finish filling the alltis array - this is for epochwise analysis - this only works when there are the same number of repeats at each TI
+# Epochwise analysis presume that the data was acquired in blocks of all TIs (even if that is not how is supplied to oxford_asl)
+# Otherwise epoch analysis doens't make sense
+# NB: we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
     for ((i=0; i<$count; i++)); do
 	idx=`expr $r \* $count + $i`
@@ -1089,11 +1089,16 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 fi
 
 if [ -z $regfrom ]; then
-# no regfrom iamge supplied so we will use the mean of the asl timeseries
-# NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
-    # brain extract the meanasl image
-    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
-    regfrom=$tempdir/meanasl_brain
+# no regfrom iamge supplied so we will use the mean of the asl timeseries - unless it was diff data
+    # NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
+    if [ $iaf = "diff" ] && [ ! -z $calib ]; then
+	#if available use calibration image
+	regfrom=$tempdir/calib
+    else
+	# brain extract the meanasl image
+	${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+	regfrom=$tempdir/meanasl_brain
+    fi
 fi
 
 if [ $register -eq 1 ]; then
@@ -1179,6 +1184,8 @@ if [ ! -z $struc ]; then
 elif [ ! -z $regfrom ]; then
     ${FSLDIR}/bin/fslmaths $regfrom -bin $tempdir/mask
     Log "Mask generated from regfrom image: $regfrom"
+    
+# We are unlikey to use these options as regfrom has probably been set above - leave for future reference
 # next option is to use betted version of mean M0 calib image as mask
 elif [ ! -z $calib ]; then
     ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib_bet -f 0.2 
@@ -1433,7 +1440,7 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 ### First analysis on whole data, normal perfusion image
 echo "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
-if [ 0 -eq 1 ]; then # DISABLED!! [ $repeats -gt 1 ]; then
+if [ $repeats -gt 1 ]; then
     # do an initial analysis using the data averaged at each TI
     Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
     datafile=$tempdir/diffdata_mean
@@ -1442,7 +1449,7 @@ if [ 0 -eq 1 ]; then # DISABLED!! [ $repeats -gt 1 ]; then
     echo "--repeats=1" >> $tempdir/init/basil_options.txt
     echo "$tislist" >> $tempdir/init/basil_options.txt
     Dobasil $datafile $tempdir/init
-    initbasil=$tempdir/init/basil/finalMVN
+    initbasil=$tempdir/init/finalMVN
 fi
 
 # main analysis using full data
