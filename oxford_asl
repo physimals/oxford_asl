@@ -62,6 +62,7 @@ Usage_extended() {
     echo " Analysis"
     echo " --artoff     : Do not infer arterial signal - (same as --artsupp)"
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
+    echo "                 {default: on (cASL); off (pASL)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
     echo " --fulldata   : Never average multiple measurements at each TI"
@@ -602,6 +603,7 @@ asl_calib=${FSLDIR}/bin/asl_calib
 # defaults that (boolean) command line options can overide
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
+fixbolus=undef; # the default for this is determined by other command line parameters.
 
 # parse command line here
 until [ -z $1 ]; do
@@ -728,7 +730,8 @@ takeargs=0;boolarg="";isbool="";
 	    ;;
 	--fixbat) fixbat=1
 	    ;;
-	--fixbolus) fixbolus=1
+	--fixbolus) isbool=1
+		    boolarg=fixbolus;
 	    ;;
 	--casl) casl=1
 		;;
@@ -930,6 +933,7 @@ echo "Saving advanced outputs"
     mkdir $outdir/advanced
 fi
 
+### Command line parameter interactions
 # white paper mode - this overrieds defaults, but can be overwritten (below) by command line specification of individual parameters
 if [ ! -z $whitepaper ]; then
     Log "Analysis in white paper mode"
@@ -938,6 +942,19 @@ if [ ! -z $whitepaper ]; then
     bat=0 # the white paper model ignores BAT
     # note that other things related to the model will be set by single TI mode below
 fi
+
+# bolus duration inference
+# if we are doing CASL then fix the bolus duration, except where the user has explicitly told us otherwise
+if [ $fixbolus = "undef" ]; then
+    # fixbolus is to take its default value
+    if [ ! -z $casl ]; then
+	fixbolus=1;
+    else
+	fixbolus="";
+    fi
+fi
+
+### End of Command line parameter interactions
 
 # general pre-processing
 echo "Pre-processing"
