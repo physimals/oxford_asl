@@ -82,7 +82,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: asl_calib,v 1.27 2015/08/07 14:43:52 chappell Exp $"
+echo "${GIT_SHA1} ${GIT_DATE}"
 exit 0
 }
 

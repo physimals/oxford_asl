@@ -137,7 +137,7 @@ Usage_extended() {
 }
 
 Version() {
-echo "$Id$"
+echo "${GIT_SHA1} ${GIT_DATE}"
 exit 0
 }
 
@@ -848,7 +848,7 @@ else
 fi
 
 echo "OXFORD_ASL - running"
-echo "File ID: $Id$"
+echo "File ID: $Id: 2c6d7384a2d68c9f7de650df6bd1bc17d368fb2f $"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
