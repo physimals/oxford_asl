@@ -34,10 +34,14 @@ Usage() {
     echo " --slicedt   : Timing difference between slices - {default: 0}"
     echo " --sliceband : Number of slices per band in a multi-band setup - {default: n/a}."
     echo ""
-    echo "Structural image (see also Registration)"
-    echo " -s          : structural image (whole head)"
-    echo " --sbrain      : structural image (already BETed)"
-    echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
+    echo "Structural image (optional) (see also Registration)"
+    echo " --fslanat=<dir> : An fsl_anat directory from structural image"
+    echo " Alternatively:"
+    echo " -s              : structural image (whole head)"
+    echo " --sbrain        : structural image (already BETed)"
+    echo " {--fastsrc=<image_stub>} : images from a FAST segmenation - if not set FAST will be run on structural"
+    echo " Options in all cases:"
+    echo " --senscorr      : use bias field (from segmentation) for sensitivity correction"
     echo ""
     echo " Calibration"
     echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
@@ -58,6 +62,7 @@ Usage_extended() {
     echo " Analysis"
     echo " --artoff     : Do not infer arterial signal - (same as --artsupp)"
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
+    echo "                 {default: on (cASL); off (pASL)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
     echo " --fulldata   : Never average multiple measurements at each TI"
@@ -100,10 +105,11 @@ Usage_extended() {
  
     echo "Partial volume correction"
     echo " --pvcorr    : Do partial volume correction"
-    echo "               *Automated determination of PV estimates {default} requires:"
-    echo "                - structural image (-s)"
-    echo "                - basis image for registration (--regfrom)"
-    echo "               *Alternatively supply PV images in same space as ASL data:"
+    echo "  PV estimates will be taken from:"
+    echo "   fsl_anat dir (--fslanat), if supplied"
+    echo "   exising fast segmentation (--fastsrc), if supplied"
+    echo "   FAST segmenation of structural (if using -s and --sbet)"
+    echo "   User supplied PV estimates (--pvgm, --pvwm)"   
     echo "   --pvgm    : Partial volume estimates for GM"
     echo "   --pvwm    : Partial volume estimates for WM"
 
@@ -597,6 +603,7 @@ asl_calib=${FSLDIR}/bin/asl_calib
 # defaults that (boolean) command line options can overide
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
+fixbolus=undef; # the default for this is determined by other command line parameters.
 
 # parse command line here
 until [ -z $1 ]; do
@@ -723,7 +730,8 @@ takeargs=0;boolarg="";isbool="";
 	    ;;
 	--fixbat) fixbat=1
 	    ;;
-	--fixbolus) fixbolus=1
+	--fixbolus) isbool=1
+		    boolarg=fixbolus;
 	    ;;
 	--casl) casl=1
 		;;
@@ -925,6 +933,7 @@ echo "Saving advanced outputs"
     mkdir $outdir/advanced
 fi
 
+### Command line parameter interactions
 # white paper mode - this overrieds defaults, but can be overwritten (below) by command line specification of individual parameters
 if [ ! -z $whitepaper ]; then
     Log "Analysis in white paper mode"
@@ -933,6 +942,19 @@ if [ ! -z $whitepaper ]; then
     bat=0 # the white paper model ignores BAT
     # note that other things related to the model will be set by single TI mode below
 fi
+
+# bolus duration inference
+# if we are doing CASL then fix the bolus duration, except where the user has explicitly told us otherwise
+if [ $fixbolus = "undef" ]; then
+    # fixbolus is to take its default value
+    if [ ! -z $casl ]; then
+	fixbolus=1;
+    else
+	fixbolus="";
+    fi
+fi
+
+### End of Command line parameter interactions
 
 # general pre-processing
 echo "Pre-processing"
@@ -1039,8 +1061,10 @@ if [ $count -lt 2 ]; then
     #    datafile=$tempdir/diffdata
 fi
 
-# finish filling the alltis array - after we have decided whether we are using all the repeats or not
-# this is for epochwise analysis, we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
+# finish filling the alltis array - this is for epochwise analysis - this only works when there are the same number of repeats at each TI
+# Epochwise analysis presume that the data was acquired in blocks of all TIs (even if that is not how is supplied to oxford_asl)
+# Otherwise epoch analysis doens't make sense
+# NB: we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
     for ((i=0; i<$count; i++)); do
 	idx=`expr $r \* $count + $i`
@@ -1087,11 +1111,16 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 fi
 
 if [ -z $regfrom ]; then
-# no regfrom iamge supplied so we will use the mean of the asl timeseries
-# NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
-    # brain extract the meanasl image
-    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
-    regfrom=$tempdir/meanasl_brain
+# no regfrom iamge supplied so we will use the mean of the asl timeseries - unless it was diff data
+    # NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
+    if [ $iaf = "diff" ] && [ ! -z $calib ]; then
+	#if available use calibration image
+	regfrom=$tempdir/calib
+    else
+	# brain extract the meanasl image
+	${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+	regfrom=$tempdir/meanasl_brain
+    fi
 fi
 
 if [ $register -eq 1 ]; then
