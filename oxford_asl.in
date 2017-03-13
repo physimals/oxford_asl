@@ -1052,6 +1052,15 @@ if [ -z $afrptstr ]; then
     echo "Number of repeats in data: $repeats"
 else
     repeats=0 #variable number of repeats at each TI - have to handle specially
+    ### deal with repeats (as specified on the command line)
+    count=0
+    rptsslist=""
+    therpts=`echo $rpts | sed 's:,: :g'`
+    for rp in $therpts; do
+	count=`expr ${count} + 1`
+	rptslist=`echo $rptslist --rpt${count}=$rp`
+    done
+    Log "RPTs list: $rptslist"
 fi
 ### End of: Establish number of repeats
 
@@ -1090,9 +1099,10 @@ for ((r=1; r<$repeats; r++)); do
 	idx=`expr $r \* $count + $i`
 	alltis[$idx]=${alltis[$i]}
     done
-    echo ${alltis[*]}
+done
+echo ${alltis[*]}
 Log `echo ${alltis[*]}`
-fi
+
 
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
@@ -1481,8 +1491,9 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 ### First analysis on whole data, normal perfusion image
 echo "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
-if [ $repeats -gt 1 ]; then
+if [ $repeats -gt 1 ] || [ $repeats -eq 0 ]; then
     # do an initial analysis using the data averaged at each TI
+    # NB repeats=0 is a special case of variable number of repeats at each TI
     Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
     datafile=$tempdir/diffdata_mean
     mkdir $tempdir/init
@@ -1495,7 +1506,12 @@ fi
 
 # main analysis using full data
 datafile=$tempdir/diffdata
-echo "--repeats=$repeats" >> $tempdir/basil_options.txt
+if [ $repeats -gt 0 ]; then
+    echo "--repeats=$repeats" >> $tempdir/basil_options.txt
+else
+    # variable number of repeats at each TI - tell basil
+    echo "$rptslist" >> $tempdir/basil_options.txt
+fi
 echo "$tislist" >> $tempdir/basil_options.txt
 
 Log "Main run of BASIL on ASL data"

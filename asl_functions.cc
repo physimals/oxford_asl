@@ -93,7 +93,7 @@ namespace OXASL {
 
 	int startvol=1;
 	for (int ti=1; ti<=ntis; ti++) {
-	  //cout << ti << endl;
+	  
 	  if (nrpts.size() > 1) {
 	    // variable number of repeats at each TI
 	    if (ispairs) nmeas = nrpts[ti-1]*2;
@@ -105,10 +105,8 @@ namespace OXASL {
 	  }
 	  Matrix thisti(nmeas,nvox);
 
-	  //cout << thisnrpts << "   " << nmeas << endl;
 	  
 	  if (blockpairs) {
-	    Matrix thisti(nmeas,nvox);
 	    thisti=0;
 	    //extract the measurements for this TI
 	    for (int i=1; i<=thisnrpts; i++)
@@ -184,8 +182,6 @@ namespace OXASL {
 
   void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven) {
     int ntis = asldata.size();
-    int nmeas = asldata[0].Nrows();
-    int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
 
     // just in case the vectors are not empty to start with
     asldataodd.clear();
@@ -194,6 +190,8 @@ namespace OXASL {
     int idx;
     
     for (int ti=0; ti<ntis; ti++) {
+      int nmeas = asldata[ti].Nrows();
+      int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
       
       Matrix oddmtx;
      
@@ -226,12 +224,13 @@ namespace OXASL {
 
   void mergepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>&asldataeven) {
     int ntis = asldataodd.size();
-    int nmeas = asldataodd[0].Nrows();
-    int nrpts=nmeas; //asldataodd does not contain pairs
 
     asldata.clear(); //make sure this is clear
 
     for (int ti=0; ti<ntis; ti++) {
+      int nmeas = asldataodd[ti].Nrows();
+      int nrpts=nmeas; //asldataodd does not contain pairs
+    
       Matrix aslmtx;
       aslmtx = asldataodd[ti].Row(1);
       aslmtx &= asldataeven[ti].Row(1);
