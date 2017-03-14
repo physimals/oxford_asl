@@ -31,9 +31,10 @@ class ReadOptions {
   Option<string> datafile;
   Option<string> maskfile;
   Option<int> ntis;
-  
+
   Option<string> inblockform;
   Option<string> inaslform;
+  Option<string> rpts;
   Option<bool> ispairs;
 
   Option<bool> splitpairs;
@@ -96,6 +97,9 @@ help(string("-h,--help"), false,
    inaslform(string("--iaf,--inaslform"),string("diff"),
 	     string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block\n"),
 	     false,requires_argument),
+   rpts(string("--rpts"),string("NULL"),
+	string("Number of repeats at each TI as comma separated list, not required if the number of repeats is same for all TIs  (only for use with --ibf=tis)"),
+	false,requires_argument),
 
    ispairs(string("--pairs,--inpairs"),false,
 	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead"),
@@ -165,6 +169,7 @@ help(string("-h,--help"), false,
        options.add(ntis);
        options.add(inblockform);
        options.add(inaslform);
+       options.add(rpts);
        options.add(ispairs);
  
        options.add(splitpairs);
