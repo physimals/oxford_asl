@@ -27,7 +27,7 @@ using namespace NEWIMAGE;
 
 namespace OXASL {
  
-  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs, bool blockpairs);
+  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
   void stdform2data(vector<Matrix>& asldata, Matrix& datareturn, bool outblocked, bool outpairs);
 
   // separate the pairs in the data (into seprate standard form items)

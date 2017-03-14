@@ -12,26 +12,30 @@
 
 namespace OXASL {
 
-  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs, bool blockpairs) {
+  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs) {
     int nvox=datamtx.Ncols();
-    int nmeas=datamtx.Nrows()/ntis;
-    int nrpts;
-    if (ispairs) nrpts=nmeas/2;
-    else nrpts=nmeas;
+    //int nmeas=datamtx.Nrows()/ntis;
+    //int nrpts;
+    //if (ispairs) nrpts=nmeas/2;
+    // else nrpts=nmeas;
+    
 
     //cout << nmeas << " " << nrpts << " " << endl;
 
-    if (isblocked)
+    if (isblocked) {
       // blocks of repateed measurements - each block contains one version of each TI
-      {
-
+      assert(nrpts.size()==1); //if we are in this mode there must be the same number of repeats at each TI
+	int nmeas;
+	if (ispairs) nmeas = nrpts[0]*2;
+	else nmeas = nrpts[0];
 	Matrix thisti(nmeas,nvox);
+
 	for (int ti=1; ti<=ntis; ti++) 
 	  {
 	    thisti=0;
 	    //asldata[ti-1].ReSize(nvox,nmeas);
 	    //extract the measurements for this TI
-	    for (int i=1; i<=nrpts; i++)
+	    for (int i=1; i<=nrpts[0]; i++)
 	      {
 		if (ispairs) {
 		  if (blockpairs) {
@@ -83,42 +87,62 @@ namespace OXASL {
       }
     else 
       {
-	
+	int nmeas;
+	int thisnrpts; //the number of repeats in the current TI
+	int nvols=0;//record how many volumes we have extracted
+	if (ispairs) nmeas = nrpts[0]*2;
+	else nmeas = nrpts[0];
+
+	int startvol=1;
 	for (int ti=1; ti<=ntis; ti++) {
+	  
+	  if (nrpts.size() > 1) {
+	    // variable number of repeats at each TI
+	    if (ispairs) nmeas = nrpts[ti-1]*2;
+	    else nmeas = nrpts[ti-1];
+	    thisnrpts = nrpts[ti-1];
+	  }
+	  else {
+	    thisnrpts = nrpts[0];
+	  }
+	  Matrix thisti(nmeas,nvox);
+
+	  
 	  if (blockpairs) {
-	    
-	    Matrix thisti(nmeas,nvox);
 	    thisti=0;
 	    //extract the measurements for this TI
-	    for (int i=1; i<=nrpts; i++)
+	    for (int i=1; i<=thisnrpts; i++)
 	      {
-		
-		thisti.Row(2*i-1) = datamtx.Row((ti-1)*2*nrpts + i);
-		thisti.Row(2*i)   = datamtx.Row((ti-1)*2*nrpts + i + nrpts);
+		thisti.Row(2*i-1) = datamtx.Row(startvol + i - 1);
+		thisti.Row(2*i)   = datamtx.Row(startvol + i + thisnrpts - 1);
 	      }
 	    
 	    asldata.push_back(thisti);
 	    
 	  }
 	  else {
-	    asldata.push_back(datamtx.Rows((ti-1)*nmeas+1,ti*nmeas));
+	    asldata.push_back(datamtx.Rows(startvol,startvol+nmeas-1));
 	  }
-	  
-	  if (datamtx.Nrows() > nmeas*ntis) throw Exception("Orphaned data found at end of file - this is not logical when data is in TI blocks");
+
+	  startvol += nmeas;
+	  //cout << startvol << endl;
+	  nvols += nmeas;
 	}
-	
+
+	//cout << nvols << endl;
+	if (datamtx.Nrows() > nvols) throw Exception("Orphaned data found at end of file - this is not logical when data is in TI blocks");
       }
   }
 
   void stdform2data(vector<Matrix>& asldata, Matrix& datareturn, bool outblocked, bool outpairs) {
     int ntis = asldata.size();
     int nvox = asldata[0].Ncols();
-    int nmeas = asldata.back().Nrows(); //safer to determine this from the very last TI (in case of orphan measurements when nodiscard is turned on)
     int ninc=1;
     if (outpairs) ninc=2;
 
     
     if (outblocked) {
+      int nmeas = asldata.back().Nrows(); //safer to determine this from the very last TI (in case of orphan measurements when nodiscard is turned on)
       datareturn.ReSize(ntis*nmeas,nvox);
       int idx=1;
       for (int m=1; m<=nmeas; m+=ninc)
@@ -160,8 +184,6 @@ namespace OXASL {
 
   void separatepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>& asldataeven) {
     int ntis = asldata.size();
-    int nmeas = asldata[0].Nrows();
-    int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
 
     // just in case the vectors are not empty to start with
     asldataodd.clear();
@@ -170,6 +192,8 @@ namespace OXASL {
     int idx;
     
     for (int ti=0; ti<ntis; ti++) {
+      int nmeas = asldata[ti].Nrows();
+      int nrpts=nmeas/2; //if we are using this function then the data must contain pairs
       
       Matrix oddmtx;
      
@@ -202,12 +226,13 @@ namespace OXASL {
 
   void mergepairs(vector<Matrix>& asldata, vector<Matrix>& asldataodd, vector<Matrix>&asldataeven) {
     int ntis = asldataodd.size();
-    int nmeas = asldataodd[0].Nrows();
-    int nrpts=nmeas; //asldataodd does not contain pairs
 
     asldata.clear(); //make sure this is clear
 
     for (int ti=0; ti<ntis; ti++) {
+      int nmeas = asldataodd[ti].Nrows();
+      int nrpts=nmeas; //asldataodd does not contain pairs
+    
       Matrix aslmtx;
       aslmtx = asldataodd[ti].Row(1);
       aslmtx &= asldataeven[ti].Row(1);

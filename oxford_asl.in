@@ -34,10 +34,14 @@ Usage() {
     echo " --slicedt   : Timing difference between slices - {default: 0}"
     echo " --sliceband : Number of slices per band in a multi-band setup - {default: n/a}."
     echo ""
-    echo "Structural image (see also Registration)"
-    echo " -s          : structural image (whole head)"
-    echo " --sbrain      : structural image (already BETed)"
-    echo " --senscorr  : use bias field (from segmentation) for sensitivity correction"
+    echo "Structural image (optional) (see also Registration)"
+    echo " --fslanat=<dir> : An fsl_anat directory from structural image"
+    echo " Alternatively:"
+    echo " -s              : structural image (whole head)"
+    echo " --sbrain        : structural image (already BETed)"
+    echo " {--fastsrc=<image_stub>} : images from a FAST segmenation - if not set FAST will be run on structural"
+    echo " Options in all cases:"
+    echo " --senscorr      : use bias field (from segmentation) for sensitivity correction"
     echo ""
     echo " Calibration"
     echo " --M0        : (single) precomputed M0 value (e.g. from having run a separate calibration)"
@@ -58,6 +62,7 @@ Usage_extended() {
     echo " Analysis"
     echo " --artoff     : Do not infer arterial signal - (same as --artsupp)"
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
+    echo "                 {default: on (cASL); off (pASL)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
     echo " --fulldata   : Never average multiple measurements at each TI"
@@ -100,10 +105,11 @@ Usage_extended() {
  
     echo "Partial volume correction"
     echo " --pvcorr    : Do partial volume correction"
-    echo "               *Automated determination of PV estimates {default} requires:"
-    echo "                - structural image (-s)"
-    echo "                - basis image for registration (--regfrom)"
-    echo "               *Alternatively supply PV images in same space as ASL data:"
+    echo "  PV estimates will be taken from:"
+    echo "   fsl_anat dir (--fslanat), if supplied"
+    echo "   exising fast segmentation (--fastsrc), if supplied"
+    echo "   FAST segmenation of structural (if using -s and --sbet)"
+    echo "   User supplied PV estimates (--pvgm, --pvwm)"   
     echo "   --pvgm    : Partial volume estimates for GM"
     echo "   --pvwm    : Partial volume estimates for WM"
 
@@ -137,7 +143,7 @@ Usage_extended() {
 }
 
 Version() {
-echo "$Id$"
+echo "${GIT_SHA1} ${GIT_DATE}"
 exit 0
 }
 
@@ -597,6 +603,7 @@ asl_calib=${FSLDIR}/bin/asl_calib
 # defaults that (boolean) command line options can overide
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
+fixbolus=undef; # the default for this is determined by other command line parameters.
 
 # parse command line here
 until [ -z $1 ]; do
@@ -622,6 +629,8 @@ takeargs=0;boolarg="";isbool="";
 	       takeargs=1;;
 	--ibf) ibf=$argument # input block format (asl_file syntax)
 	       takeargs=1;;
+	--rpts) rpts=$argument # the number of repeats at each TI (when --ibf=tis) - to be passed to asl_file
+		takeargs=1;;
 	-c) calibflag=1 calib=$argument #calibration image
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
@@ -723,7 +732,8 @@ takeargs=0;boolarg="";isbool="";
 	    ;;
 	--fixbat) fixbat=1
 	    ;;
-	--fixbolus) fixbolus=1
+	--fixbolus) isbool=1
+		    boolarg=fixbolus;
 	    ;;
 	--casl) casl=1
 		;;
@@ -848,7 +858,7 @@ else
 fi
 
 echo "OXFORD_ASL - running"
-echo "File ID: $Id$"
+echo "File ID: $Id: 2c6d7384a2d68c9f7de650df6bd1bc17d368fb2f $"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
@@ -925,6 +935,7 @@ echo "Saving advanced outputs"
     mkdir $outdir/advanced
 fi
 
+### Command line parameter interactions
 # white paper mode - this overrieds defaults, but can be overwritten (below) by command line specification of individual parameters
 if [ ! -z $whitepaper ]; then
     Log "Analysis in white paper mode"
@@ -933,6 +944,19 @@ if [ ! -z $whitepaper ]; then
     bat=0 # the white paper model ignores BAT
     # note that other things related to the model will be set by single TI mode below
 fi
+
+# bolus duration inference
+# if we are doing CASL then fix the bolus duration, except where the user has explicitly told us otherwise
+if [ $fixbolus = "undef" ]; then
+    # fixbolus is to take its default value
+    if [ ! -z $casl ]; then
+	fixbolus=1;
+    else
+	fixbolus="";
+    fi
+fi
+
+### End of Command line parameter interactions
 
 # general pre-processing
 echo "Pre-processing"
@@ -973,6 +997,7 @@ for ti in $thetis; do
     alltis[`expr ${count} - 1`]=$ti
 done
 Log "TIs list: $tislist"
+ntis=$count
 ### End of: Deal with the TIs
 
 ### Label-control subtraction (we repeat subtraction after doing distortion correction - when applicable)
@@ -988,33 +1013,60 @@ if [ -z $ibf ]; then
 fi
 Log "Input block format is: $ibf"
 
+afrptstr=""
+if [ $ibf == "tis" ]; then
+    if [ ! -z $rpts ]; then
+	# the repeats at each TI have been specified
+	afrptstr="--rpts=$rpts"
+
+	if [ ! -z $epoch ]; then
+	    echo "ERROR: cannot do epochwise analysis when there are not the same number of repeats for each TI"
+	    exit 1
+	fi
+    fi
+fi
+
 if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    asl_file --data=$infile --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
     #${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-    asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    asl_file --data=$infile --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     
     # pull out (label &) control images (NB these will have suffix _even or _odd)  *TODO asl_file should now be able to do suffix of _label and _control, which would be more helpful
     # NOT enabled at the moment - since this is only specifically useful for extensing the calibration options - TODO 
-    #asl_file --data=$infile --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
+    #asl_file --data=$infile --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
 
 fi
 ### End of : Label-control subtraction
 
 ### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
 tpoints=`fslinfo $tempdir/diffdata | grep "^dim4" | sed 's:dim4[ ]*::'`
-repeats=`expr $tpoints / $count`
 
-echo "Number of inversion times: $count"
+echo "Number of inversion times: $ntis"
 echo "Number of timepoints in data: $tpoints"
-echo "Number of repeats in data: $repeats"
+
+if [ -z $afrptstr ]; then
+    repeats=`expr $tpoints / $ntis`
+    echo "Number of repeats in data: $repeats"
+else
+    repeats=0 #variable number of repeats at each TI - have to handle specially
+    ### deal with repeats (as specified on the command line)
+    count=0
+    rptslist=""
+    therpts=`echo $rpts | sed 's:,: :g'`
+    for rp in $therpts; do
+	count=`expr ${count} + 1`
+	rptslist=`echo $rptslist --rpt${count}=$rp`
+    done
+    Log "RPTs list: $rptslist"
+fi
 ### End of: Establish number of repeats
 
 # Single or Multi TI setup
-if [ $count -lt 2 ]; then
+if [ $ntis -lt 2 ]; then
 # single TI data - dont average send to BASIL as-is (helps with noise estimation)
 #    Log "Single TI data to be passed to BASIL"
     #datafile=$tempdir/diffdata
@@ -1044,13 +1096,14 @@ fi
 # Otherwise epoch analysis doens't make sense
 # NB: we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
-    for ((i=0; i<$count; i++)); do
-	idx=`expr $r \* $count + $i`
+    for ((i=0; i<$ntis; i++)); do
+	idx=`expr $r \* $ntis + $i`
 	alltis[$idx]=${alltis[$i]}
     done
 done
 echo ${alltis[*]}
 Log `echo ${alltis[*]}`
+
 
 # standard pre-processing of calibration image
 if [ ! -z $calib ]; then
@@ -1233,10 +1286,10 @@ if [ ! -z $fmap ]; then
     # Repeat the label-control subtraction on the corrected data
     if [ $iaf = 'diff' ]; then
 	# make sure the block format is correct for BASIL
-	asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     else
 	# create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-	asl_file --data=$tempdir/asldata --ntis=$count --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     fi
     
     # Now apply the correction to the calibration image
@@ -1264,11 +1317,31 @@ fi
 Log "T1b: $t1bset"
 
 
-#deal with bolus
+### Bolus duration(s)
 if [ -z $boluset ]; then
-    boluslen=1;
+    boluslen=1.8; # use the WP default
 fi
-Log "Bolus duration: $boluslen"
+Log "Bolus duration(s): $boluslen"
+
+count=0
+tauslist=""
+thetaus=`echo $boluslen | sed 's:,: :g'`
+for tau in $thetaus; do
+    count=`expr ${count} + 1`
+    tauslist=`echo $tauslist --tau${count}=$tau`
+done
+
+if [ $count -eq 1 ]; then
+    tauslist="--tau=$tau" #single univerisal bolus duration
+    Log "Bolus duration: $tau"
+else
+    Log "bolus duration list: $tauslist"
+    if [ $count -ne $ntis ]; then
+	Echo "Error: number bolus durations specified does not match the number of TIs - this is not possible for multiple bolus duration processing"
+	exit 1
+    fi
+fi
+### End of Bolus duration(s)
 
 #pre-processing for epochwise analysis
 # separate data into epochs here
@@ -1276,7 +1349,7 @@ if [ ! -z $epoch ]; then
 if [ -z $eol ]; then
     eol=0
 fi
-    asl_file --data=$tempdir/diffdata --ntis=$count --ibf=tis --iaf=diff --epoch=$tempdir/epoch --elen=$elen --eol=$eol --eunit=tis
+    asl_file --data=$tempdir/diffdata --ntis=$ntis --ibf=tis --iaf=diff --epoch=$tempdir/epoch --elen=$elen --eol=$eol --eunit=tis
     eadv=`expr $elen - $eol`
 fi
 
@@ -1302,7 +1375,8 @@ else
     Log "pASL model"
 fi
 
-echo "--tau=$boluslen" >> $tempdir/basil_options.txt
+#echo "--tau=$boluslen" >> $tempdir/basil_options.txt
+echo $tauslist >> $tempdir/basil_options.txt
 
 
 # slice timing correction?
@@ -1440,8 +1514,9 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 ### First analysis on whole data, normal perfusion image
 echo "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
-if [ $repeats -gt 1 ]; then
+if [ $repeats -gt 1 ] || [ $repeats -eq 0 ]; then
     # do an initial analysis using the data averaged at each TI
+    # NB repeats=0 is a special case of variable number of repeats at each TI
     Log "Initial run of BASIL on data where we have avareged all repeats at each TI"
     datafile=$tempdir/diffdata_mean
     mkdir $tempdir/init
@@ -1454,7 +1529,12 @@ fi
 
 # main analysis using full data
 datafile=$tempdir/diffdata
-echo "--repeats=$repeats" >> $tempdir/basil_options.txt
+if [ $repeats -gt 0 ]; then
+    echo "--repeats=$repeats" >> $tempdir/basil_options.txt
+else
+    # variable number of repeats at each TI - tell basil
+    echo "$rptslist" >> $tempdir/basil_options.txt
+fi
 echo "$tislist" >> $tempdir/basil_options.txt
 
 Log "Main run of BASIL on ASL data"

@@ -77,6 +77,8 @@ int main(int argc, char *argv[])
     */
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
 
+        
+
     //load data
     volume4D<float> data;
     if(!opts.par_rec_to_nifti_option.value()) {
@@ -154,16 +156,47 @@ int main(int argc, char *argv[])
     cout << "Number of voxels is:" << nvox << endl;
 
     //establish number of repeats
-    int ntis=opts.ntis.value();
-    int nmeas=data.tsize()/ntis; //number of measurements at each TI
-    int nrpts;
-    if (ispairs) nrpts=nmeas/2; // number of repeats, note that is data is pairs then we have half as many true repeats
-    else nrpts=nmeas;
-    cout << "Number of repeats in data is:" << nrpts << endl;
 
-    int ndata;
-    if (ispairs) ndata=ntis*nrpts*2;
-    else ndata = nmeas*ntis;
+    // deal with the repeats string if specified
+    int ntis=opts.ntis.value();
+    int ndata=0;
+    vector<int> nrpts;
+
+    string rpts=opts.rpts.value();
+    if (rpts.compare("NULL")==0) {
+      int nmeas=data.tsize()/ntis; //number of measurements at each TI
+      if (ispairs) nrpts.push_back( nmeas/2 ); // number of repeats, note that is data is pairs then we have half as many true repeats
+      else nrpts.push_back( nmeas );
+      cout << "Number of repeats in data is:" << nrpts[0] << endl;
+
+      // calculate the expected size of the data
+      if (ispairs) ndata=ntis*nrpts[0]*2;
+      else ndata = nmeas*ntis;
+    }
+    else {
+      //we have a comma separated list of repeats
+      if (isblocked) throw Exception("Cannot have different number of repeats at each TI when --ibf=rpt, do not specify --rpts this will be calcuateld from the data");
+      vector<string> result;
+      stringstream ss(rpts);
+      while ( ss.good() ) {
+	string substr;
+	getline( ss, substr, ',' );
+	int thisnrpts = stoi(substr);
+	nrpts.push_back( thisnrpts );
+
+	cout << "Number of repeats at TI" << nrpts.size() << " is " << thisnrpts << endl;
+
+	//cumulative calculation of the expected size of the data
+	if (ispairs) ndata += thisnrpts*2;
+	else ndata += thisnrpts;
+
+	
+      }
+      if (nrpts.size()<ntis) throw Exception("Insufficient entries in list fo repeats (--rpts) compared to number of TIs");
+    }
+
+   
+    
     if (ndata<data.tsize()) {
       //some leftover samples in the data, produce a warning
       cout << "Warning: spare measurements found at end of data!" << endl
@@ -176,7 +209,7 @@ int main(int argc, char *argv[])
 
     //get data into 'standard' format
     vector<Matrix> asldata;
-    data2stdform(datamtx,asldata,ntis,isblocked,ispairs,blockpairs);
+    data2stdform(datamtx,asldata,ntis,nrpts,isblocked,ispairs,blockpairs);
 
     //deal with the splitting of pairs
     vector<Matrix> asldataodd;

@@ -10,7 +10,7 @@
 
 Usage() {
     echo "ASL_REG"
-    echo "Version: 2.0"
+    echo "Version: ${GIT_SHA1} ${GIT_DATE}"
     echo "Registration for ASL data"
     echo ""
     echo "Usage (optional parameters in {}):"
