@@ -309,7 +309,7 @@ int main(int argc, char *argv[])
           Matrix data_pvcorr_mtx;
           vector<Matrix> asldataout_pvcorr;
           data_pvcorr_mtx = data_pvcorr.matrix(mask);
-          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs,blockpairs);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, nrpts, isblocked, ispairs,blockpairs);
           asldataout = asldataout_pvcorr;
 
           //save_volume4D(data_pvcorr, pvout_file_name);
@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
         vector<Matrix> asldataout_pvcorr;
         data_pvcorr_mtx = data_nifti.matrix(mask_nifti);
         ndata = data_nifti.tsize();
-        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, isblocked, ispairs,blockpairs);
+        data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, nrpts, isblocked, ispairs,blockpairs);
         asldataout = asldataout_pvcorr;
         mask = mask_nifti;
 
@@ -378,7 +378,7 @@ int main(int argc, char *argv[])
           Matrix data_extrapolated_mtx;
           vector<Matrix> asldataout_extrapolated;
           data_extrapolated_mtx = data_extrapolated.matrix(mask);
-          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, isblocked, ispairs,blockpairs);
+          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, nrpts, isblocked, ispairs,blockpairs);
           asldataout = asldataout_extrapolated;
         }
 
