@@ -1027,10 +1027,22 @@ if [ ! -z $moco ]; then
 	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
 	# this also removes motion effects between asldata and calibration image
 	Log "Motion correction to calibration image"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
+	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
+
+	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
+	# Extract the middle transformation
+	middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
+	${FSLDIR}/bin/convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
+	# convert all the transofmrations
+	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
+	    ${FSLDIR}/bin/convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
+	done
+	${FSLDIR}/bin/applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
+	# Convert the calibration image to align with asldata
+	${FSLDIR}/bin/flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
     else
 	Log "Motion correction to middle volume of ASL data"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
+	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
     fi
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
 fi
