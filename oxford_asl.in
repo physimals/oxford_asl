@@ -1055,7 +1055,7 @@ else
     repeats=0 #variable number of repeats at each TI - have to handle specially
     ### deal with repeats (as specified on the command line)
     count=0
-    rptsslist=""
+    rptslist=""
     therpts=`echo $rpts | sed 's:,: :g'`
     for rp in $therpts; do
 	count=`expr ${count} + 1`
@@ -1317,11 +1317,31 @@ fi
 Log "T1b: $t1bset"
 
 
-#deal with bolus
+### Bolus duration(s)
 if [ -z $boluset ]; then
-    boluslen=1;
+    boluslen=1.8; # use the WP default
 fi
-Log "Bolus duration: $boluslen"
+Log "Bolus duration(s): $boluslen"
+
+count=0
+tauslist=""
+thetaus=`echo $boluslen | sed 's:,: :g'`
+for tau in $thetaus; do
+    count=`expr ${count} + 1`
+    tauslist=`echo $tauslist --tau${count}=$tau`
+done
+
+if [ $count -eq 1 ]; then
+    tauslist="--tau=$tau" #single univerisal bolus duration
+    Log "Bolus duration: $tau"
+else
+    Log "bolus duration list: $tauslist"
+    if [ $count -ne $ntis ]; then
+	Echo "Error: number bolus durations specified does not match the number of TIs - this is not possible for multiple bolus duration processing"
+	exit 1
+    fi
+fi
+### End of Bolus duration(s)
 
 #pre-processing for epochwise analysis
 # separate data into epochs here
@@ -1355,7 +1375,8 @@ else
     Log "pASL model"
 fi
 
-echo "--tau=$boluslen" >> $tempdir/basil_options.txt
+#echo "--tau=$boluslen" >> $tempdir/basil_options.txt
+echo $tauslist >> $tempdir/basil_options.txt
 
 
 # slice timing correction?
