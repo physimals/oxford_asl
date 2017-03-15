@@ -11,6 +11,7 @@
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <sstream>
 #include "newmatap.h"
 #include "newmatio.h"
 #include "newimage/newimageall.h"
@@ -181,7 +182,9 @@ int main(int argc, char *argv[])
       while ( ss.good() ) {
 	string substr;
 	getline( ss, substr, ',' );
-	int thisnrpts = stoi(substr);
+  stringstream ss(substr);
+	int thisnrpts;
+  ss >> thisnrpts;
 	nrpts.push_back( thisnrpts );
 
 	cout << "Number of repeats at TI" << nrpts.size() << " is " << thisnrpts << endl;
