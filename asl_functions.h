@@ -65,16 +65,6 @@ namespace OXASL {
   // Function to correct NaN values
   volume<float> correct_NaN(const volume<float>& data_in);
 
-  // function to covert Phillip PAR REC file to Nifty format
-  void convert_par_rec_to_nifti(const string file_par, const string file_rec, volume<float>& mask_nifti, volume4D<float>& data_nifti);
-
-  // function to make default mask
-  void create_default_mask(volume<float>& mask_nifti);
-
-  // function to make default data nifti file
-  void create_default_data_nifti(volume4D<float>& data_nifti);
-
-  float convert_pixel_value_to_floating_point(int pixel_value, float rescale_slope, float rescale_intercept, float scale_slope);
 
   // function to extrapolate voxels
   void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
