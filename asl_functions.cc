@@ -1019,6 +1019,7 @@ namespace OXASL {
 
   }
 
+  // Function to do spiral search on 2D images and extrapolate edge voxels
   Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size) {
 
     Matrix data_extrapolated = data_in;
@@ -1052,7 +1053,7 @@ namespace OXASL {
         int y_index_on_matrix = y_index + y_offset;
 
         // Only work on eroded voxels
-	if (mask_in.element(x_index_on_matrix, y_index_on_matrix) != 0 && data_in.element(x_index_on_matrix, y_index_on_matrix) == 0 ){
+	      if (mask_in.element(x_index_on_matrix, y_index_on_matrix) != 0 && data_in.element(x_index_on_matrix, y_index_on_matrix) == 0 ){
           // Create a square matrix of size neighbourhood and centered at the current postion
           int off_set = floor(neighbour_size / 2);
 
@@ -1100,22 +1101,24 @@ namespace OXASL {
 
   }
 
-  // Function to extrapolate voxels
-  void extrapolate(const volume4D<float>& data, int ndata_in, const volume<float>& mask, int neighbour_size, volume4D<float>& data_extrapolated) {
+  // Function to extrapolate voxels on the edge
+  void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs) {
 
     // Version control
-    cout << "Extrapolation. version 1.0.1 (beta). Last compiled on 20161029" << endl;
-    
+    //cout << "Extrapolation. version 1.0.1 (beta). Last compiled on 20170315" << endl;
+
+    // Convert data_in to volume format
+    Matrix in_mtx;
+    volume4D<float> data;
+    stdform2data(data_in, in_mtx, outblocked, outpairs);
+    data.setmatrix(in_mtx, mask);
+
     // Clone input data to pv corrected data
-    data_extrapolated = data;
+    volume4D<float> data_extrapolated = data;
 
     // Correct NaN and INF numbers of input mask and pvmap
     volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
-    //volume<float> pv_map_gm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
-    //volume<float> pv_map_wm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
     mask_in_corr = correct_NaN(mask);
-    //pv_map_gm_in_corr = correct_NaN(pv_map_gm);
-    //pv_map_wm_in_corr = correct_NaN(pv_map_wm);
 
     // Do correction on each slice of time series
     for(int i = 0; i < ndata_in; i++) {
@@ -1161,6 +1164,12 @@ namespace OXASL {
       // Assign result to the 4D volume
       data_extrapolated[i] = extrapolated_data_3D;
     }
+
+    // convert data_extrapolated to vector<Matrix> format
+    Matrix datamtx;
+    datamtx = data_extrapolated.matrix(mask);
+    data2stdform(datamtx, data_out, ndata_in, nrpts, isblocked, ispairs, blockpairs);
   }
+
 
 }

@@ -117,15 +117,14 @@ int main(int argc, char *argv[])
     volume<float> mask_nifti(x_dim, y_dim, z_dim);
 
     // Extrapolation variables
-    //volume<float> pv_gm_map;
-    //volume<float> pv_wm_map;
-    volume4D<float> data_extrapolated(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    //volume4D<float> data_extrapolated(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    // To save output data
+    vector<Matrix> output_data_extrapolated;
     // Extrapolation options
     int neighbour_size;
     if (opts.extrapolate_option.value()) {
       // Get the neighbourhood size
       neighbour_size = opts.neighbour.value();
-      //cout << neighbour_size << endl;
     }
 
     //string file_path_full;
@@ -260,6 +259,23 @@ int main(int argc, char *argv[])
   }
 
 
+    // Extrapolation options
+    if (opts.extrapolate_option.value()) {
+      // Check mask and input file
+      if(opts.maskfile.set()) {
+        cout << "Start extrapolation!" << endl;
+
+        // Perform extrapolation, result in output_data_extrapolated
+        extrapolate(asldata, ndata, mask, neighbour_size, output_data_extrapolated, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+      }
+
+      else {
+        throw Exception("Missing mask file. --mask=<mask file>");
+      }
+    }
+
+
     vector<Matrix> asldataout; //the data we are about to use for output purposes
     int nout=1; //number of output cycles we need to go through
     string fsub="";
@@ -356,47 +372,18 @@ int main(int argc, char *argv[])
 
       }
 
-      // Extrapolation options
+      // Case to handle extrapolation output
       if (opts.extrapolate_option.value()) {
-        // Check mask and input file
-        if(opts.maskfile.set()) {
-          cout << "Start extrapolation!" << endl;
-
-              //volume<float> pv_gm_map;
-              //volume<float> pv_wm_map;
-              //int kernel;
-              //volume4D<float> data_pvcorr
-
-          // Define a matrix 
-          Matrix aslmatrix_non_extrapolated;
-          volume4D<float> asldata_non_extrapolated;
-          stdform2data(asldataout, aslmatrix_non_extrapolated, outblocked, outpairs);
-          asldata_non_extrapolated.setmatrix(aslmatrix_non_extrapolated, mask);
-
-          // Perform extrapolation
-          extrapolate(asldata_non_extrapolated, ndata, mask, neighbour_size, data_extrapolated);
-          //pvcorr_LR(asldata_non_extrapolated, ndata, mask, neighbour_size, data_extrapolated);
-
-
-          Matrix data_extrapolated_mtx;
-          vector<Matrix> asldataout_extrapolated;
-          data_extrapolated_mtx = data_extrapolated.matrix(mask);
-          data2stdform(data_extrapolated_mtx, asldataout_extrapolated, ndata, nrpts, isblocked, ispairs,blockpairs);
-          asldataout = asldataout_extrapolated;
-        }
-
-        else {
-          throw Exception("Missing mask file. --mask=<mask file>");
-        }
+        asldataout = output_data_extrapolated;
       }
 
       //output data. Use input volume as basis for output volume to ensure consistent metadata
       if (opts.out.set()) {
-	Matrix outmtx;
-	volume4D<float> dataout = data*0;;
-	stdform2data(asldataout,outmtx,outblocked,outpairs);
-	dataout.setmatrix(outmtx,mask);
-	save_volume4D(dataout,opts.out.value()+fsub);
+      	Matrix outmtx;
+      	volume4D<float> dataout = data*0;;
+      	stdform2data(asldataout,outmtx,outblocked,outpairs);
+      	dataout.setmatrix(outmtx,mask);
+      	save_volume4D(dataout,opts.out.value()+fsub);
       }
 
       //take mean at each TI

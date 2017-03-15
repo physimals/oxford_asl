@@ -77,8 +77,9 @@ namespace OXASL {
   float convert_pixel_value_to_floating_point(int pixel_value, float rescale_slope, float rescale_intercept, float scale_slope);
 
   // function to extrapolate voxels
-  void extrapolate(const volume4D<float>& data, int ndata_in, const volume<float>& mask, int neighbour_size, volume4D<float>& data_extrapolated);
+  void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 
+  // Function to do spiral search on 2D images and extrapolate edge voxels
   Matrix extrapolate_avg(Matrix data_in, Matrix mask, int neighbour_size);
 }
 
