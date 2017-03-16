@@ -109,14 +109,14 @@ help(string("-h,--help"), false,
 	       string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
 	       false,requires_argument),
    inaslform(string("--iaf,--inaslform"),string("diff"),
-	     string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block\n"),
+	     string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block"),
 	     false,requires_argument),
    rpts(string("--rpts"),string("NULL"),
 	string("Number of repeats at each TI as comma separated list, not required if the number of repeats is same for all TIs  (only for use with --ibf=tis)"),
 	false,requires_argument),
 
    ispairs(string("--pairs,--inpairs"),false,
-	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead"),
+	   string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead\n"),
 	   false,no_argument),
    
 
@@ -134,6 +134,23 @@ help(string("-h,--help"), false,
    surrtcdiff(string("--surrdiff"), false,
 	      string("Do surround subtraction on the pairs\n"),
 	      false,no_argument),
+
+  // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+    // Assumes an eroded brain
+    extrapolate_option(string("--extrapolate"), false, 
+      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
+      false, no_argument),
+    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
+
+   // Partial volume (linear regression) options
+    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
+      false, requires_argument),
+    pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
+      false, requires_argument),
+    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
+  
 
    //basic output
    outblockform(string("--obf,--outblockform"),string("notset"),
@@ -171,22 +188,9 @@ help(string("-h,--help"), false,
       string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)\n"),
       false,requires_argument),
 
-    // Partial volume (linear regression) options
-    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
-      false, requires_argument),
-    pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
-      false, requires_argument),
-    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
-      false, requires_argument),
+   
 
-
-    // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
-    // Assumes an eroded brain
-    extrapolate_option(string("--extrapolate"), false, 
-      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
-      false, no_argument),
-    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
-      false, requires_argument),
+    
 
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
       try {
@@ -205,6 +209,13 @@ help(string("-h,--help"), false,
        options.add(tcdiff);
        options.add(surrtcdiff);
 
+       options.add(extrapolate_option);
+       options.add(neighbour);
+
+       options.add(pv_gm_file);
+       options.add(pv_wm_file);
+       options.add(kernel);
+
        options.add(out);
        options.add(outblockform);
 
@@ -219,13 +230,7 @@ help(string("-h,--help"), false,
        options.add(deconvout);
        options.add(aif);
 
-       options.add(pv_gm_file);
-       options.add(pv_wm_file);
-       options.add(kernel);
-
-       options.add(extrapolate_option);
-       options.add(neighbour);
-
+      
      }
 
      catch(X_OptionError& e) {
