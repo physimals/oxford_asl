@@ -1519,6 +1519,7 @@ if [ ! -z $spatial ]; then
     echo "Instructing BASIL to use automated spatial smoothing"
     basil_options=$basil_options"--spatial "
     Log "Employing spatial VB"
+
 fi
 
 if [ ! -z $infert1 ]; then
@@ -1639,7 +1640,7 @@ fi
 ### End of: Partial Volume Estimates
 
 ### Calibration
-# Do calibration here becuase we do not need if before this point & if we are generating a CSF mask we have a better registration at this point
+# Do calibration here becuase we do not need it before this point & if we are generating a CSF mask we have a better registration at this point
 if [ -z $t1tset ]; then
     t1tset=1.3;
 fi
@@ -1676,6 +1677,8 @@ if [ -z $cmethod ]; then
 fi
 
 if [ ! -z $calib ]; then
+
+    # Single M0 value for calibration
     if [ $cmethod = 'single' ]; then
 	Log "Calibration is using a single M0 value with a CSF reference"
 	if [ -z $csf ] && [ -z $fasthasrun ]; then
@@ -1685,6 +1688,8 @@ if [ ! -z $calib ]; then
        # calcualte M0a from CSF
 	Calibration
 	Mo=`cat $outdir/calib/M0.txt`
+
+    # Voxelwise M0 values for calibration
     elif [ $cmethod = 'voxel' ]; then
 	Log "Calibration is voxelwise"
 	mkdir $outdir/calib
@@ -1700,6 +1705,13 @@ if [ ! -z $calib ]; then
 
 	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
 	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
+
+	# correct for (partial volume) edge effects
+	# median smoothing and erosion
+	fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
+	# extrapolation to match mask
+	asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
+	
     else
 	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 

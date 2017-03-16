@@ -1,14 +1,17 @@
 /*   asl_file.cc file manipulator for multi-TI ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
 #include <iostream>
 #include <math.h>
 #include <string>
+#include <sstream>
 #include "newmatap.h"
 #include "newmatio.h"
 #include "newimage/newimageall.h"
@@ -33,6 +36,7 @@ int main(int argc, char *argv[])
     //parse command line (puts these into the log file)
     ReadOptions& opts = ReadOptions::getInstance();
     opts.parse_command_line(argc,argv);
+
 
    //deal with input data type options
     bool isblocked=false; //indicates if data is in blocks of repeats (of all TIs) rather than TIs
@@ -72,7 +76,6 @@ int main(int argc, char *argv[])
     else if(oaf.compare("tc")==0) outdiff=false;
     else throw Exception("Unrecognised output asl form");
     */
-
     bool outpairs=ispairs; // outpairs indicates wehter the data we are processing for output is in the form of pairs - by deafult if input is in pairs then output the pairs
 
         
@@ -81,13 +84,38 @@ int main(int argc, char *argv[])
     volume4D<float> data;
     read_volume4D(data,opts.datafile.value());
 
+    // Partail volume correction variables
+    volume<float> pv_gm_map;
+    volume<float> pv_wm_map;
+    int kernel;
+    vector<Matrix> output_data_gm;
+    vector<Matrix> output_data_wm;
+    // Read partial volume map and kernel size
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set() && opts.kernel.set()) {
+      read_volume(pv_gm_map, opts.pv_gm_file.value());
+      read_volume(pv_wm_map, opts.pv_wm_file.value());
+      kernel = opts.kernel.value();
+    }
+
+
+    // Extrapolation variables
+    // To save output data
+    vector<Matrix> output_data_extrapolated;
+    // Extrapolation options
+    int neighbour_size;
+    if (opts.extrapolate_option.value()) {
+      // Get the neighbourhood size
+      neighbour_size = opts.neighbour.value();
+    }
+
+
     // load mask
     // if a mask is not supplied then default to processing whole volume
     // Create a mask from the data volume to ensure metadata is correct 
     volume<float> mask = data[0]*0;
     mask=1;
     if (opts.maskfile.set()) read_volume(mask,opts.maskfile.value());
-
+    
     Matrix datamtx;
     datamtx = data.matrix(mask);
     int nvox=datamtx.Ncols();
@@ -120,7 +148,9 @@ int main(int argc, char *argv[])
       while ( ss.good() ) {
 	string substr;
 	getline( ss, substr, ',' );
-	int thisnrpts = stoi(substr);
+  stringstream ss(substr);
+	int thisnrpts;
+  ss >> thisnrpts;
 	nrpts.push_back( thisnrpts );
 
 	cout << "Number of repeats at TI" << nrpts.size() << " is " << thisnrpts << endl;
@@ -156,9 +186,9 @@ int main(int argc, char *argv[])
     // int idx;
     
     if (opts.splitpairs.value() && opts.tcdiff.value()) {
-	// doesn't make sense to try and do both splitpairs and tcdifference
-	throw Exception("Cannot both split the pairs and difference them");
-      }
+    	// doesn't make sense to try and do both splitpairs and tcdifference
+    	throw Exception("Cannot both split the pairs and difference them");
+    }
 
 
   if (opts.splitpairs.value()) {
@@ -195,6 +225,72 @@ int main(int argc, char *argv[])
 	outpairs=false;
   }
 
+    // Here we throw some exceptions that we currently don't support
+    // PVC and Split ASL file
+    if( (opts.pv_gm_file.set() || opts.pv_wm_file.set()) && (opts.splitpairs.value()) ) {
+      throw Exception("We don't support partial volume correction and split files done together!");
+    }
+    // PVC and Extrapolation
+    if( (opts.pv_gm_file.set() || opts.pv_wm_file.set()) && (opts.extrapolate_option.value()) ) {
+      throw Exception("We don't support partial volume correction and extrapolation done together!");
+    }
+    if( (opts.splitpairs.value()) && (opts.extrapolate_option.value()) ) {
+      throw Exception("We don't support split files and extrapolation done together!");
+    }
+
+
+    // Partial Volume Correction Options
+    // Partial volume correction on each TI
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+      // Check mask file is specified
+      if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
+        cout << "Start partial volume correction" << endl;
+
+        cout << "Dealing with GM PV Correction" << endl;
+        pvcorr_LR(asldata, ndata, mask, pv_gm_map, pv_wm_map, kernel, output_data_gm, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+        cout << "Dealing with WM PV Correction" << endl;
+        pvcorr_LR(asldata, ndata, mask, pv_wm_map, pv_gm_map, kernel, output_data_wm, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+        cout << "Partial volume correction done!" << endl;
+      }
+      else if(!opts.maskfile.set()) {
+        throw Exception("Missing mask file. --mask=<mask file>");
+      }
+      else if(!opts.kernel.set()) {
+        throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+      }
+      else if(!opts.out.set()) {
+        throw Exception("Missing output file. --out=<output file name>");
+      }
+      else {
+        throw Exception("Halt!");
+      }
+    }
+
+    // Extrapolation options
+    if ( (opts.extrapolate_option.value()) && (opts.out.set()) ) {
+      // Check mask and input file
+      if (opts.maskfile.set()) {
+        cout << "Start extrapolation!" << endl;
+
+        // Perform extrapolation, result in output_data_extrapolated
+        extrapolate(asldata, ndata, mask, neighbour_size, output_data_extrapolated, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+      }
+
+      else if (!opts.extrapolate_option.value()) {
+        throw Exception("Missing mask file. --mask=<mask file>");
+      }
+      else if (!opts.out.set()) {
+        throw Exception("Missing output file. --out=<out file>");
+      }
+      else {
+        throw Exception("Halt!");
+      }
+    }
+
 
     vector<Matrix> asldataout; //the data we are about to use for output purposes
     int nout=1; //number of output cycles we need to go through
@@ -205,19 +301,95 @@ int main(int argc, char *argv[])
       outpairs=false;
     }
 
+    if (opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+      nout = 2;
+    }
+
     // OUTPUT: Main output section - anything that is compatible with the splitting of pairs (splitpairs) can go in here
     for (int o=1; o<=nout; o++) {
       if(!opts.splitpairs.value()) asldataout=asldata;
       else if (o==1) { asldataout=asldataodd; fsub="_odd"; cout << "Dealing with odd members of pairs"<<endl;}
       else           { asldataout=asldataeven; fsub="_even"; cout << "Dealing with even members of pairs"<<endl;}
 
+      // Partial volume correction on each TI
+      if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+
+        /*
+        // Check mask file is specified
+        if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
+          cout << "Start partial volume correction" << endl;
+
+
+          // Convert asldataout to volume4D<float>
+          Matrix aslmatrix_non_pvcorr;
+          volume4D<float> asldata_non_pvcorr;
+          stdform2data(asldataout, aslmatrix_non_pvcorr, outblocked, outpairs);
+          asldata_non_pvcorr.setmatrix(aslmatrix_non_pvcorr, mask);
+
+          if(o == 1) {
+            cout << "Dealing with GM PV Correction" << endl;
+            fsub = "_gm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+          }
+
+          if(o == 2) {
+            cout << "Dealing with WM PV Correction" << endl;
+            fsub = "_wm";
+            pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_wm_map, pv_gm_map, kernel, data_pvcorr);
+          }
+          // function to perform partial volume correction by linear regression
+          //pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
+
+          //covert data_pvcorr to vector<Matrix> aka stdform 
+          Matrix data_pvcorr_mtx;
+          vector<Matrix> asldataout_pvcorr;
+          data_pvcorr_mtx = data_pvcorr.matrix(mask);
+          data2stdform(data_pvcorr_mtx, asldataout_pvcorr, ndata, nrpts, isblocked, ispairs,blockpairs);
+          asldataout = asldataout_pvcorr;
+
+          //save_volume4D(data_pvcorr, pvout_file_name);
+          cout << "Partial volume correction done!" << endl;
+        }
+        else if(!opts.maskfile.set()) {
+          throw Exception("Missing mask file. --mask=<mask file>");
+        }
+        else if(!opts.kernel.set()) {
+          throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+        }
+        else if(!opts.out.set()) {
+          throw Exception("Missing output file. --out=<output file name>");
+        }
+        else {
+          throw Exception("Halt!");
+        }
+        */
+
+        // GM case
+        if (o == 1) {
+          //cout << "Dealing with GM PV Correction" << endl;
+          fsub = "_gm";
+          asldataout = output_data_gm;
+        }
+        // WM case
+        if (o == 2) {
+          fsub = "_wm";
+          asldataout = output_data_wm;
+        }
+      }
+
+      // Case to handle extrapolation output
+      if (opts.extrapolate_option.value()) {
+        asldataout = output_data_extrapolated;
+      }
+
       //output data. Use input volume as basis for output volume to ensure consistent metadata
       if (opts.out.set()) {
-	Matrix outmtx;
-	volume4D<float> dataout = data*0;;
-	stdform2data(asldataout,outmtx,outblocked,outpairs);
-	dataout.setmatrix(outmtx,mask);
-	save_volume4D(dataout,opts.out.value()+fsub);
+      	Matrix outmtx;
+      	volume4D<float> dataout = data*0;;
+      	stdform2data(asldataout,outmtx,outblocked,outpairs);
+      	dataout.setmatrix(outmtx,mask);
+      	save_volume4D(dataout,opts.out.value()+fsub);
       }
 
       //take mean at each TI
@@ -236,21 +408,9 @@ int main(int argc, char *argv[])
     
       //split data into separate file for each TI
       if (opts.splitout.set()) {
-	splitout(asldataout,mask,opts.splitout.value()+fsub);
-	/*cout << "Splitting ASL data into files for each TI" << endl;
-	  volume4D<float> blockout = data*0;;
-	  for (int n=0; n<ntis; n++) 
-	  {
-	  char cstr [5];
-	  if (n<10) sprintf(cstr,"00%d",n);
-	  else if (n<100) sprintf(cstr,"0%d",n);
-	  else if (n<1000) sprintf(cstr,"%d",n);
-	  else throw Exception("More than 1000 measurements in this ASL data file, sorry cannot handle this operation");
-	  string tino(cstr);
-	  
-	  blockout.setmatrix(asldata[n],mask);
-	  save_volume4D(blockout,opts.splitout.value()+tino);
-	  }*/
+
+        splitout(asldataout,mask,opts.splitout.value()+fsub);
+
       }
 
     //do epochwise output

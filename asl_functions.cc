@@ -1,8 +1,10 @@
 /*   asl_functions.cc various functions for the manipulation of ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
@@ -491,6 +493,385 @@ namespace OXASL {
     save_volume4D(magout,fname+"_magntiude");
   }
 
+  // Function to correct PV using LR method
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel)
+  {
+
+    volume<float> submask;
+    volume<float> data_roi;
+    volume<float> pv_roi;
+    Matrix pseudo_inv;
+    Matrix pv_corr_result;
+    Matrix ha_result;
+
+    int singular_matrix_flag = -1;
+
+    // Variables to store the boundary index of submask (ROI)
+    int x_0;
+    int x_1;
+    int y_0;
+    int y_1;
+    int z_0;
+    int z_1;
+
+    float pv_average = 0.0f;
+
+    // Get x y z dimension
+    int x = mask.xsize();
+    int y = mask.ysize();
+    int z = mask.zsize();
+
+    volume<float> gm_corr_data(x, y, z); // result matrix GM
+    //volume<float> wm_corr_data(x, y, z); // result matrix WM
+
+    // Linear regression to correct (smooth) the data
+    for (int i = 0; i < x; i++) {
+      for (int j = 0; j < y; j++) {
+        for (int k = 0; k < z; k++) {
+          // Only work with positive voxels
+          if(mask.value(i, j, k) > 0) {
+
+            // Determine ROI boundary index
+            x_0 = max(i - kernel, 0);
+            x_1 = min(i + kernel, x - 1);
+            y_0 = max(j - kernel, 0);
+            y_1 = min(j + kernel, y - 1);
+            z_0 = max(k - kernel, 0);
+            z_1 = min(k + kernel, z - 1);
+
+            // create a submask here
+            //mask.setROIlimits(x_0, x_1, y_0, y_1, z_0, z_1);
+            //mask.activateROI();
+            //submask = mask.ROI();
+
+            // Define three column vectors to store data and PVE of the current regression kernel
+            ColumnVector sub_mask = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            ColumnVector sub_data = ColumnVector((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1));
+            Matrix sub_pve  = Matrix((x_1 - x_0 + 1) * (y_1 - y_0 + 1) * (z_1 - z_0 + 1), 2);
+            
+            int sub_mask_count = 0;
+            int non_zero_count = 0;
+            float submask_sum = 0.0f; // value to store the sum of current mask kernel
+            for(int p = 0; p < z_1 - z_0 + 1; p++) {
+              for(int n = 0; n < y_1 - y_0 + 1; n++) {
+                for(int m = 0; m < x_1 - x_0 + 1; m++) {
+                  //sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  //sub_pve.element(sub_mask_count) = pv_map.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_mask.element(sub_mask_count) = mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  sub_data.element(sub_mask_count) = data_in.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, first column is GM
+                  sub_pve.element(sub_mask_count, 0) = pv_map_gm.value(x_0 + m, y_0 + n, z_0 + p);
+                  // In the Sub PVE matrix, second column is WM
+                  sub_pve.element(sub_mask_count, 1) = pv_map_wm.value(x_0 + m, y_0 + n, z_0 + p);
+                  submask_sum = submask_sum + mask.value(x_0 + m, y_0 + n, z_0 + p);
+                  if(mask.value(x_0 + m, y_0 + n, z_0 + p) > 0) {
+                    non_zero_count++;
+                  }
+                  sub_mask_count++;
+                }
+              }
+            }
+
+            // calculate the sum of all elements in submask
+            // proceed if sum is greater than 5 (arbitrary threshold)
+            if(submask_sum > 5) {
+              // Apply submask to the data and PVE of the current kernel
+              ColumnVector data_roi_v = ColumnVector(non_zero_count);
+              Matrix pv_roi_v = Matrix(non_zero_count, 2);
+              //RowVector pv_roi_r = RowVector(non_zero_count);
+              
+              int non_zero_index = 0;
+              // Extract all non-zero elements
+              //cout << sub_mask_count << endl;
+              for(int a = 0; a < sub_mask_count; a++) {
+                if(sub_mask.element(a) > 0) {
+                  data_roi_v.element(non_zero_index) = sub_data.element(a);
+                  pv_roi_v.element(non_zero_index, 0) = sub_pve.element(a, 0);
+                  pv_roi_v.element(non_zero_index, 1) = sub_pve.element(a, 1);
+                  non_zero_index++;
+                }
+                else {
+                  continue;
+                }
+              }
+
+              // If pv_roi is all zeros, then the pseudo inversion matrix will be singular
+              // This will cause run time error
+              // So we assign the corrected result to zero in such cases
+              float det = ((pv_roi_v.t()) * pv_roi_v).Determinant();
+              if( (det <= 0.00001) && (det >= 0) ) {
+                gm_corr_data.value(i, j, k) = 0.0f;
+                singular_matrix_flag = 0;
+                //cout << i << ", " << j << ", " << k << endl;
+                //cout << "singular" << endl;
+                //getchar();
+              }
+              else {
+                // Compute pseudo inversion matrix of PV map
+                // ((P^t * P) ^ -1) * (P^t)
+                //float haha = ((pv_roi_v.t()) * pv_roi_v).Determinant();
+                //cout << ((pv_roi_v.t()) * pv_roi_v).Determinant() << endl;
+                pseudo_inv = ( ( (pv_roi_v.t()) * pv_roi_v).i() ) * (pv_roi_v.t());
+                //cout << i << ", " << j << ", " << k << endl;
+                // Get average PV value of the current kernel
+                pv_average = (float) pv_roi_v.Sum() / pv_roi_v.Nrows();
+
+                // Calculate PV corrected data only if there is some PV compoment
+                // If there is little PV small, make it zero
+                if(pv_average >= 0.01) {
+                  pv_corr_result = pseudo_inv * data_roi_v;
+                  gm_corr_data.value(i, j, k) = pv_corr_result.element(0, 0); // output GM only
+                  //corr_data.value(i, j, k) = pv_corr_result.element(1, 0);
+                }
+                else {
+                  gm_corr_data.value(i, j, k) = 0.0f;
+                }
+
+              }
+            }
+
+            else {
+            } // end submask
+
+          }
+
+          else{
+            // do nothing at the moment
+          } // end mask
+
+        }
+      }
+    }
+
+    if(singular_matrix_flag == 0) {
+      cout << "Caution: singular matrix found in PV Correction. This usually happens to data from Siemens. No action required." << endl;
+    }
+
+    return gm_corr_data;
+
+  } // End function correct_pv_lr
+
+  // Function to correct NaN values
+  volume<float> correct_NaN(const volume<float>& data_in) {
+
+    // Clone the input data to output data
+    volume<float> data_out = data_in;
+
+    for(int i = 0; i < data_in.xsize(); i++) {
+      for(int j = 0; j < data_in.ysize(); j++) {
+        for(int k = 0; k < data_in.zsize(); k++) {
+          // IEEE standard: comparison between NaN values is always false
+          // i.e. NaN == NaN is false
+          // In this case, we set it to zero
+          if(data_in.value(i, j, k) != data_in.value(i, j, k)) {
+            data_out.value(i, j, k) = 0.0f;
+          }
+          else {
+            continue;
+          }
+        }
+      }
+    }
+
+    return data_out;
+
+  }
+
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, volume<float>& pv_map_gm, volume<float>& pv_map_wm, int kernel, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs) {
+
+    // Version control
+    cout << "PV correction by linear regression. version 1.0.4 (beta). Last compiled on 20170316" << endl;
+    
+    // Convert data_in to volume format
+    Matrix in_mtx;
+    volume4D<float> data;
+    stdform2data(data_in, in_mtx, outblocked, outpairs);
+    data.setmatrix(in_mtx, mask);
+
+    // Clone input data to pv corrected data
+    volume4D<float> data_pvcorr = data;
+    //data_pvcorr = data;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    volume<float> pv_map_gm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
+    volume<float> pv_map_wm_in_corr(pv_map_gm.xsize(), pv_map_gm.ysize(), pv_map_gm.zsize());
+    mask_in_corr   = correct_NaN(mask);
+    pv_map_gm_in_corr = correct_NaN(pv_map_gm);
+    pv_map_wm_in_corr = correct_NaN(pv_map_wm);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> corrected_data_ti = correct_NaN(data[i]);
+
+      // Linear regression PV correction
+      data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_gm_in_corr, pv_map_wm_in_corr, kernel);
+    }
+
+    // convert data_extrapolated to vector<Matrix> format
+    Matrix datamtx;
+    datamtx = data_pvcorr.matrix(mask);
+    data2stdform(datamtx, data_out, ndata_in, nrpts, isblocked, ispairs, blockpairs);
+
+  }
+
+
+
+
+  // Function to do spiral search on 2D images and extrapolate edge voxels
+  Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size) {
+
+    Matrix data_extrapolated = data_in;
+
+    int x = data_in.Nrows();
+    int y = data_in.Ncols();
+
+    int x_index = 0;
+    int y_index = 0;
+    int dx = 0;
+    int dy = -1;
+
+    int x_boundary = x - 1;
+    int y_boundary = y - 1;
+    int x_offset = x / 2;
+    int y_offset = y / 2;
+
+    int t = max(x_boundary, y_boundary);
+    int max_i = t * t;
+
+    int count = 1;
+
+    for (int i = 0; i < max_i; i++) {
+
+      // Position found
+      if ( (-x_boundary / 2 <= x_index) && (x_index <= x_boundary / 2) && (-1 * y_boundary / 2 <= y_index) && (y_index <= y_boundary / 2)) {
+        //cout << x_index << ", " << y_index << endl;
+
+        // Do extrapolation
+        int x_index_on_matrix = x_index + x_offset;
+        int y_index_on_matrix = y_index + y_offset;
+
+        // Only work on eroded voxels
+	      if (mask_in.element(x_index_on_matrix, y_index_on_matrix) != 0 && data_in.element(x_index_on_matrix, y_index_on_matrix) == 0 ){
+          // Create a square matrix of size neighbourhood and centered at the current postion
+          int off_set = floor(neighbour_size / 2);
+
+          int column_begin = x_index_on_matrix - off_set;
+          int column_end = x_index_on_matrix + off_set;
+
+          int row_begin = y_index_on_matrix - off_set;
+          int row_end = y_index_on_matrix + off_set;
+
+          // If it is out of boundary then continue
+          if (column_begin <= 0 || column_end <= 0 || row_begin <= 0 || row_end <= 0) {
+            continue;
+          }
+
+          float sum = 0;
+          int non_zero_count = 0;
+
+          for (int m = column_begin; m <= column_end; m++) {
+            for (int n = row_begin; n <= row_end; n++) {
+              if (data_in.element(m, n) != 0) {
+                sum = sum + data_in.element(m, n);
+                non_zero_count++;
+              }
+            }
+          }
+
+          if(non_zero_count > 0) {
+            data_extrapolated.element(x_index_on_matrix, y_index_on_matrix) = sum / non_zero_count;
+          }
+
+        }
+      }
+
+      if( (x_index == y_index) || ((x_index < 0) && (x_index == (-1) * y_index)) || ((x_index > 0) && (x_index == 1 - y_index))  ) {
+        t = dx;
+        dx = -1 * dy;
+        dy = t;
+      }
+
+      x_index = x_index + dx;
+      y_index = y_index + dy;
+    }
+
+    return data_extrapolated;
+
+  }
+
+  // Function to extrapolate voxels on the edge
+  void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs) {
+
+    // Version control
+    //cout << "Extrapolation. version 1.0.1 (beta). Last compiled on 20170315" << endl;
+
+    // Convert data_in to volume format
+    Matrix in_mtx;
+    volume4D<float> data;
+    stdform2data(data_in, in_mtx, outblocked, outpairs);
+    data.setmatrix(in_mtx, mask);
+
+    // Clone input data to pv corrected data
+    volume4D<float> data_extrapolated = data;
+
+    // Correct NaN and INF numbers of input mask and pvmap
+    volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
+    mask_in_corr = correct_NaN(mask);
+
+    // Do correction on each slice of time series
+    for(int i = 0; i < ndata_in; i++) {
+      // Correct NaN and INF values of the 3D matrix of current TI (time domain)
+      volume<float> nan_corrected_data_ti = correct_NaN(data[i]);
+
+      // Define a temporary matrix to save current extrapolated results
+      volume<float> extrapolated_data_3D(mask.xsize(), mask.ysize(), mask.zsize());
+
+      // Get x y z dimension
+      int x = nan_corrected_data_ti.xsize();
+      int y = nan_corrected_data_ti.ysize();
+      int z = nan_corrected_data_ti.zsize();
+
+      // for each slice, perform extrapolation
+      for(int j = 0; j < z; j++) {
+        Matrix data_slice_non_extrapolated = Matrix(x, y);
+        Matrix data_slice_extrapolated = Matrix(x, y);
+        Matrix data_mask = Matrix(x, y);
+
+        // Copy the current slice to non-extrapolated matrix
+        for(int m = 0; m < x; m++) {
+          for(int n = 0; n < y; n++) {
+            data_slice_non_extrapolated.element(m, n) = nan_corrected_data_ti.value(m, n, j);
+            data_mask.element(m, n) = mask_in_corr.value(m, n, j);
+            // Default value for the extrapolated matrix is the same with the input file
+            data_slice_extrapolated.element(m, n) = nan_corrected_data_ti.value(m, n, j);
+          }
+        }
+
+        data_slice_extrapolated = extrapolate_avg(data_slice_non_extrapolated, data_mask, neighbour_size);
+
+        // Assign the extrapolated matrix to the 3D volume
+        for(int m = 0; m < x; m++) {
+          for(int n = 0; n < y; n++) {
+           extrapolated_data_3D.value(m, n, j) = data_slice_extrapolated.element(m, n);
+          }
+        }
+
+
+      }
+
+      // Assign result to the 4D volume
+      data_extrapolated[i] = extrapolated_data_3D;
+    }
+
+    // convert data_extrapolated to vector<Matrix> format
+    Matrix datamtx;
+    datamtx = data_extrapolated.matrix(mask);
+    data2stdform(datamtx, data_out, ndata_in, nrpts, isblocked, ispairs, blockpairs);
+  }
 
 
 }
