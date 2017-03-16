@@ -88,7 +88,8 @@ int main(int argc, char *argv[])
     volume<float> pv_gm_map;
     volume<float> pv_wm_map;
     int kernel;
-    volume4D<float> data_pvcorr(data.xsize(), data.ysize(), data.zsize(), data.tsize()); // partial volume corrected data
+    vector<Matrix> output_data_gm;
+    vector<Matrix> output_data_wm;
     // Read partial volume map and kernel size
     if(opts.pv_gm_file.set() && opts.pv_wm_file.set() && opts.kernel.set()) {
       read_volume(pv_gm_map, opts.pv_gm_file.value());
@@ -225,10 +226,40 @@ int main(int argc, char *argv[])
   }
 
 
+    // Partial Volume Correction Options
+    // Partial volume correction on each TI
+    if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
+      // Check mask file is specified
+      if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
+
+        cout << "Start partial volume correction" << endl;
+
+        cout << "Dealing with GM PV Correction" << endl;
+        pvcorr_LR(asldata, ndata, mask, pv_gm_map, pv_wm_map, kernel, output_data_gm, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+        cout << "Dealing with WM PV Correction" << endl;
+        pvcorr_LR(asldata, ndata, mask, pv_wm_map, pv_gm_map, kernel, output_data_wm, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+
+        cout << "Partial volume correction done!" << endl;
+      }
+      else if(!opts.maskfile.set()) {
+        throw Exception("Missing mask file. --mask=<mask file>");
+      }
+      else if(!opts.kernel.set()) {
+        throw Exception("Missing kernel size. --kernel=<3 to 9 integer>");
+      }
+      else if(!opts.out.set()) {
+        throw Exception("Missing output file. --out=<output file name>");
+      }
+      else {
+        throw Exception("Halt!");
+      }
+    }
+
     // Extrapolation options
-    if (opts.extrapolate_option.value()) {
+    if ( (opts.extrapolate_option.value()) && (opts.out.set()) ) {
       // Check mask and input file
-      if(opts.maskfile.set()) {
+      if (opts.maskfile.set()) {
         cout << "Start extrapolation!" << endl;
 
         // Perform extrapolation, result in output_data_extrapolated
@@ -236,8 +267,14 @@ int main(int argc, char *argv[])
 
       }
 
-      else {
+      else if (!opts.extrapolate_option.value()) {
         throw Exception("Missing mask file. --mask=<mask file>");
+      }
+      else if (!opts.out.set()) {
+        throw Exception("Missing output file. --out=<out file>");
+      }
+      else {
+        throw Exception("Halt!");
       }
     }
 
@@ -264,6 +301,7 @@ int main(int argc, char *argv[])
       // Partial volume correction on each TI
       if(opts.pv_gm_file.set() && opts.pv_wm_file.set()) {
 
+        /*
         // Check mask file is specified
         if( (opts.maskfile.set()) && (opts.kernel.set()) && (opts.out.set()) )  {
 
@@ -311,6 +349,19 @@ int main(int argc, char *argv[])
         }
         else {
           throw Exception("Halt!");
+        }
+        */
+
+        // GM case
+        if (o == 1) {
+          //cout << "Dealing with GM PV Correction" << endl;
+          fsub = "_gm";
+          asldataout = output_data_gm;
+        }
+        // WM case
+        if (o == 2) {
+          fsub = "_wm";
+          asldataout = output_data_wm;
         }
       }
 

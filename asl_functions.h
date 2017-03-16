@@ -56,8 +56,10 @@ namespace OXASL {
   // create a (simple) convolution matrix
   ReturnMatrix convmtx(const ColumnVector& invec);
 
+
+  // Partial volume correction functions
   // function to perform partial volume correction by linear regression
-  void pvcorr_LR(const volume4D<float>& data, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr);
+  void pvcorr_LR(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, volume<float>& pv_map_gm, volume<float>& pv_map_wm, int kernel, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 
   // PV correction using linear regression (Asllani's method)
   volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel);
@@ -66,6 +68,7 @@ namespace OXASL {
   volume<float> correct_NaN(const volume<float>& data_in);
 
 
+  // Extrapolation functions
   // function to extrapolate voxels
   void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 

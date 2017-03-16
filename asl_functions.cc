@@ -678,15 +678,21 @@ namespace OXASL {
 
   }
 
-
   // function to perform partial volume correction by linear regression
-  void pvcorr_LR(const volume4D<float>& data_in, int ndata_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel, volume4D<float>& data_pvcorr) {
+  void pvcorr_LR(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, volume<float>& pv_map_gm, volume<float>& pv_map_wm, int kernel, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs) {
 
     // Version control
-    cout << "PV correction by linear regression. version 1.0.4 (beta). Last compiled on 20160203" << endl;
+    cout << "PV correction by linear regression. version 1.0.4 (beta). Last compiled on 20170316" << endl;
     
+    // Convert data_in to volume format
+    Matrix in_mtx;
+    volume4D<float> data;
+    stdform2data(data_in, in_mtx, outblocked, outpairs);
+    data.setmatrix(in_mtx, mask);
+
     // Clone input data to pv corrected data
-    data_pvcorr = data_in;
+    volume4D<float> data_pvcorr = data;
+    //data_pvcorr = data;
 
     // Correct NaN and INF numbers of input mask and pvmap
     volume<float> mask_in_corr(mask.xsize(), mask.ysize(), mask.zsize());
@@ -699,12 +705,20 @@ namespace OXASL {
     // Do correction on each slice of time series
     for(int i = 0; i < ndata_in; i++) {
       // Correct NaN and INF values of the 3D matrix of current TI (time domain)
-      volume<float> corrected_data_ti = correct_NaN(data_in[i]);
+      volume<float> corrected_data_ti = correct_NaN(data[i]);
 
       // Linear regression PV correction
       data_pvcorr[i] = correct_pv_lr(corrected_data_ti, mask_in_corr, pv_map_gm_in_corr, pv_map_wm_in_corr, kernel);
     }
+
+    // convert data_extrapolated to vector<Matrix> format
+    Matrix datamtx;
+    datamtx = data_pvcorr.matrix(mask);
+    data2stdform(datamtx, data_out, ndata_in, nrpts, isblocked, ispairs, blockpairs);
+
   }
+
+
 
 
   // Function to do spiral search on 2D images and extrapolate edge voxels
