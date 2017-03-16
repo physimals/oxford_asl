@@ -19,11 +19,18 @@ GIT_SHA1:=$(shell git describe --dirty)
 GIT_DATE:=$(shell git log -1 --format=%ad --date=local)
 CXXFLAGS += -DGIT_SHA1=\"${GIT_SHA1}\" -DGIT_DATE="\"${GIT_DATE}\""
 
+# Always rebuild scripts
+.PHONY: FORCE
+FORCE:
+
 all:	${XFILES} ${SCRIPTS}
 
 asl_file: ${OBJS} asl_file.o 
 	${CXX}  ${CXXFLAGS} ${LDFLAGS} -o $@ ${OBJS} asl_file.o ${LIBS}
 
-$(SCRIPTS): %: %.in
+$(SCRIPTS): %: %.in FORCE
 	sed -e "s/\$${GIT_SHA1}/${GIT_SHA1}/" -e "s/\$${GIT_DATE}/${GIT_DATE}/" $< >$@
+
+clean:
+	rm ${SCRIPTS}
 
