@@ -225,6 +225,19 @@ int main(int argc, char *argv[])
 	outpairs=false;
   }
 
+    // Here we throw some exceptions that we currently don't support
+    // PVC and Split ASL file
+    if( (opts.pv_gm_file.set() || opts.pv_wm_file.set()) && (opts.splitpairs.value()) ) {
+      throw Exception("We don't support partial volume correction and split files done together!");
+    }
+    // PVC and Extrapolation
+    if( (opts.pv_gm_file.set() || opts.pv_wm_file.set()) && (opts.extrapolate_option.value()) ) {
+      throw Exception("We don't support partial volume correction and extrapolation done together!");
+    }
+    if( (opts.splitpairs.value()) && (opts.extrapolate_option.value()) ) {
+      throw Exception("We don't support split files and extrapolation done together!");
+    }
+
 
     // Partial Volume Correction Options
     // Partial volume correction on each TI
