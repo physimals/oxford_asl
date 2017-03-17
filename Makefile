@@ -1,4 +1,4 @@
-include ${FSLCONFDIR}/default.mk
+#include ${FSLCONFDIR}/default.mk
 
 PROJNAME = oxford_asl
 
@@ -21,7 +21,6 @@ CXXFLAGS += -DGIT_SHA1=\"${GIT_SHA1}\" -DGIT_DATE="\"${GIT_DATE}\""
 
 # Always rebuild scripts
 .PHONY: FORCE
-FORCE:
 
 all:	${XFILES} ${SCRIPTS}
 
@@ -33,4 +32,6 @@ $(SCRIPTS): %: %.in FORCE
 
 clean:
 	rm ${SCRIPTS}
+
+FORCE:
 
