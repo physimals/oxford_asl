@@ -1,8 +1,10 @@
 /*   asl_functions.h various functions for the manipulation of ASL data
 
-      Michael Chappell - FMIRB Image Analysis Group
+    Michael Chappell - FMRIB Image Analysis Group
 
-      Copyright (C) 2009 University of Oxford */
+    Moss Zhao - IBME Quantitative Biomedical Inference (QuBIc) Group
+
+    Copyright (C) 2015 University of Oxford  */
 
 /*   CCOPYRIGHT   */
 
@@ -10,6 +12,13 @@
 #define asl_functions_h
 
 #include <string>
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
 #include "newimage/newimageall.h"
 #include "miscmaths/miscmaths.h"
 
@@ -18,7 +27,7 @@ using namespace NEWIMAGE;
 
 namespace OXASL {
  
-  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, bool isblocked, bool ispairs);
+  void data2stdform(Matrix& datamtx, vector<Matrix>& asldata, int ntis, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
   void stdform2data(vector<Matrix>& asldata, Matrix& datareturn, bool outblocked, bool outpairs);
 
   // separate the pairs in the data (into seprate standard form items)
@@ -46,6 +55,25 @@ namespace OXASL {
   ReturnMatrix SVDdeconv(const Matrix& data, const Matrix& aif);
   // create a (simple) convolution matrix
   ReturnMatrix convmtx(const ColumnVector& invec);
+
+
+  // Partial volume correction functions
+  // function to perform partial volume correction by linear regression
+  void pvcorr_LR(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, volume<float>& pv_map_gm, volume<float>& pv_map_wm, int kernel, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+
+  // PV correction using linear regression (Asllani's method)
+  volume<float> correct_pv_lr(const volume<float>& data_in, const volume<float>& mask, const volume<float>& pv_map_gm, const volume<float>& pv_map_wm, int kernel);
+
+  // Function to correct NaN values
+  volume<float> correct_NaN(const volume<float>& data_in);
+
+
+  // Extrapolation functions
+  // function to extrapolate voxels
+  void extrapolate(vector<Matrix>& data_in, int ndata_in, volume<float>& mask, int neighbour_size, vector<Matrix>& data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+
+  // Function to do spiral search on 2D images and extrapolate edge voxels
+  Matrix extrapolate_avg(Matrix data_in, Matrix mask, int neighbour_size);
 }
 
 #endif

@@ -3,4 +3,9 @@ CVS
 *~
 .DS_Store
 depend.mk
+oxford_asl
+asl_calib
+asl_preproc
+asl_reg
+quasil
 asl_file

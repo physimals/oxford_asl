@@ -43,6 +43,7 @@ Usage() {
     echo " --t2r      : T2(*) of reference tissue (defaults T2/T2*: csf 750/400, gm 100/60,  wm 50/50  ms)"
     echo " --t2b      : T2(*) of blood (default T2/T2*: 150/50 ms)"
     echo " --pc       : Partition co-efficient (defaults csf 1.15, gm 0.98,  wm 0.82)"
+    echo " --alpha    : Specify inversion efficiency - only applied to final CBF image calculation"
     echo ""
     echo " CSF masking options (only for --tissref csf)"
     echo "  By default asl_calib extracts CSF from the structural image by segmentation and"
@@ -81,7 +82,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: asl_calib,v 1.27 2015/08/07 14:43:52 chappell Exp $"
+echo "${GIT_SHA1} ${GIT_DATE}"
 exit 0
 }
 
@@ -123,7 +124,9 @@ until [ -z $1 ]; do
 	--t2star) t2star=1
 	    ;;
 	--pc) pcin=$2
-	    shift;;
+	      shift;;
+	--alpha) alpha=$2
+		 shift;;
 	--tis) tis=$2
 	    shift;;
 	-m) maskflag=1 mask=$2
@@ -308,12 +311,24 @@ echo "Tissue reference : $tissref" >> $log
 
 # command line override of default T1 and T2
 if [ ! -z $T1rin ]; then
-    T1r=$T1rin
-    echo "Setting T1r from command line: $T1r" >> $log
+    if [ `${FSLDIR}/bin/imtest $T1rin` ]; then
+	# we have been supplied with a T1 image - record that here to process later
+	T1rim=$T1rin
+	echo "Loading T1 image for reference region: T1im" >> $log
+    else
+	T1r=$T1rin
+	echo "Setting T1r from command line: $T1r" >> $log
+    fi
 fi
 if [ ! -z $T2rin ]; then
-    T2r=$T2rin
-    echo "Setting T2r from command line: $T2r" >> $log
+    if [ `${FSLDIR}/bin/imtest $T2rin` ]; then
+	# we have been supplied with a T2 image - record that here to process later
+	T2rim=$T2rin
+	echo "Loading T2 image for reference region: T2im" >> $log
+    else
+	T2r=$T2rin
+	echo "Setting T2r from command line: $T2r" >> $log
+    fi
 fi
 if [ ! -z $T2bin ]; then
     T2b=$T2bin
@@ -447,7 +462,7 @@ if [ -z $maskflag ]; then
         # do std space masking with FLIRT registration
 	    
 	    convert_xfm -omat $temp_calib/std2struc.mat -inverse $temp_calib/struc2std.mat
-	    flirt -in $temp_calib/VentricleMask -applyxfm -init $temp_calib/std2struc.mat -ref $struc -out $temp_calib/mask
+	    flirt -in $temp_calib/VentricleMask -applyxfm -init $temp_calib/std2struc.mat -ref $temp_calib/refpve -out $temp_calib/mask
 	else
             # do std space masking using FNIRT registration
             # Register the structural image to standard space using FNIRT
@@ -464,8 +479,8 @@ if [ -z $maskflag ]; then
 	    fi
             # Calculate the inverse warp using INVWARP and apply to standard space ventricle mask
 	    invwarp --ref=$struc --warp=$temp_calib/coef_struc2MNI152 --out=$temp_calib/coef_MNI2struc
-	    applywarp --ref=$struc --in=$temp_calib/VentricleMask --warp=$temp_calib/coef_MNI2struc --out=$temp_calib/mask --interp=nn
-	    
+	    applywarp --ref=$temp_calib/refpve --in=$temp_calib/VentricleMask --warp=$temp_calib/coef_MNI2struc --out=$temp_calib/mask --interp=nn
+	    # using refpve as reference for applywarp as this is the image we apply the mask to, nit the structural
 	fi
 	
 	echo "Masking FAST output with standard space derrived ventricle mask" >> $log
@@ -530,6 +545,8 @@ if [ "$nzvox" -lt 1 ]; then
 fi
 mask=$temp_calib/refmask
 
+# ----
+
 if [ $mode = longtr ]; then
     echo "MODE: longtr" >> $log
 # Calibration data is a long TR acquisition - all we need to do here is take the mean 
@@ -553,7 +570,23 @@ if [ $mode = longtr ]; then
     fi
 
     #mask M0 map with tissue reference
-    fslmaths $temp_calib/calib -mas $mask $temp_calib/calib
+   fslmaths $temp_calib/calib -mas $mask $temp_calib/calib
+
+   # calcualte T1 of reference region (if a T1 image has been supplied)
+   if [ ! -z $T1rim ]; then
+       fslmaths $T1rim -mas $mask $temp_calib/T1r
+       T1r=`fslstats $temp_calib/T1r -M`
+       echo "Calculated T1 of reference tissue: $T1r"
+       echo "Calculated T1 of reference tissue: $T1r" >> $log
+   fi
+
+   # calcualte T2 of reference region (if a T2 image has been supplied)
+   if [ ! -z $T2rim ]; then
+       fslmaths $T2rim -mas $mask $temp_calib/T2r
+       T2r=`fslstats $temp_calib/T2r -M`
+       echo "Calculated T2 of reference tissue: $T2r"
+       echo "Calculated T2 of reference tissue: $T2r" >> $log
+   fi
 
     # calculate M0_ref value
     Moval=`fslstats $temp_calib/calib -M` # this is Mz of CSF
@@ -656,6 +689,12 @@ if [ ! -z $inflag ]; then
 	fslmaths $infile -div $temp_calib/sens $temp_calib/infile
     else
 	imcp $infile $temp_calib/infile
+    fi
+
+    if [ ! -z $alpha ]; then
+	echo "Applying inversion efficiency of: $alpha" >> $log
+	# apply the inversion efficiency supplied to M0 prior to final calculation
+	Moval=`echo "scale=2; $Moval * $alpha" | bc`
     fi
 
     fslmaths $temp_calib/infile -mul 60 -mul 100 -div $Moval $outfile

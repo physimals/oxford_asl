@@ -10,7 +10,6 @@
 
 Usage() {
     echo "QUASAR Bayesian Inference for Arterial Spin Labelling MRI"
-#    echo "Version: 0.95 (beta)"
     echo ""
     echo "Usage (optional parameters in {}):"
     echo " -i         : specify data file"
@@ -33,7 +32,7 @@ Usage() {
 }
 
 Version() {
-echo "$Id: quasil,v 1.10 2013/01/10 17:00:39 chappell Exp $"
+echo "${GIT_SHA1} ${GIT_DATE}"
 exit 0
 }
 
