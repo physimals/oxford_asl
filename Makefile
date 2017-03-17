@@ -1,4 +1,4 @@
-#include ${FSLCONFDIR}/default.mk
+include ${FSLCONFDIR}/default.mk
 
 PROJNAME = oxford_asl
 
