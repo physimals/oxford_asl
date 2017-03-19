@@ -19,6 +19,7 @@ Usage() {
     echo " -m         : mask (in native space of ASL data) - {default: automatically generated}"
     echo " --spatial  : Use adaptive spatial smoothing on perfusion {default: on}"
     echo " --wp       : analysis that conforms to the 'white paper' (Alsop et al. 2014)"
+    echo " --mc       : apply motion correction using mcflirt"
     echo " --more     : see extended options and usage notes"
     echo ""
     echo " Acquisition/Data specific"
@@ -653,6 +654,9 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	-m) mask=$argument
 	    takeargs=1;;
+	--mc) isbool=1; # do motion correction using mcflirt
+	      boolarg=moco;
+	      ;;
 	--tis) tis=$argument
 	    takeargs=1;;
 	--bolus) boluset=1 boluslen=$argument
@@ -986,6 +990,63 @@ if [ ! -z $lowstrucflag ]; then
 #    Log "BET on low res. structural image"
 fi
 
+# standard pre-processing of calibration image
+if [ ! -z $calib ]; then
+    tsize=`fslinfo $calib | grep "^dim4" | sed 's:dim4[ ]*::'`
+    if [ $tsize -gt 1 ]; then
+        #cut - throw away first volume
+	Log "Removing first volume of calibration time series - to ensure data is in steady state"
+	tsize=`expr $tsize - 1`
+	fslroi $calib $tempdir/calib 1 $tsize
+
+	if [ ! -z $moco ]; then
+	    #motion correction
+	    mcflirt -in $tempdir/calib -o $tempdir/calib
+	fi
+	# take the mean
+	fslmaths $tempdir/calib -Tmean $tempdir/calib
+    else
+	${FSLDIR}/bin/fslmaths $calib $tempdir/calib
+    fi
+
+    # bet
+    ${FSLDIR}/bin/imcp $tempdir/calib $tempdir/calib_wholehead # keep the whole head for motion correction later if reqd
+    ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib
+fi
+
+# read in ASL data
+${FSLDIR}/bin/imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
+# take a copy that will not be subject to any subsequent corrections
+${FSLDIR}/bin/imcp $tempdir/asldata $tempdir/asldata_orig
+
+### Motion Correction (main)
+# note motion correction within calibration data is done above
+if [ ! -z $moco ]; then
+    echo "Motion Correction"
+    if [ ! -z $calib ]; then
+	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
+	# this also removes motion effects between asldata and calibration image
+	Log "Motion correction to calibration image"
+	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
+
+	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
+	# Extract the middle transformation
+	middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
+	${FSLDIR}/bin/convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
+	# convert all the transofmrations
+	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
+	    ${FSLDIR}/bin/convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
+	done
+	${FSLDIR}/bin/applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
+	# Convert the calibration image to align with asldata
+	${FSLDIR}/bin/flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+    else
+	Log "Motion correction to middle volume of ASL data"
+	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
+    fi
+    cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
+fi
+
 ### deal with TIs (as specified on the command line)
 count=0
 tislist=""
@@ -996,6 +1057,7 @@ for ti in $thetis; do
     tislist=`echo $tislist --ti${count}=$ti`
     alltis[`expr ${count} - 1`]=$ti
 done
+Log "Number of TIs in list: $count"
 Log "TIs list: $tislist"
 ntis=$count
 ### End of: Deal with the TIs
@@ -1030,7 +1092,6 @@ if [ $iaf = 'diff' ]; then
     # make sure the block format is correct for BASIL
     asl_file --data=$infile --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     Log "Label-control difference data provided: $infile"
-    #${FSLDIR}/bin/fslmaths $infile $tempdir/diffdata
 else
     # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
     asl_file --data=$infile --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
@@ -1104,26 +1165,8 @@ done
 echo ${alltis[*]}
 Log `echo ${alltis[*]}`
 
-
-# standard pre-processing of calibration image
-if [ ! -z $calib ]; then
-    tsize=`fslinfo $calib | grep "^dim4" | sed 's:dim4[ ]*::'`
-    if [ $tsize -gt 1 ]; then
-        #cut - throw away first volume
-	Log "Removing first volume of calibration time series - to ensure data is in steady state"
-	tsize=`expr $tsize - 1`
-	fslroi $calib $tempdir/calib 1 $tsize
-    else
-	${FSLDIR}/bin/fslmaths $calib $tempdir/calib
-    fi
-    # take the mean
-    fslmaths $tempdir/calib -Tmean $tempdir/calib
-    # bet
-    bet $tempdir/calib $tempdir/calib
-fi
-
 # take mean of the asl data as we might need this later
-fslmaths $infile -Tmean $tempdir/meanasl
+fslmaths $tempdir/asldata -Tmean $tempdir/meanasl
 # generate a perfusion-weighted image by taking the mean over all TIs
 fslmaths $tempdir/diffdata_mean -Tmean $tempdir/pwi
 
@@ -1213,7 +1256,7 @@ if [ ! -z $fasthasrun ]; then
     $FSLDIR/bin/fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
 
     # transform the bias field and invert to use for sensitivity correction in calibration
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
 
     if [ ! -z $senscorr ]; then
 	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
@@ -1247,7 +1290,7 @@ elif [ ! -z $calib ]; then
  # use the low resolution strucutral image to create mask (ahould already be BETed)
 elif [ ! -z $lowstrucflag ]; then
  # resample
-    ${FSLDIR}/bin/flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $infile
+    ${FSLDIR}/bin/flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $tempdir/asldata
  # make binary
     ${FSLDIR}/bin/fslmaths $tempdir/mask -bin $tempdir/mask
     Log "Mask generated from low res. structural"
@@ -1280,8 +1323,9 @@ if [ ! -z $fmap ]; then
     ${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
     ${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
     
-    # Now apply the correction to the data
-    ${FSLDIR}/bin/applywarp -i $infile -r $tempdir/meanasl -o $tempdir/asldata -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    # Now apply the correction to the data.
+    # note that we use the orignal data here and apply the motion correction as part of the process
+    ${FSLDIR}/bin/applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata --premat=$tempdir/asldata.cat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
     ${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
     # Repeat the label-control subtraction on the corrected data
     if [ $iaf = 'diff' ]; then
@@ -1562,9 +1606,9 @@ if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
     ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     
     # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$infile --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
     ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
     ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
