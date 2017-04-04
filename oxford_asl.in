@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # OXFORD_ASL: Converts ASL images in to perfusion maps
 #
