@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os
+import colorsys
 
 import wx
 import wx.grid
@@ -323,24 +324,24 @@ class AslCalibration(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Calibration")
 
+        self.wp = False
+
         self.calib_cb = self.checkbox("Enable Calibration", bold=True)
 
         self.calib_image_picker = self.file_picker("Calibration Image")
         self.m0_type_ch = self.choice("M0 Type", choices=["Proton Density (long TR)", "Saturation Recovery"])
 
         self.seq_tr_num = self.number("Sequence TR (s)", min=0,max=10,initial=6)
-        self.seq_te_num = self.number("Seqiemce TE (ms)", min=0,max=30,initial=0)
-        self.blood_t2_num = self.number("Blood T2 (s)", min=0,max=5,initial=3)
         self.calib_gain_num = self.number("Calibration Gain", min=0,max=5,initial=1)
-        self.coil_image_picker = self.file_picker("Coil Sensitivity Image", optional=True)
-
         self.calib_mode_ch = self.choice("Calibration mode", choices=["Reference Region", "Voxelwise"])
 
         self.section("Reference tissue")
 
         self.ref_tissue_type_ch = self.choice("Type", choices=["CSF", "WM", "GM", "None"], handler=self.ref_tissue_type_changed)
         self.ref_tissue_mask_picker = self.file_picker("Mask", optional=True)
-        
+        self.seq_te_num = self.number("Sequence TE (ms)", min=0,max=30,initial=0)
+        self.blood_t2_num = self.number("Blood T2 (s)", min=0,max=5,initial=3)
+        self.coil_image_picker = self.file_picker("Coil Sensitivity Image", optional=True)
         self.ref_t1_num = self.number("Reference T1 (s)", min=0,max=5,initial=1.3)
         self.ref_t2_num = self.number("Reference T2 (s)", min=0,max=5,initial=1)
 
@@ -381,22 +382,28 @@ class AslCalibration(TabPage):
             self.ref_t2_num.SetValue(100.0/60)
         self.update()
 
+    def wp_changed(self, wp):
+        self.wp = wp
+        if wp: self.calib_mode_ch.SetSelection(1)
+        self.update()
+
     def update(self, event=None):
         enable = self.calib()
         self.m0_type_ch.Enable(enable)
         self.seq_tr_num.Enable(enable and self.m0_type() == 0)
-        self.seq_te_num.Enable(enable)
         self.calib_image_picker.Enable(enable)
         self.calib_gain_num.Enable(enable)
         self.coil_image_picker.checkbox.Enable(enable)
-        self.coil_image_picker.Enable(enable and self.coil_image_picker.checkbox.IsChecked())
-        self.calib_mode_ch.Enable(enable)
+        self.calib_mode_ch.Enable(enable and not self.wp)
         self.ref_tissue_type_ch.Enable(enable and self.calib_mode() == 0)
         self.ref_tissue_mask_picker.checkbox.Enable(enable and self.calib_mode() == 0)
         self.ref_tissue_mask_picker.Enable(enable and self.ref_tissue_mask_picker.checkbox.IsChecked() and self.calib_mode() == 0)
+        self.coil_image_picker.checkbox.Enable(enable and self.calib_mode() == 0)
+        self.coil_image_picker.Enable(enable and self.calib_mode() == 0 and self.coil_image_picker.checkbox.IsChecked())
+        self.seq_te_num.Enable(enable and self.calib_mode() == 0)
+        self.blood_t2_num.Enable(enable and self.calib_mode() == 0)
         self.ref_t1_num.Enable(enable and self.calib_mode() == 0)
         self.ref_t2_num.Enable(enable and self.calib_mode() == 0)
-        self.blood_t2_num.Enable(enable and self.calib_mode() == 0)
         TabPage.update(self)
 
 class AslAnalysis(TabPage):
@@ -404,12 +411,14 @@ class AslAnalysis(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Analysis")
 
+        self.transform_choices = ["Matrix", "Warp image", "Use FSL_ANAT output"]
+
         self.section("Registration")
 
         self.transform_cb = wx.CheckBox(self, label="Transform to standard space")
         self.transform_cb.Bind(wx.EVT_CHECKBOX, self.update)
-        self.transform_ch = wx.Choice(self, choices=["Matrix", "Warp image", "Use fsl_anat output"])
-        self.transform_ch.SetSelection(0)
+        self.transform_ch = wx.Choice(self, choices=self.transform_choices)
+        self.transform_ch.SetSelection(2)
         self.transform_ch.Bind(wx.EVT_CHOICE, self.update)
         self.transform_picker = wx.FilePickerCtrl(self)
         self.pack("", self.transform_cb, self.transform_ch, self.transform_picker, enable=False)
@@ -422,9 +431,9 @@ class AslAnalysis(TabPage):
 
         self.section("Initial parameter values")
 
-        self.bat_num = self.number("Bolus arrival time", min=0,max=2.5,initial=0.7)
-        self.t1_num = self.number("T1", min=0,max=2,initial=1)
-        self.t1b_num = self.number("T1b", min=0,max=3,initial=1.05)
+        self.bat_num = self.number("Bolus arrival time (s)", min=0,max=2.5,initial=0.7)
+        self.t1_num = self.number("T1 (s)", min=0,max=3,initial=1.3)
+        self.t1b_num = self.number("T1b (s)", min=0,max=3,initial=1.65)
         self.ie_num = self.number("Inversion Efficiency", min=0,max=1,initial=0.98)
         
         self.section("Analysis Options")
@@ -432,7 +441,7 @@ class AslAnalysis(TabPage):
         self.spatial_cb = self.checkbox("Adaptive spatial regularization on perfusion", initial=True)
         self.infer_t1_cb = self.checkbox("Incorporate T1 value uncertainty")
         self.macro_cb = self.checkbox("Include macro vascular component")
-        self.fixbolus_cb = self.checkbox("Fix bolus duration")
+        self.fixbolus_cb = self.checkbox("Fix bolus duration", initial=True)
 
         self.pv_cb = self.checkbox("Partial Volume Correction")
         self.mc_cb = self.checkbox("Motion Correction (MCFLIRT)")
@@ -469,7 +478,7 @@ class AslAnalysis(TabPage):
     def wp_changed(self, event):
         if self.wp():
             self.t1_num.SetValue(1.65)
-            # FIXME calib model=voxelwise, exch=simple
+        self.calibration.wp_changed(self.wp())
         self.t1_num.Enable(not self.wp())
         self.update()
 
@@ -481,6 +490,21 @@ class AslAnalysis(TabPage):
             self.bat_num.SetValue(1.3)
             self.ie_num.SetValue(0.85)
         
+    def fsl_anat_changed(self, enabled):
+        """ If FSL_ANAT is selected, use it by default, otherwise do not allow it """
+        sel = self.transform_ch.GetSelection()
+        if enabled: 
+            choices = self.transform_choices
+            sel = 2
+        else: 
+            choices = self.transform_choices[:2]
+            if sel == 2: sel = 0
+        self.transform_ch.Enable(False)
+        self.transform_ch.Clear()
+        self.transform_ch.AppendItems(choices)
+        self.transform_ch.SetSelection(sel)
+        self.transform_ch.Enable(self.transform())
+
 class AslInputOptions(TabPage):
     
     def __init__(self, parent):
@@ -498,7 +522,7 @@ class AslInputOptions(TabPage):
         self.section("Data order")
 
         self.choice1 = wx.Choice(self, choices=self.groups)
-        self.choice1.SetSelection(0)
+        self.choice1.SetSelection(2)
         self.choice1.Bind(wx.EVT_CHOICE, self.update)
         self.choice2 = wx.Choice(self, choices=self.groups)
         self.choice2.SetSelection(0)
@@ -508,29 +532,29 @@ class AslInputOptions(TabPage):
         
         self.section("Acquisition parameters")
 
-        self.labelling_ch = self.choice("Labelling", choices=["pASL", "cASL/pcASL"], handler=self.labelling_changed)
+        self.labelling_ch = self.choice("Labelling", choices=["pASL", "cASL/pcASL"], initial=1, handler=self.labelling_changed)
 
         self.bolus_dur_ch = wx.Choice(self, choices=["Constant", "Variable"])
         self.bolus_dur_ch.SetSelection(0)
         self.bolus_dur_ch.Bind(wx.EVT_CHOICE, self.update)
         self.bolus_dur_num = NumberChooser(self, min=0, max=2.5, step=0.1, initial=0.7)
         self.bolus_dur_num.span = 2
-        self.pack("Bolus duration", self.bolus_dur_ch, self.bolus_dur_num)
+        self.pack("Bolus duration (s)", self.bolus_dur_ch, self.bolus_dur_num)
         
         self.bolus_dur_list = NumberList(self, self.ntis())
         self.bolus_dur_list.span = 3
         self.bolus_dur_list.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.update)
-        self.pack("Bolus durations", self.bolus_dur_list, enable=False)
+        self.pack("Bolus durations (s)", self.bolus_dur_list, enable=False)
 
         self.ti_list = NumberList(self, self.ntis())
         self.ti_list.span=3
         self.ti_list.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.update)
-        self.pack("TIs", self.ti_list)
+        self.pack("TIs (s)", self.ti_list)
         
         self.readout_ch = wx.Choice(self, choices=["3D (eg GRASE)", "2D multi-slice (eg EPI)"])
         self.readout_ch.SetSelection(0)
         self.readout_ch.Bind(wx.EVT_CHOICE, self.update)
-        self.time_per_slice_num = NumberChooser(self, label="Time per slice", min=0, max=50, step=1, initial=10)
+        self.time_per_slice_num = NumberChooser(self, label="Time per slice (ms)", min=0, max=50, step=1, initial=10)
         self.time_per_slice_num.span=2
         self.pack("Readout", self.readout_ch, self.time_per_slice_num)
         self.time_per_slice_num.Enable(False)
@@ -544,7 +568,7 @@ class AslInputOptions(TabPage):
 
         self.section("Structure")
 
-        self.fsl_anat_picker = self.file_picker("Use FSL_ANAT output", dir=True, optional=True, initial_on=True)
+        self.fsl_anat_picker = self.file_picker("Use FSL_ANAT output", dir=True, optional=True, initial_on=True, handler=self.fsl_anat_changed)
 
         cb = wx.CheckBox(self, label="Use Structural Image")
         cb.Bind(wx.EVT_CHECKBOX, self.update)
@@ -632,6 +656,10 @@ class AslInputOptions(TabPage):
         self.analysis.labelling_changed(event.GetInt() == 0)
         self.update()
 
+    def fsl_anat_changed(self, event):
+        self.analysis.fsl_anat_changed(self.fsl_anat_picker.checkbox.IsChecked())
+        self.update()
+
     def update_groups(self, group1=True, group2=True):
         g2 = self.choice2.GetSelection()
         g1 = self.choice1.GetSelection()
@@ -704,9 +732,10 @@ class NumberChooser(wx.Panel):
         if self.handler: self.handler(event)
 
 class NumberList(wx.grid.Grid):
-    def __init__(self, parent, n):
+    def __init__(self, parent, n, default=1.8):
         super(NumberList, self).__init__(parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.n=0
+        self.default = default
         self.CreateGrid(1, 0)
         self.SetRowLabelSize(0)
         self.SetColLabelSize(0)
@@ -724,7 +753,7 @@ class NumberList(wx.grid.Grid):
     def set_size(self, n):
         if n > self.n:
             self.AppendCols(n - self.n)
-            for c in range(self.n, n): self.SetCellValue(0, c, "1.0")
+            for c in range(self.n, n): self.SetCellValue(0, c, str(self.default))
         elif n < self.n:
             self.DeleteCols(n, self.n-n)
         self.n = n
@@ -756,6 +785,16 @@ class AslDataPreview(wx.Panel):
         event.Skip()
         self.Refresh()
 
+    def get_col(self, pos, ti):
+        if ti: h = 170.0/255
+        else: 
+            h = 90.0/255
+        s, v = 0.5, 0.95 - pos/2
+        #print(h, s, v)
+        r,g,b = colorsys.hsv_to_rgb(h, s, v)
+        #print(r,g,b)
+        return wx.Colour(int(r*255), int(g*255), int(b*255))
+
     def on_paint(self, event):
         w, h = self.GetClientSize()
         N = self.n_tis * self.n_repeats
@@ -766,15 +805,20 @@ class AslDataPreview(wx.Panel):
         leg_width = (w-200)/4
         leg_start = 100
 
-        b = wx.Brush('#00b8e6', wx.SOLID)
-        dc.SetBrush(b)
-        dc.DrawRectangle(leg_start, 20, leg_width/4, 20)
-        dc.DrawText("Ti", leg_start+leg_width/3, 20)
+        #b = wx.Brush(self.get_col(0.5, True), wx.SOLID)
+        #dc.SetBrush(b)
+        dc.SetBrush(wx.TRANSPARENT_BRUSH)
+        rect = wx.Rect(leg_start, 20, leg_width/4, 20)
+        dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
+        dc.DrawRectangleRect(rect)
+        dc.DrawText("Tis", leg_start+leg_width/3, 20)
 
-        b = wx.Brush('#40bf80', wx.SOLID)
-        dc.SetBrush(b)
-        dc.DrawRectangle(leg_start+leg_width, 20, leg_width/4, 20)
-        dc.DrawText("Repeat", leg_start+4*leg_width/3, 20)
+        #b = wx.Brush(self.get_col(0.5, False), wx.SOLID)
+        #dc.SetBrush(b)
+        rect = wx.Rect(leg_start+leg_width, 20, leg_width/4, 20)
+        dc.GradientFillLinear(rect, self.get_col(0, False), self.get_col(1.0, False), wx.EAST)
+        dc.DrawRectangleRect(rect)
+        dc.DrawText("Repeats", leg_start+4*leg_width/3, 20)
 
         if self.tc_pairs:
             dc.SetBrush(wx.TRANSPARENT_BRUSH)
@@ -810,14 +854,24 @@ class AslDataPreview(wx.Panel):
                 elif t == "r":
                     seq.append(i)
                     seq += [i+2,] * (self.n_repeats - 1)
-                    
+        
+        tistart = -1
+        ti_sep = 1
+        for idx, s in enumerate(seq):
+            if s == 1 and tistart < 0: 
+                tistart = idx
+            elif s == 1:
+                ti_sep = idx - tistart
+                break
+
         bwidth = float(w - 100) / N
         x = 50
-        for s in seq:
+        pos = 0.0
+        ti = 0
+        d = 1.0/self.n_tis
+        for idx, s in enumerate(seq):
             dc.SetPen(wx.TRANSPARENT_PEN)
-            b = wx.Brush('#00b8e6', wx.SOLID)
-            if s in (3, 4):
-                b.SetColour('#40bf80')
+            b = wx.Brush(self.get_col(pos, s in (1, 2)), wx.SOLID)
             dc.SetBrush(b)
             dc.DrawRectangle(int(x), 50, int(bwidth+1), h-100)
 
@@ -829,6 +883,12 @@ class AslDataPreview(wx.Panel):
             dc.SetPen(wx.Pen('black'))
             dc.DrawLine(int(x), 50, int(x), h-50)
             x += bwidth
+            if (idx+1) % ti_sep == 0: 
+                pos += d
+                ti += 1
+                if ti == self.n_tis: 
+                    pos = 0
+                    ti = 0
 
 class AslGui(wx.Frame):
 
