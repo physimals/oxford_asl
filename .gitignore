@@ -9,3 +9,4 @@ asl_preproc
 asl_reg
 quasil
 asl_file
+*.pyc
