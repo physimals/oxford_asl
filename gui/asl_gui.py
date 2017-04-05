@@ -307,11 +307,14 @@ class AslRun(wx.Frame):
                     self.check_exists("Calibration reference tissue mask", self.calibration.ref_tissue_mask())
                     calib.add("-m %s" % self.calibration.ref_tissue_mask())
                 else:
-                    # use structural_brain?
-                    pass
+                    # use structural_brain? What about FSL_ANAT?
+                    calib.add("-s %s/structural_brain" % self.outdir)
+                    calib.add("-t %s/native_space/asl2struct.mat" % self.outdir)
             if self.calibration.coil_image() is not None:
                 self.check_exists("Coil sensitivity reference image", self.calibration.coil_image())
                 calib.add("--cref %s" % self.calibration.coil_image())
+
+            run.add("FIXME need to add more calibration commands here")
 
         return run
 
@@ -547,9 +550,11 @@ class AslInputOptions(TabPage):
         cb.Bind(wx.EVT_CHECKBOX, self.update)
         cb.Enable(False)
         self.struc_image_picker = wx.FilePickerCtrl(self)
+        self.struc_image_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
         self.struc_image_picker.span = 2
         self.struc_image_picker.checkbox = cb
         self.struc_image_ch = wx.Choice(self, choices=["Already brain extracted", "Run BET to extract brain"])
+        self.struc_image_ch.Bind(wx.EVT_CHOICE, self.update)
         self.struc_image_ch.SetSelection(0)
         self.pack("", cb, self.struc_image_picker, self.struc_image_ch, enable=False)
 
