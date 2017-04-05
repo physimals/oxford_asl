@@ -610,6 +610,7 @@ asl_calib=asl_calib
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
 fixbolus=undef; # the default for this is determined by other command line parameters.
+edgecorr=1; # we do edge correction with the voxelwise calibration method by default
 
 # parse command line here
 until [ -z $1 ]; do
@@ -687,7 +688,10 @@ takeargs=0;boolarg="";isbool="";
 	--noisesd) noisesd=$argument
 	    takeargs=1;;
 	--cmethod) cmethod=$argument
-	    takeargs=1;;
+		   takeargs=1;;
+	--edgecorr) isbool=1;
+		    boolarg=edgecorr;
+		    ;;
 	--csf) csfflag=1 csf=$argument
 	    takeargs=1;;
 	--cref) cref=$argument; senscorr=1;
@@ -1711,12 +1715,13 @@ if [ ! -z $calib ]; then
 	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
 	fslmaths $Mo -div 0.9 $Mo
 
-	# correct for (partial volume) edge effects
-	# median smoothing and erosion
-	fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
-	# extrapolation to match mask
-	asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
-	
+	if [ ! -z $edgecorr ]; then
+	    # correct for (partial volume) edge effects
+	    # median smoothing and erosion
+	    fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
+	    # extrapolation to match mask
+	    asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
+	fi
     else
 	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 
