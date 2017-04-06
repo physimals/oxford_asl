@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # OXFORD_ASL: Converts ASL images in to perfusion maps
 #
@@ -7,6 +7,11 @@
 # Copyright (c) 2008-2016 University of Oxford
 #
 # SHCOPYRIGHT
+
+# Make script use local copies of helper scripts/programs in the same
+# directory, if present. This allows for multiple versions of the scripts
+# to be used, possibly with bundled dependencies
+PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "OXFORD_ASL"
@@ -220,7 +225,7 @@ Report() {
 	subdir=$2
 	masktype=$3
 
-	repval=`${FSLDIR}/bin/fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure -m`
+	repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure -m`
 	echo $repval > $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
 
@@ -447,7 +452,7 @@ fi
 
 if [ ! -z $varout ]; then
 #get varainces out of finalMVN
-    ${FSLDIR}/bin/fabber_var -d ${finalstep} -m $tempdir/mask
+    fabber_var -d ${finalstep} -m $tempdir/mask
 # do correction of negative values
     fslmaths ${finalstep}/var_ftiss -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_ftiss $2/var_ftiss
     if [ ! -z $senscorr ]; then
@@ -460,7 +465,7 @@ fi
 fi
 
 #copy the final MVN to the temp directory for future use
-${FSLDIR}/bin/imcp ${finalstep}/finalMVN $2/finalMVN
+imcp ${finalstep}/finalMVN $2/finalMVN
 cp ${finalstep}/paramnames.txt $2/paramnames.txt
 
 
@@ -532,7 +537,7 @@ if [ ! -z $calibflag ]; then
     if [ $cmethod = 'single' ]; then
 	malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
     elif [ $cmethod = 'voxel' ]; then
-	${FSLDIR}/bin/fslmaths $outdir/calib/M0 -mul $alpha $tempdir/malpha
+	fslmaths $outdir/calib/M0 -mul $alpha $tempdir/malpha
 	malpha=$tempdir/malpha
     fi
 
@@ -552,7 +557,7 @@ if [ ! -z $calibflag ]; then
 	if [ $cmethod = 'single' ]; then
 	    Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
 	elif [ $cmethod = 'voxel' ]; then
-	    ${FSLDIR}/bin/fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
+	    fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
 	    Mosq=$tempdir/mosq
 	fi
 	
@@ -568,7 +573,7 @@ fi
 # advanced output
 if [ ! -z $advout ]; then
     if [ ! -d  $outdir/advanced/$subdir ]; then mkdir $outdir/advanced/$subdir; fi
-    ${FSLDIR}/bin/imcp $tempdir/$subdir/finalMVN $outdir/advanced/$subdir/finalMVN
+    imcp $tempdir/$subdir/finalMVN $outdir/advanced/$subdir/finalMVN
    cp $tempdir/$subdir/paramnames.txt $outdir/advanced/$subdir/paramnames.txt
 fi
 
@@ -597,14 +602,15 @@ fi
 #asl_reg=asl_reg
 #asl_calib=asl_calib
 
-basil=${FSLDIR}/bin/basil
-asl_reg=${FSLDIR}/bin/asl_reg
-asl_calib=${FSLDIR}/bin/asl_calib
+basil=basil
+asl_reg=asl_reg
+asl_calib=asl_calib
 
 # defaults that (boolean) command line options can overide
 spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
 fixbolus=undef; # the default for this is determined by other command line parameters.
+edgecorr=1; # we do edge correction with the voxelwise calibration method by default
 
 # parse command line here
 until [ -z $1 ]; do
@@ -682,7 +688,10 @@ takeargs=0;boolarg="";isbool="";
 	--noisesd) noisesd=$argument
 	    takeargs=1;;
 	--cmethod) cmethod=$argument
-	    takeargs=1;;
+		   takeargs=1;;
+	--edgecorr) isbool=1;
+		    boolarg=edgecorr;
+		    ;;
 	--csf) csfflag=1 csf=$argument
 	    takeargs=1;;
 	--cref) cref=$argument; senscorr=1;
@@ -837,7 +846,7 @@ if [ -z $verbose ]; then
 fi
 
 # deal with the temporary directory
-tmpbase=`$FSLDIR/bin/tmpnam`
+tmpbase=`tmpnam`
 tempdir=${tmpbase}_ox_asl
 mkdir $tempdir
 
@@ -885,7 +894,7 @@ if [ -z $inflag ]; then
     echo "ERROR: no input file specified"
     exit 1
 else
-    if [ `${FSLDIR}/bin/imtest $infile` -eq 0 ]; then
+    if [ `imtest $infile` -eq 0 ]; then
 	echo "ERROR: $infile is not an image/has not been found"
 	exit 1
     fi
@@ -894,7 +903,7 @@ Log "Input file: $infile"
 
 if [ ! -z $strucflag ]; then
     if [ ! -z $struc ]; then
-	if [ `${FSLDIR}/bin/imtest $struc` -eq 0 ]; then
+	if [ `imtest $struc` -eq 0 ]; then
 	    echo "ERROR: $struc is not an image/has not been found"
 	    exit 1
 	fi
@@ -912,7 +921,7 @@ if [ ! -z $transflag ]; then
     Log "Structural to standard transformation matrix: $trans"
 fi
 if [ ! -z $lowstruc ]; then
-    if [ `${FSLDIR}/bin/imtest $lowstruc` -eq 0 ]; then
+    if [ `imtest $lowstruc` -eq 0 ]; then
 	echo "ERROR: $lowstruc is not an image/has not been found"
 	exit 1
     fi
@@ -967,24 +976,24 @@ echo "Pre-processing"
 if [ ! -z $fslanat ]; then
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
-    ${FSLDIR}/bin/imcp $fslanat/T1_biascorr $tempdir/struc
-    ${FSLDIR}/bin/imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    imcp $fslanat/T1_biascorr $tempdir/struc
+    imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     
 elif [ ! -z $struc ]; then
-    ${FSLDIR}/bin/fslmaths $struc $tempdir/struc
+    fslmaths $struc $tempdir/struc
     Log "Structural image is: $struc"
     if [ -z $strucbet ]; then
        #bet the structural for calibration and registration
 	bet $struc $tempdir/struc_bet
 	Log "BET on structural image"
     else
-	${FSLDIR}/bin/fslmaths $strucbet $tempdir/struc_bet
+	fslmaths $strucbet $tempdir/struc_bet
     fi
 fi
 
 
 if [ ! -z $lowstrucflag ]; then
-    ${FSLDIR}/bin/fslmaths $lowstruc $tempdir/lowstruc
+    fslmaths $lowstruc $tempdir/lowstruc
 ## bet the low res. struc (if present)
 #    bet $lowstruc $tempdir/lowstruc_bet
 #    Log "BET on low res. structural image"
@@ -1006,18 +1015,18 @@ if [ ! -z $calib ]; then
 	# take the mean
 	fslmaths $tempdir/calib -Tmean $tempdir/calib
     else
-	${FSLDIR}/bin/fslmaths $calib $tempdir/calib
+	fslmaths $calib $tempdir/calib
     fi
 
     # bet
-    ${FSLDIR}/bin/imcp $tempdir/calib $tempdir/calib_wholehead # keep the whole head for motion correction later if reqd
-    ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib
+    imcp $tempdir/calib $tempdir/calib_wholehead # keep the whole head for motion correction later if reqd
+    bet $tempdir/calib $tempdir/calib
 fi
 
 # read in ASL data
-${FSLDIR}/bin/imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
+imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
 # take a copy that will not be subject to any subsequent corrections
-${FSLDIR}/bin/imcp $tempdir/asldata $tempdir/asldata_orig
+imcp $tempdir/asldata $tempdir/asldata_orig
 
 ### Motion Correction (main)
 # note motion correction within calibration data is done above
@@ -1027,22 +1036,22 @@ if [ ! -z $moco ]; then
 	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
 	# this also removes motion effects between asldata and calibration image
 	Log "Motion correction to calibration image"
-	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
+	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
 
 	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
 	# Extract the middle transformation
 	middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
-	${FSLDIR}/bin/convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
+	convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
 	# convert all the transofmrations
 	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
-	    ${FSLDIR}/bin/convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
+	    convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
 	done
-	${FSLDIR}/bin/applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
+	applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
 	# Convert the calibration image to align with asldata
-	${FSLDIR}/bin/flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
     else
 	Log "Motion correction to middle volume of ASL data"
-	${FSLDIR}/bin/mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
+	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
     fi
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
 fi
@@ -1180,7 +1189,7 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 	register=0
 	Log "Using existing asl to structural transform: $asl2struc"
 	cp $asl2struc $tempdir/asl2struct.mat
-	${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+	convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     fi
 fi
 
@@ -1192,7 +1201,7 @@ if [ -z $regfrom ]; then
 	regfrom=$tempdir/calib
     else
 	# brain extract the meanasl image
-	${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+	bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
 	regfrom=$tempdir/meanasl_brain
     fi
 fi
@@ -1210,7 +1219,7 @@ if [ $register -eq 1 ]; then
 
 	Registration $regfrom $extraoptions
     fi
-    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
 fi
 ### End of: Registration (1/2)
 
@@ -1220,18 +1229,18 @@ if [ ! -z $fslanat ]; then
     fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
     
     # copy over the things we need and place them using the names used elsewhere
-    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
-    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
-    ${FSLDIR}/bin/imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
+    imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
+    imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
 
-    $FSLDIR/bin/imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+    imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
     
 elif [ ! -z $struc ]; then
     # do we have the results from FAST already? If not run it
     if [ -z $fastsrc ]; then
 	echo "Segmenting the structural image"
 	Log "Segmenting the structural image"
-	${FSLDIR}/bin/fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+	fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
 	fastsrc=$tempdir/seg
     else
 	# FAST has been run externally
@@ -1242,24 +1251,24 @@ elif [ ! -z $struc ]; then
     fasthasrun=1
 
      # copy over the things we need and place them using the names used elsewhere
-    ${FSLDIR}/bin/imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
-    ${FSLDIR}/bin/imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
-    ${FSLDIR}/bin/imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
+    imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
+    imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
 
-    $FSLDIR/bin/imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    imcp ${fastsrc}_bias $tempdir/biasfield_struct
      
 fi
 
 # some useful preproc to do with FAST outputs
 if [ ! -z $fasthasrun ]; then
     # create a tissseg (wmseg) image for BBR in asl_reg
-    $FSLDIR/bin/fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
+    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
 
     # transform the bias field and invert to use for sensitivity correction in calibration
-    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
 
     if [ ! -z $senscorr ]; then
-	${FSLDIR}/bin/fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+	fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
     fi
 fi
     
@@ -1272,32 +1281,32 @@ echo "Creating mask"
 Log "Automatic mask generation"
 # preferred option is to use brain extracted structural
 if [ ! -z $struc ]; then
-    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
-    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
-    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
+    fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    fslcpgeom $regfrom $tempdir/mask
 # otherwise use the regfrom image (should already be BETed) - note that regfrom may have been set in the Registration (1/2) section.
 elif [ ! -z $regfrom ]; then
-    ${FSLDIR}/bin/fslmaths $regfrom -bin $tempdir/mask
+    fslmaths $regfrom -bin $tempdir/mask
     Log "Mask generated from regfrom image: $regfrom"
     
 # We are unlikey to use these options as regfrom has probably been set above - leave for future reference
 # next option is to use betted version of mean M0 calib image as mask
 elif [ ! -z $calib ]; then
-    ${FSLDIR}/bin/bet $tempdir/calib $tempdir/calib_bet -f 0.2 
-    ${FSLDIR}/bin/fslmaths $tempdir/calib_bet -bin $tempdir/mask
+    bet $tempdir/calib $tempdir/calib_bet -f 0.2 
+    fslmaths $tempdir/calib_bet -bin $tempdir/mask
     Log "Mask generated from calibration image (post BET)"
  # use the low resolution strucutral image to create mask (ahould already be BETed)
 elif [ ! -z $lowstrucflag ]; then
  # resample
-    ${FSLDIR}/bin/flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $tempdir/asldata
+    flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $tempdir/asldata
  # make binary
-    ${FSLDIR}/bin/fslmaths $tempdir/mask -bin $tempdir/mask
+    fslmaths $tempdir/mask -bin $tempdir/mask
     Log "Mask generated from low res. structural"
 # otherwise just use mean time series
 else
-    ${FSLDIR}/bin/bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
-    ${FSLDIR}/bin/fslmaths $tempdir/meanasl -bin $tempdir/mask
+    bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
+    fslmaths $tempdir/meanasl -bin $tempdir/mask
     Log "Mask generated from mean time series"
 fi
 else
@@ -1320,13 +1329,13 @@ if [ ! -z $fmap ]; then
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
     
     # generate the correction warp
-    ${FSLDIR}/bin/convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
-    ${FSLDIR}/bin/fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
     
     # Now apply the correction to the data.
     # note that we use the orignal data here and apply the motion correction as part of the process
-    ${FSLDIR}/bin/applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata --premat=$tempdir/asldata.cat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-    ${FSLDIR}/bin/fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
+    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata --premat=$tempdir/asldata.cat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
     # Repeat the label-control subtraction on the corrected data
     if [ $iaf = 'diff' ]; then
 	# make sure the block format is correct for BASIL
@@ -1337,14 +1346,14 @@ if [ ! -z $fmap ]; then
     fi
     
     # Now apply the correction to the calibration image
-    ${FSLDIR}/bin/applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-    ${FSLDIR}/bin/fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
+    applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
 fi
 ### End of: Distortion Correction
 
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
-    ${FSLDIR}/bin/fslmaths $isen $outdir/native_space/sensitivity
+    fslmaths $isen $outdir/native_space/sensitivity
 fi
 
 # Defaults for (some) parameters
@@ -1502,8 +1511,8 @@ if [ ! -z $noiseprior ]; then
      if [ -z $noisesd ]; then
 	 Log "Using SNR of $snr to set noise std dev"
 	# estimate signal magntiude
-	${FSLDIR}/bin/fslmaths $datafile -Tmax $tempdir/datamax
-	brain_mag=`${FSLDIR}/bin/fslstats $tempdir/datamax -k $tempdir/mask -M`
+	fslmaths $datafile -Tmax $tempdir/datamax
+	brain_mag=`fslstats $tempdir/datamax -k $tempdir/mask -M`
 	# this will correspond to whole brain CBF (roughly) - about 0.5 of GM
 	noisesd=`echo "scale=2;sqrt( $brain_mag * 2 / $snr )" | bc`
     fi
@@ -1603,15 +1612,15 @@ fi
 if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
     # PVE in ASL space from strcutural segmentation results
     # invert the transformation matrix
-    ${FSLDIR}/bin/convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     
     # Gray matter - assume this will be PVE 1
-    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    applywarp --ref=$tempdir/asldata --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # white matter  - assume this will be PVE 2
-    ${FSLDIR}/bin/applywarp --ref=$tempdir/asldata --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    applywarp --ref=$tempdir/asldata --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
     # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
+    fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
+    fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
     pvexist=1
 fi
 
@@ -1622,20 +1631,20 @@ if [ ! -z $pvgm ]; then
 	    echo "ERROR: no WM PV image has been supplied"
 	fi
 	Log "PV GM is: $pvgm"
-	${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
+	fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
 	Log "PV WM is: $pvwm"
-	${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
+	fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
 	pvexist=1
 fi
 
 if [ ! -z $pvexist ]; then
     # make some masks 
     # these are currently used for masking after model fitting
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+    fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
+    fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
     # these are for calculating mean perfusion within tissue types
-    ${FSLDIR}/bin/fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-    ${FSLDIR}/bin/fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+    fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
+    fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
 fi
 ### End of: Partial Volume Estimates
 
@@ -1694,24 +1703,25 @@ if [ ! -z $calib ]; then
 	Log "Calibration is voxelwise"
 	mkdir $outdir/calib
         # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
-	${FSLDIR}/bin/fslmaths $calib -mul $cgain $outdir/calib/M0
+	fslmaths $calib -mul $cgain $outdir/calib/M0
 	Mo=$outdir/calib/M0 
 	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
 	 # correct the M0 image for short TR using the equation from the white paper
 	    Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
 	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
-	    ${FSLDIR}/bin/fslmaths $Mo -mul $ccorr $Mo
+	    fslmaths $Mo -mul $ccorr $Mo
 	fi
 
 	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
-	${FSLDIR}/bin/fslmaths $Mo -div 0.9 $Mo
+	fslmaths $Mo -div 0.9 $Mo
 
-	# correct for (partial volume) edge effects
-	# median smoothing and erosion
-	fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
-	# extrapolation to match mask
-	asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
-	
+	if [ ! -z $edgecorr ]; then
+	    # correct for (partial volume) edge effects
+	    # median smoothing and erosion
+	    fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
+	    # extrapolation to match mask
+	    asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
+	fi
     else
 	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 
@@ -1731,18 +1741,18 @@ fi
 Dooutput
 
 # save the mask used to the (native space) output directory
-${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask
+imcp $tempdir/mask $outdir/native_space/mask
 ### End of: Output main BASIL results
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
     # redo the mask now that we have a better registration - as this might matter for PV correction
     # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
-    ${FSLDIR}/bin/fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-    ${FSLDIR}/bin/flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
-    ${FSLDIR}/bin/fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
-    ${FSLDIR}/bin/fslcpgeom $regfrom $tempdir/mask
-    ${FSLDIR}/bin/imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
+    fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    fslcpgeom $regfrom $tempdir/mask
+    imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
 
     # intructions for BASIL
     basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
@@ -1751,7 +1761,7 @@ if [ ! -z $pvcorr ]; then
     # Run BASIL
     Dobasil $datafile $tempdir/pvcorr
 
-    ${FSLDIR}/bin/imcp $tempdir/pvcorr/finalMVN $tempdir/finalMVN #just in case we are about to do a epochwise analysis
+    imcp $tempdir/pvcorr/finalMVN $tempdir/finalMVN #just in case we are about to do a epochwise analysis
 
     #output the results
     Dooutput pvcorr
@@ -1835,16 +1845,16 @@ fi
 
 if [ ! -z $pvcorr ]; then
 # copy PVE in ASL space to output directory
-${FSLDIR}/bin/imcp $tempdir/pvgm_inasl $outdir/native_space/pvgm_inasl
-${FSLDIR}/bin/imcp $tempdir/pvwm_inasl $outdir/native_space/pvwm_inasl
+imcp $tempdir/pvgm_inasl $outdir/native_space/pvgm_inasl
+imcp $tempdir/pvwm_inasl $outdir/native_space/pvwm_inasl
 fi
 
 if [ ! -z $pvexist ]; then
     # copy PV masks to output directory
-    ${FSLDIR}/bin/imcp $tempdir/gmmask $outdir/native_space/gm_mask
-    ${FSLDIR}/bin/imcp $tempdir/wmmask $outdir/native_space/wm_mask
-    ${FSLDIR}/bin/imcp $tempdir/gmmask_pure $outdir/native_space/gm_roi
-    ${FSLDIR}/bin/imcp $tempdir/wmmask_pure $outdir/native_space/wm_roi
+    imcp $tempdir/gmmask $outdir/native_space/gm_mask
+    imcp $tempdir/wmmask $outdir/native_space/wm_mask
+    imcp $tempdir/gmmask_pure $outdir/native_space/gm_roi
+    imcp $tempdir/wmmask_pure $outdir/native_space/wm_roi
 fi
 
 # clearup

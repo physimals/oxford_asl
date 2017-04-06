@@ -8,6 +8,11 @@
 #
 # SHCOPYRIGHT
 
+# Make script use local copies of helper scripts/programs in the same
+# directory, if present. This allows for multiple versions of the scripts
+# to be used, possibly with bundled dependencies
+PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+
 Usage() {
     echo "ASL_PREPROC"
     echo "Version: ${GIT_SHA1} ${GIT_DATE}"
@@ -47,7 +52,7 @@ if [ -z $1 ]; then
     exit 1
 fi
 
-perfusion_subtract=${FSLDIR}/bin/perfusion_subtract
+perfusion_subtract=perfusion_subtract
 
 until [ -z $1 ]; do
     case $1 in
@@ -92,7 +97,7 @@ echo "ASL_PREPROC"
 oldpwd=`pwd`
 
 
-tmpbase=`$FSLDIR/bin/tmpnam`
+tmpbase=`tmpnam`
 if [ -z $debug ]; then
     tempdir=${tmpbase}_asl_pre
 else

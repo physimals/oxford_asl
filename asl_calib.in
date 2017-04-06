@@ -8,6 +8,11 @@
 #
 # SHCOPYRIGHT
 
+# Make script use local copies of helper scripts/programs in the same
+# directory, if present. This allows for multiple versions of the scripts
+# to be used, possibly with bundled dependencies
+PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+
 #deal with options
 
 Usage() {
@@ -182,15 +187,7 @@ done
 echo "ASL_CALIB"
 
 # set the version of fabber to use
-fabber=fabber
-#fabber=$FSLDIR/bin/fabber
-if [ ! -z $devel ]; then
-    fabber=~chappell/cproject/fabber/fabber
-    if [ $FSLMACHTYPE = linux_64-gcc4.1 ]; then #assumption that the architecuture tell me that we are on a jalapeno node
-	echo "We are on jalapeno"
-	fabber=~chappell/cproject/jalapeno/fabber/fabber
-    fi
-fi
+fabber=fabber_asl
 
 #check for mandatory inputs
 if [ -z $calib ]; then
@@ -227,7 +224,7 @@ if [ ! -d $outdir ]; then
 fi
 
 # make a temporary directory to work in - delete at end
-tmpbase=`$FSLDIR/bin/tmpnam`
+tmpbase=`tmpnam`
 temp_calib=${tmpbase}_asl_calib
 mkdir $temp_calib
 
@@ -311,7 +308,7 @@ echo "Tissue reference : $tissref" >> $log
 
 # command line override of default T1 and T2
 if [ ! -z $T1rin ]; then
-    if [ `${FSLDIR}/bin/imtest $T1rin` ]; then
+    if [ `imtest $T1rin` ]; then
 	# we have been supplied with a T1 image - record that here to process later
 	T1rim=$T1rin
 	echo "Loading T1 image for reference region: T1im" >> $log
@@ -321,7 +318,7 @@ if [ ! -z $T1rin ]; then
     fi
 fi
 if [ ! -z $T2rin ]; then
-    if [ `${FSLDIR}/bin/imtest $T2rin` ]; then
+    if [ `imtest $T2rin` ]; then
 	# we have been supplied with a T2 image - record that here to process later
 	T2rim=$T2rin
 	echo "Loading T2 image for reference region: T2im" >> $log
@@ -395,7 +392,7 @@ fi
 if [ $tissref = "none" ]; then
 # whole brain M0
 # in this case use the brain mask
-    ${FSLDIR}/bin/imcp $bmask $temp_calib/refmask
+    imcp $bmask $temp_calib/refmask
     maskflag=1
     echo "Brain mask is being used as the reference tissue (beware!)" >> $log
 fi
@@ -502,8 +499,8 @@ if [ -z $maskflag ]; then
     
     if [ ! -z $fasthasrun ] && [ -z $senson ]; then
         # also extract the bias field and convert to sensitivity image (as long as we have already been supplied by a sensivity iamge or reference)
-	${FSLDIR}/bin/applywarp --ref=$calib --in=$temp_calib/seg_bias --out=$temp_calib/biasfield --premat=$temp_calib/high2low.mat --super --interp=spline --superlevel=4
-	${FSLDIR}/bin/fslmaths $temp_calib/biasfield -recip $temp_calib/sens
+	applywarp --ref=$calib --in=$temp_calib/seg_bias --out=$temp_calib/biasfield --premat=$temp_calib/high2low.mat --super --interp=spline --superlevel=4
+	fslmaths $temp_calib/biasfield -recip $temp_calib/sens
 	senson=1
 	echo "Using bias field from structural image for sensitivity correction" >> $log
     fi
@@ -521,7 +518,7 @@ if [ -z $maskflag ]; then
     
 else
     #use supplied tissue reference mask
-    ${FSLDIR}/bin/imcp $mask $temp_calib/refmask
+    imcp $mask $temp_calib/refmask
     echo "Using supplied reference tissue mask: $mask" >> $log
 fi
 
@@ -636,10 +633,10 @@ elif [ $mode = satrecov ]; then
     if [ ! -z $senson ]; then
 	echo "Apply sensitivity image to data for reference tisse M0 estimation" >> $log
         # apply sensitivity map to calibration image - ONLY for the reference tissue calculations
-	${FSLDIR}/bin/fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
+	fslmaths $calib -div $temp_calib/sens $temp_calib/calib_senscorr
     else
 	# no sensitivity correction required, but copy image over ready for next command
-	${FSLDIR}/bin/imcp $calib $temp_calib/calib_senscorr
+	imcp $calib $temp_calib/calib_senscorr
     fi
     echo "FABBER within reference tissue mask" >> $log
     $fabber --data=$temp_calib/calib_senscorr --mask=$mask --output=$temp_calib/satrecov --data-order=singlefile --model=satrecov --noise=white --method=vb $tislist $llopts $sropts --t1=$T1r
