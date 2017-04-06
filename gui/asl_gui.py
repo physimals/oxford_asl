@@ -5,12 +5,10 @@ import colorsys
 import wx
 import wx.grid
 
-from numpy import arange, sin, pi
 import matplotlib
 matplotlib.use('WXAgg')
 
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
-from matplotlib.backends.backend_wx import NavigationToolbar2Wx
 from matplotlib.figure import Figure
 
 import nibabel as nib
@@ -154,12 +152,18 @@ class PreviewPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
         self.data_file = ""
+        self.slice = 0
+        self.nslices = 1
+        self.data = None
+        self.view = 0
         self.figure = Figure(figsize=(4, 4), dpi=100, facecolor='black')
         self.axes = self.figure.add_subplot(111)
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])
         #self.img = self.axes.imshow(np.zeros([10, 10]), interpolation="nearest")            
         self.canvas = FigureCanvas(self, -1, self.figure)
+        self.canvas.mpl_connect('scroll_event', self.scroll)
+        self.canvas.mpl_connect('button_press_event', self.view_change)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.sizer.Add(wx.StaticText(self, label="Data preview"), 0)        
         self.sizer.Add(self.canvas, 2, border=5, flag = wx.EXPAND | wx.ALL)
@@ -173,13 +177,42 @@ class PreviewPanel(wx.Panel):
         data_file = self.input.data()
         if data_file != self.data_file:
             img = nib.load(data_file)
-            data = img.get_data()
-            sl = data[:,:,15,0]
-            self.axes.clear()
-            i = self.axes.imshow(sl, interpolation="nearest", vmin=sl.min(), vmax=sl.max())
-            i.set_cmap("gray")
-            self.Layout()
+            self.data = img.get_data()
+            self.slice = 0
+            self.nslices = self.data.shape[2]
+            self.redraw()
 
+    def redraw(self):
+        if self.data is None: return
+        if self.view == 0:
+            sl = self.data[:,:,self.slice,0]
+        elif self.view == 1:
+            sl = self.data[:,self.slice,:,0]
+        else:
+            sl = self.data[self.slice,:,:,0]
+
+        self.axes.clear()
+        i = self.axes.imshow(sl.T, interpolation="nearest", vmin=sl.min(), vmax=sl.max())
+        self.axes.set_ylim(self.axes.get_ylim()[::-1])
+        i.set_cmap("gray")
+        self.Layout()
+
+    def view_change(self, event):
+        if self.data is None: return
+        if event.dblclick:
+            self.view += 1
+            if self.view == 3: self.view = 0
+            self.nslices = self.data.shape[2-self.view]
+            self.slice = self.nslices/2
+            self.redraw()
+
+    def scroll(self, event):
+        if event.button == "up":
+            if self.slice != self.nslices-1: self.slice += 1
+        else:
+            if self.slice != 0: self.slice -= 1
+        self.redraw()
+            
 class AslRun(wx.Frame):
 
     order_opts = {"trp" : "--ibf=tis --iaf=diff", 
