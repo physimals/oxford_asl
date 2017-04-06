@@ -5,6 +5,16 @@ import colorsys
 import wx
 import wx.grid
 
+from numpy import arange, sin, pi
+import matplotlib
+matplotlib.use('WXAgg')
+
+from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
+from matplotlib.backends.backend_wx import NavigationToolbar2Wx
+from matplotlib.figure import Figure
+
+import nibabel as nib
+
 class RunSequence:
     def __init__(self):
         self.cmds = []
@@ -138,6 +148,37 @@ class TabPage(wx.Panel):
 
     def update(self, evt=None):
         if hasattr(self, "run"): self.run.update()
+        if hasattr(self, "preview"): self.preview.update()
+
+class PreviewPanel(wx.Panel):
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
+        self.data_file = ""
+        self.figure = Figure(figsize=(4, 4), dpi=100, facecolor='black')
+        self.axes = self.figure.add_subplot(111)
+        self.axes.get_xaxis().set_ticklabels([])
+        self.axes.get_yaxis().set_ticklabels([])
+        #self.img = self.axes.imshow(np.zeros([10, 10]), interpolation="nearest")            
+        self.canvas = FigureCanvas(self, -1, self.figure)
+        self.sizer = wx.BoxSizer(wx.VERTICAL)
+        self.sizer.Add(wx.StaticText(self, label="Data preview"), 0)        
+        self.sizer.Add(self.canvas, 2, border=5, flag = wx.EXPAND | wx.ALL)
+        self.sizer.Add(wx.StaticText(self, label="Data order preview"), 0)
+        self.order_preview = AslDataPreview(self, 1, 1, True, "trp", True)
+        self.sizer.Add(self.order_preview, 1, wx.EXPAND)
+        self.SetSizer(self.sizer)
+        self.Layout()
+
+    def update(self):
+        data_file = self.input.data()
+        if data_file != self.data_file:
+            img = nib.load(data_file)
+            data = img.get_data()
+            sl = data[:,:,15,0]
+            self.axes.clear()
+            i = self.axes.imshow(sl, interpolation="nearest", vmin=sl.min(), vmax=sl.max())
+            i.set_cmap("gray")
+            self.Layout()
 
 class AslRun(wx.Frame):
 
@@ -156,9 +197,9 @@ class AslRun(wx.Frame):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
 
         self.run_btn = run_btn
-        self.run_label = run_label
         self.run_btn.Bind(wx.EVT_BUTTON, self.dorun)
-
+        self.run_label = run_label
+    
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.output_text = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE)
         self.sizer.Add(self.output_text, 1, flag=wx.EXPAND)
@@ -575,19 +616,19 @@ class AslInputOptions(TabPage):
         self.struc_image_brain_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
         self.pack("Brain extraction", self.struc_image_ch, self.struc_image_brain_picker)
 
-        self.section("Data Order Preview")
+        #self.section("Data Order Preview")
 
-        self.preview = AslDataPreview(self, self.ntis(), self.nrepeats(), self.tc_pairs(), "trp", True)
-        self.sizer.Add(self.preview, pos=(self.row, 0), span=(1, 5), flag=wx.EXPAND | wx.ALL)
+        #self.preview = AslDataPreview(self, self.ntis(), self.nrepeats(), self.tc_pairs(), "trp", True)
+        #self.sizer.Add(self.preview, pos=(self.row, 0), span=(1, 5), flag=wx.EXPAND | wx.ALL)
 
         self.sizer.AddGrowableCol(2, 1)
-        self.sizer.AddGrowableRow(self.row, 1)
+#        self.sizer.AddGrowableRow(self.row, 1)
         self.SetSizer(self.sizer)
 
     def data(self): return self.data_picker.GetPath()
     def ntis(self): return self.ntis_int.GetValue()
     def nrepeats(self): return self.nrepeats_int.GetValue()
-    def data_order(self): return self.preview.order, self.preview.tagfirst
+    def data_order(self): return self.preview.order_preview.order, self.preview.order_preview.tagfirst
     def tc_pairs(self): return self.tc_ch.checkbox.IsChecked()
     def labelling(self): return self.labelling_ch.GetSelection()
     def bolus_dur_type(self): return self.bolus_dur_ch.GetSelection()
@@ -636,11 +677,11 @@ class AslInputOptions(TabPage):
         self.tc_ch.Enable(self.tc_pairs())
         self.update_groups()
 
-        self.preview.n_tis = self.ntis()
-        self.preview.n_repeats = self.nrepeats()
-        self.preview.tc_pairs = self.tc_pairs()
-        self.preview.tagfirst = self.tc_ch.GetSelection() == 0
-        self.preview.Refresh()
+        self.preview.order_preview.n_tis = self.ntis()
+        self.preview.order_preview.n_repeats = self.nrepeats()
+        self.preview.order_preview.tc_pairs = self.tc_pairs()
+        self.preview.order_preview.tagfirst = self.tc_ch.GetSelection() == 0
+        self.preview.order_preview.Refresh()
         TabPage.update(self)
 
     def labelling_changed(self, event):
@@ -682,7 +723,7 @@ class AslInputOptions(TabPage):
         order += self.abbrevs[g2]
         order += self.abbrevs[3-g1-g2]
         #print(order)
-        self.preview.order = order
+        self.preview.order_preview.order = order
 
     def update_group_choice(self, w, items, sel):
         w.Enable(False)
@@ -780,7 +821,7 @@ class NumberList(wx.grid.Grid):
 
 class AslDataPreview(wx.Panel):
     def __init__(self, parent, n_tis, n_repeats, tc_pairs, order, tagfirst):
-        super(AslDataPreview, self).__init__(parent)
+        wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_PAINT, self.on_paint)
@@ -902,18 +943,24 @@ class AslDataPreview(wx.Panel):
 class AslGui(wx.Frame):
 
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Basil", size=(800, 850), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
-        panel = wx.Panel(self)
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        banner = wx.StaticBitmap(panel, -1, wx.Bitmap("banner.png", wx.BITMAP_TYPE_ANY))
-        sizer.Add(banner)
+        wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE)
+        #wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
+        main_panel = wx.Panel(self)
+        main_vsizer = wx.BoxSizer(wx.VERTICAL)
 
-        notebook = wx.Notebook(panel, id=wx.ID_ANY, style=wx.BK_DEFAULT)
-        
-        sizer.Add(notebook, 1, wx.ALL|wx.EXPAND, 5)
-                
-        self.run_panel = wx.Panel(panel)
+        banner = wx.StaticBitmap(main_panel, -1, wx.Bitmap("banner.png", wx.BITMAP_TYPE_ANY))
+        main_vsizer.Add(banner)
+
+        hpanel = wx.Panel(main_panel)
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        notebook = wx.Notebook(hpanel, id=wx.ID_ANY, style=wx.BK_DEFAULT)
+        hsizer.Add(notebook, 1, wx.ALL|wx.EXPAND, 5)
+        self.preview = PreviewPanel(hpanel)
+        hsizer.Add(self.preview, 1, wx.EXPAND)
+        hpanel.SetSizer(hsizer)
+        main_vsizer.Add(hpanel, 2, wx.EXPAND)
+
+        self.run_panel = wx.Panel(main_panel)
         runsizer = wx.BoxSizer(wx.HORIZONTAL)
         self.run_label = wx.StaticText(self.run_panel, label="Unchecked")
         self.run_label.SetFont(wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.BOLD))
@@ -921,9 +968,11 @@ class AslGui(wx.Frame):
         self.run_btn = wx.Button(self.run_panel, label="Run")
         runsizer.Add(self.run_btn, 0, wx.ALIGN_CENTER_VERTICAL)
         self.run_panel.SetSizer(runsizer)
-        sizer.Add(self.run_panel, 0, wx.EXPAND)
+        main_vsizer.Add(self.run_panel, 0, wx.EXPAND)
         self.run_panel.Layout()
-
+        
+        main_panel.SetSizer(main_vsizer)
+        
         self.run = AslRun(self, self.run_btn, self.run_label)
         tabs = [AslInputOptions(notebook),
                 AslAnalysis(notebook),
@@ -932,13 +981,16 @@ class AslGui(wx.Frame):
         for tab in tabs:
             notebook.AddPage(tab, tab.title)
             setattr(tab, "run", self.run)
+            setattr(tab, "preview", self.preview)
             setattr(self.run, tab.name, tab)
+            setattr(self.preview, tab.name, tab)
             for tab2 in tabs:
                 if tab != tab2: setattr(tab, tab2.name, tab2)
             tab.update()
 
-        panel.SetSizer(sizer)
         self.Layout()
+
+
 
 if __name__ == '__main__':
     app = wx.App(redirect=False)
