@@ -694,17 +694,16 @@ class AslInputOptions(TabPage):
 class NumberChooser(wx.Panel):
     def __init__(self, parent, label=None, min=0, max=1, initial=0.5, step=0.1, digits=2, changed_handler=None):
         super(NumberChooser, self).__init__(parent)
-        self.min = min
-        self.max = max
+        self.min, self.orig_min, self.max, self.orig_max = min, min, max, max
         self.handler = changed_handler
         self.hbox=wx.BoxSizer(wx.HORIZONTAL)
         if label is not None:
             self.label = wx.StaticText(self, label=label)
             self.hbox.Add(self.label, proportion=0, flag=wx.ALIGN_CENTRE_VERTICAL)
-        self.spin = wx.SpinCtrlDouble(self, min=min,max=max,initial=initial)
+        self.spin = wx.SpinCtrlDouble(self, initial=initial)
         self.spin.SetDigits(digits)
         self.spin.SetIncrement(step)
-        self.spin.Bind(wx.EVT_SLIDER, self.spin_changed)
+        self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.spin_changed)
         self.slider = wx.Slider(self, value=initial, minValue=0, maxValue=100)
         self.slider.SetValue(100*(initial-self.min)/(self.max-self.min))
         self.slider.Bind(wx.EVT_SLIDER, self.slider_changed)
@@ -726,7 +725,18 @@ class NumberChooser(wx.Panel):
         if self.handler: self.handler(event)
 
     def spin_changed(self, event):
+        """ If user sets the spin outside the current range, update the slider range
+        to match. However if they go back inside the current range, revert to this for
+        the slider"""
         val = event.GetValue()
+        if val < self.min: 
+            self.min = val
+        elif val > self.orig_min:
+            self.min = self.orig_min
+        if val > self.max: 
+            self.max = val
+        elif val < self.orig_max:
+            self.max = self.orig_max
         self.slider.SetValue(100*(val-self.min)/(self.max-self.min))
         if self.handler: self.handler(event)
 
