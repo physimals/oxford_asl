@@ -172,7 +172,8 @@ if [ ! -z $structout ]; then
 fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
-    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
+    #flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
+    applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp 
 fi
 
 }
@@ -666,6 +667,9 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	-S) stdflag=1 std=$argument
 	    takeargs=1;;
+	--warp) transflag=1
+		warp=$argument #structural to standard warp
+		takargs=1;;
 	-m) mask=$argument
 	    takeargs=1;;
 	--mc) isbool=1; # do motion correction using mcflirt
@@ -923,13 +927,8 @@ if [ ! -z $strucflag ]; then
 fi
 
 
-if [ ! -z $transflag ]; then
-    if [ ! -e $trans ]; then
-	echo "ERROR: $trans is not a file/has not been found"
-	exit 1
-    fi
-    Log "Structural to standard transformation matrix: $trans"
-fi
+
+
 if [ ! -z $lowstruc ]; then
     if [ `imtest $lowstruc` -eq 0 ]; then
 	echo "ERROR: $lowstruc is not an image/has not been found"
@@ -938,11 +937,6 @@ if [ ! -z $lowstruc ]; then
     Log "Low res. structural image: $lowstruc"
 fi
 
-# deal with Standard brain image
-if [ -z $stdflag ]; then
-    std=${FSLDIR}/data/standard/MNI152_T1_2mm
-fi
-Log "Standard brain is: $std"
 
 # Setup option outputs - main subdirectories and anything that would be common to all epochs
 if [ ! -z $nativeout ] && [ ! -d $outdir/native_space ]; then
@@ -989,6 +983,15 @@ if [ ! -z $fslanat ]; then
     # copy over the structural and brain extracted strucutral so that we can use them
     imcp $fslanat/T1_biascorr $tempdir/struc
     imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+
+    # use the registration to standard space - if it is there
+    if [ -e $fslanat/T1_to_MNI_nonlin_coeff.nii.gz ]; then
+        stdout=1; transflag=1;
+	warp=$fslanat/T1_to_MNI_nonlin_coeff.nii.gz
+    elif [ -e $fslanat/T1_to_MNI_lin.mat ]; then
+        stdout=1; transflag=1;
+	trans=$fslanat/T1_to_MNI_lin.mat
+    fi
     
 elif [ ! -z $struc ]; then
     fslmaths $struc $tempdir/struc
@@ -1002,6 +1005,19 @@ elif [ ! -z $struc ]; then
     fi
 fi
 
+if [ ! -z $transflag ]; then
+    # deal with Standard brain image
+    if [ -z $stdflag ]; then
+	std=${FSLDIR}/data/standard/MNI152_T1_2mm
+    fi
+    Log "Standard brain is: $std"
+
+    if [ ! -z $warp ]; then
+	Log "Structural to standard transformation warp: $warp"
+    elif [ ! -z $trans ]; then
+	Log "Structural to standard transformation matrix: $trans"
+    fi
+fi
 
 if [ ! -z $lowstrucflag ]; then
     fslmaths $lowstruc $tempdir/lowstruc
