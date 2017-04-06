@@ -203,12 +203,7 @@ class AslRun(wx.Frame):
         run.add("mkdir %s" % outdir)
         run.add("mkdir %s/native_space" % outdir)
 
-        # ASL_FILE
-        cmd = AslCmd("asl_file")
-        cmd.add("--data", self.input.data())
-        cmd.add("--out", "%s/native_space/diffData" % outdir)
-        cmd.add("--obf", "rpt")
-        cmd.add("--ntis", self.input.ntis())
+        # Check data order is supported
         order, tagfirst = self.input.data_order()
         if self.input.tc_pairs(): 
             if tagfirst: order += ",tc"
@@ -216,41 +211,12 @@ class AslRun(wx.Frame):
         if order not in self.order_opts:
             #print(order)
             raise RuntimeError("This data ordering is not supported by ASL_FILE")
-        cmd.add(self.order_opts[order])
-        run.add(cmd)
-
+        
         # OXFORD_ASL
         cmd = AslCmd("oxford_asl")
-
-        # Structural image - may require Bet to be run
-        fsl_anat_dir = self.input.fsl_anat()
-        struc_image = self.input.struc_image()
-        if fsl_anat_dir is not None:
-            self.check_exists("FSL_ANAT", fsl_anat_dir)
-            cmd.add("--fslanat=%s" % fsl_anat_dir)
-        elif struc_image is not None:
-            self.check_exists("Structural image", struc_image)
-            if self.input.struc_image_bet() == 1:
-                bet = AslCmd("bet")
-                bet.add(struc_image)
-                bet.add("%s/structural_brain" % outdir)
-                run.add(bet)
-                cmd.add("-s %s/structural_brain" % outdir)
-            else:
-                cp = AslCmd("imcp")
-                cp.add(struc_image)
-                cp.add("%s/structural_brain" % outdir)
-                run.add(cp)
-                cmd.add("--sbrain %s/structural_brain" % outdir)
-        else:
-            # No structural image
-            pass
-        
-        # Current GUI has unclear logic here which may involve running ASL_FILE/BET again
-        run.add("CURRENT GUI HAS UNCLEAR LOGIC HERE!")
-
-        cmd.add("-i %s/native_space/diffData" % outdir)
+        cmd.add("-i %s" % self.input.data())
         cmd.add("-o %s" % outdir)
+        cmd.add(self.order_opts[order])
         cmd.add("--tis %s" % ",".join(["%.2f" % v for v in self.input.tis()]))
         cmd.add("--bolus %s" % ",".join(["%.2f" % v for v in self.input.bolus_dur()]))
         if self.analysis.wp(): 
@@ -280,6 +246,37 @@ class AslRun(wx.Frame):
                 cmd.add("--regfrom %s" % self.analysis.transform_file())
             else:
                 pass # --fslanat already set when option 2 chosen
+
+        # Structural image - may require Bet to be run
+        fsl_anat_dir = self.input.fsl_anat()
+        struc_image = self.input.struc_image()
+        if fsl_anat_dir is not None:
+            self.check_exists("FSL_ANAT", fsl_anat_dir)
+            cmd.add("--fslanat=%s" % fsl_anat_dir)
+        elif struc_image is not None:
+            self.check_exists("Structural image", struc_image)
+            cp = AslCmd("imcp")
+            cp.add(struc_image)
+            cp.add("%s/structural_head" % outdir)
+            run.add(cp)
+            if self.input.struc_image_bet() == 1:
+                bet = AslCmd("bet")
+                bet.add(struc_image)
+                bet.add("%s/structural_brain" % outdir)
+                run.add(bet)
+            else:
+                struc_image_brain = self.input.struc_image_brain()
+                self.check_exists("Structural brain image", struc_image_brain)
+                cp = AslCmd("imcp")
+                cp.add(struc_image_brain)
+                cp.add("%s/structural_brain" % outdir)
+                run.add(cp)
+            cmd.add("--s %s/structural_head" % outdir)
+            cmd.add("--sbrain %s/structural_brain" % outdir)
+        else:
+            # No structural image
+            pass
+        
         run.add(cmd)
     
         # ASL_CALIB
@@ -569,18 +566,14 @@ class AslInputOptions(TabPage):
         self.section("Structure")
 
         self.fsl_anat_picker = self.file_picker("Use FSL_ANAT output", dir=True, optional=True, initial_on=True, handler=self.fsl_anat_changed)
-
-        cb = wx.CheckBox(self, label="Use Structural Image")
-        cb.Bind(wx.EVT_CHECKBOX, self.update)
-        cb.Enable(False)
-        self.struc_image_picker = wx.FilePickerCtrl(self)
-        self.struc_image_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
-        self.struc_image_picker.span = 2
-        self.struc_image_picker.checkbox = cb
-        self.struc_image_ch = wx.Choice(self, choices=["Already brain extracted", "Run BET to extract brain"])
+        self.struc_image_picker = self.file_picker("Use Structural Image", optional=True)
+        self.struc_image_ch = wx.Choice(self, choices=["Have brain image", "Run BET to extract brain"])
         self.struc_image_ch.Bind(wx.EVT_CHOICE, self.update)
         self.struc_image_ch.SetSelection(0)
-        self.pack("", cb, self.struc_image_picker, self.struc_image_ch, enable=False)
+        self.struc_image_brain_picker = wx.FilePickerCtrl(self)
+        self.struc_image_brain_picker.span = 2
+        self.struc_image_brain_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
+        self.pack("Brain extraction", self.struc_image_ch, self.struc_image_brain_picker)
 
         self.section("Data Order Preview")
 
@@ -613,6 +606,10 @@ class AslInputOptions(TabPage):
         if self.struc_image_picker.checkbox.IsChecked() and not self.fsl_anat():
             return self.struc_image_picker.GetPath()
         else: return None
+    def struc_image_brain(self): 
+        if self.struc_image_picker.checkbox.IsChecked() and not self.fsl_anat() and self.struc_image_bet() == 0:
+            return self.struc_image_brain_picker.GetPath()
+        else: return None
     def struc_image_bet(self): return self.struc_image_ch.GetSelection()
 
     def update(self, event=None):
@@ -630,6 +627,8 @@ class AslInputOptions(TabPage):
         self.struc_image_picker.checkbox.Enable(not use_fsl_anat)
         self.struc_image_ch.Enable(use_struc_image and not use_fsl_anat)
         self.struc_image_picker.Enable(use_struc_image and not use_fsl_anat)
+        self.struc_image_brain_picker.Enable(use_struc_image and not use_fsl_anat and self.struc_image_bet() == 0)
+        self.struc_image_brain_picker.label.Enable(use_struc_image and not use_fsl_anat and self.struc_image_bet() == 0)
         
         self.bolus_dur_num.Enable(self.bolus_dur_type() == 0)
         self.bolus_dur_list.Enable(self.bolus_dur_type() == 1)
