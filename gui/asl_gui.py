@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import os
 import colorsys
+import tempfile
+import shutil
+import traceback
 
 import wx
 import wx.grid
@@ -145,19 +148,20 @@ class TabPage(wx.Panel):
         return enable
 
     def update(self, evt=None):
-        if hasattr(self, "run"): self.run.update()
-        if hasattr(self, "preview"): self.preview.update()
+        if hasattr(self, "run"): 
+            self.run.update()
+            if hasattr(self, "preview"): self.preview.run = self.run
 
 class PreviewPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
-        self.data_file = ""
-        self.slice = 0
-        self.nslices = 1
         self.data = None
+        self.run = None
+        self.slice = -1
+        self.nslices = 1
         self.view = 0
-        self.figure = Figure(figsize=(4, 4), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111)
+        self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
+        self.axes = self.figure.add_subplot(111, axisbg='black')
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])
         #self.img = self.axes.imshow(np.zeros([10, 10]), interpolation="nearest")            
@@ -165,33 +169,53 @@ class PreviewPanel(wx.Panel):
         self.canvas.mpl_connect('scroll_event', self.scroll)
         self.canvas.mpl_connect('button_press_event', self.view_change)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
-        self.sizer.Add(wx.StaticText(self, label="Data preview"), 0)        
+        font = self.GetFont()
+        font.SetWeight(wx.BOLD)
+        text = wx.StaticText(self, label="Data preview - perfusion weighted image")
+        text.SetFont(font)
+        self.sizer.AddSpacer(10)
+        self.sizer.Add(text, 0)   
         self.sizer.Add(self.canvas, 2, border=5, flag = wx.EXPAND | wx.ALL)
-        self.sizer.Add(wx.StaticText(self, label="Data order preview"), 0)
+
+        hbox = wx.BoxSizer(wx.HORIZONTAL)
+        hbox.Add(wx.StaticText(self, label="Use scroll wheel to change slice, double click to change view"), 0, flag=wx.ALIGN_CENTRE_VERTICAL)      
+        self.update_btn = wx.Button(self, label="Update")
+        self.update_btn.Bind(wx.EVT_BUTTON, self.update)
+        hbox.Add(self.update_btn)
+        self.sizer.Add(hbox)
+
+        self.sizer.AddSpacer(10)
+        text = wx.StaticText(self, label="Data order preview")
+        text.SetFont(font)
+        self.sizer.Add(text, 0)
         self.order_preview = AslDataPreview(self, 1, 1, True, "trp", True)
-        self.sizer.Add(self.order_preview, 1, wx.EXPAND)
+        self.sizer.Add(self.order_preview, 2, wx.EXPAND)
         self.SetSizer(self.sizer)
         self.Layout()
 
-    def update(self):
-        data_file = self.input.data()
-        if data_file != self.data_file:
-            img = nib.load(data_file)
-            self.data = img.get_data()
-            self.slice = 0
+    def update(self, evt):
+        if self.run is not None:
+            self.data = self.run.get_preview_data()
+            if len(self.data.shape) == 4:
+                self.data = self.data[:,:,:,0]
+
+        if self.data is not None:
             self.nslices = self.data.shape[2]
-            self.redraw()
+            if self.slice < 0 or self.slice >= self.nslices: 
+                self.slice = 0
+        self.redraw()
 
     def redraw(self):
+        self.axes.clear() 
         if self.data is None: return
-        if self.view == 0:
-            sl = self.data[:,:,self.slice,0]
-        elif self.view == 1:
-            sl = self.data[:,self.slice,:,0]
-        else:
-            sl = self.data[self.slice,:,:,0]
 
-        self.axes.clear()
+        if self.view == 0:
+            sl = self.data[:,:,self.slice]
+        elif self.view == 1:
+            sl = self.data[:,self.slice,:]
+        else:
+            sl = self.data[self.slice,:,:]
+
         i = self.axes.imshow(sl.T, interpolation="nearest", vmin=sl.min(), vmax=sl.max())
         self.axes.set_ylim(self.axes.get_ylim()[::-1])
         i.set_cmap("gray")
@@ -265,6 +289,36 @@ class AslRun(wx.Frame):
         if not os.path.exists(file):
             raise RuntimeError("%s - no such file or directory" % label)
 
+    def get_preview_data(self):
+        # Run ASL_FILE for perfusion weighted image - just for the preview
+        tempdir = tempfile.mkdtemp()
+        self.preview_data = None
+        try:
+            meanfile = "%s/mean.nii.gz" % tempdir
+            cmd = AslCmd("../asl_file")
+            cmd.add("--data=%s" % self.input.data())
+            cmd.add("--ntis=%i" % len(self.input.tis()))
+            cmd.add("--mean=%s" % meanfile)
+            cmd.add(self.get_data_order_options())
+            os.system(str(cmd))
+            img = nib.load(meanfile)
+            return img.get_data()
+        except:
+            return None
+        finally:
+            shutil.rmtree(tempdir)
+
+    def get_data_order_options(self):
+        # Check data order is supported and return the relevant options
+        order, tagfirst = self.input.data_order()
+        if self.input.tc_pairs(): 
+            if tagfirst: order += ",tc"
+            else: order += ",ct"
+        if order not in self.order_opts:
+            raise RuntimeError("This data ordering is not supported by ASL_FILE")
+        else: 
+            return self.order_opts[order]
+
     def get_run_sequence(self):
         run = RunSequence()
 
@@ -277,20 +331,11 @@ class AslRun(wx.Frame):
         run.add("mkdir %s" % outdir)
         run.add("mkdir %s/native_space" % outdir)
 
-        # Check data order is supported
-        order, tagfirst = self.input.data_order()
-        if self.input.tc_pairs(): 
-            if tagfirst: order += ",tc"
-            else: order += ",ct"
-        if order not in self.order_opts:
-            #print(order)
-            raise RuntimeError("This data ordering is not supported by ASL_FILE")
-        
         # OXFORD_ASL
         cmd = AslCmd("oxford_asl")
         cmd.add("-i %s" % self.input.data())
         cmd.add("-o %s" % outdir)
-        cmd.add(self.order_opts[order])
+        cmd.add(self.get_data_order_options())
         cmd.add("--tis %s" % ",".join(["%.2f" % v for v in self.input.tis()]))
         cmd.add("--bolus %s" % ",".join(["%.2f" % v for v in self.input.bolus_dur()]))
         if self.analysis.wp(): 
@@ -755,7 +800,6 @@ class AslInputOptions(TabPage):
         order = self.abbrevs[g1]
         order += self.abbrevs[g2]
         order += self.abbrevs[3-g1-g2]
-        #print(order)
         self.preview.order_preview.order = order
 
     def update_group_choice(self, w, items, sel):
@@ -873,9 +917,7 @@ class AslDataPreview(wx.Panel):
         else: 
             h = 90.0/255
         s, v = 0.5, 0.95 - pos/2
-        #print(h, s, v)
         r,g,b = colorsys.hsv_to_rgb(h, s, v)
-        #print(r,g,b)
         return wx.Colour(int(r*255), int(g*255), int(b*255))
 
     def on_paint(self, event):
@@ -885,8 +927,8 @@ class AslDataPreview(wx.Panel):
         dc = wx.AutoBufferedPaintDC(self)
         dc.Clear()
 
-        leg_width = (w-200)/4
-        leg_start = 100
+        leg_width = (w-100)/4
+        leg_start = 50
 
         #b = wx.Brush(self.get_col(0.5, True), wx.SOLID)
         #dc.SetBrush(b)
