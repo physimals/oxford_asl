@@ -626,13 +626,13 @@ class AslInputOptions(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Input Data", "input")
  
-        self.groups = ["TIs", "Repeats", "Tag/Control pairs"]
+        self.groups = ["PLDs", "Repeats", "Tag/Control pairs"]
         self.abbrevs = ["t", "r", "p"]
 
         self.section("Data contents")
 
         self.data_picker = self.file_picker("Input Image")
-        self.ntis_int = self.integer("Number of TIs", min=1,max=100,initial=1)
+        self.ntis_int = self.integer("Number of PLDs", min=1,max=100,initial=1)
         self.nrepeats_int = self.integer("Number of repeats", min=1,max=100,initial=1)
 
         self.section("Data order")
@@ -665,7 +665,7 @@ class AslInputOptions(TabPage):
         self.ti_list = NumberList(self, self.ntis())
         self.ti_list.span=3
         self.ti_list.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.update)
-        self.pack("TIs (s)", self.ti_list)
+        self.pack("PLDs (s)", self.ti_list)
         
         self.readout_ch = wx.Choice(self, choices=["3D (eg GRASE)", "2D multi-slice (eg EPI)"])
         self.readout_ch.SetSelection(0)
@@ -767,10 +767,14 @@ class AslInputOptions(TabPage):
             self.bolus_dur_num.SetValue(0.7)
             self.ntis_int.label.SetLabel("Number of TIs")
             self.ti_list.label.SetLabel("TIs")
+            self.preview.order_preview.tis_name="TIs"
+            self.groups[0] = "TIs"
         else:
             self.bolus_dur_num.SetValue(1.8)
             self.ntis_int.label.SetLabel("Number of PLDs")
             self.ti_list.label.SetLabel("PLDs")
+            self.preview.order_preview.tis_name="PLDs"
+            self.groups[0] = "PLDs"
         self.analysis.labelling_changed(event.GetInt() == 0)
         self.update()
 
@@ -907,6 +911,7 @@ class AslDataPreview(wx.Panel):
         self.tc_pairs = tc_pairs
         self.tagfirst = tagfirst
         self.order = order
+        self.tis_name = "PLDs"
 
     def on_size(self, event):
         event.Skip()
@@ -936,7 +941,7 @@ class AslDataPreview(wx.Panel):
         rect = wx.Rect(leg_start, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
         dc.DrawRectangleRect(rect)
-        dc.DrawText("Tis", leg_start+leg_width/3, 20)
+        dc.DrawText(self.tis_name, leg_start+leg_width/3, 20)
 
         #b = wx.Brush(self.get_col(0.5, False), wx.SOLID)
         #dc.SetBrush(b)
