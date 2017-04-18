@@ -322,10 +322,10 @@ Calibration() {
 	extraoptions=$extraoptions" --debug"
     fi
 
-    if [ ! -z $cref ]; then
+    #if [ ! -z $cref ]; then
 	# pass calibration reference image to asl_calib
-	extraoptions=$extraoptions" --cref $cref"
-    elif [ ! -z $senscorr ]; then
+	#extraoptions=$extraoptions" --cref $tempdir/cref"
+    if [ ! -z $senscorr ]; then
 	    # use a sensitivity iamge from elsewhere
 	    Log "Sensitivity image $outdir/native_space/sensitivity being loaded into asl_calib"
 	    extraoptions=$extraoptions" --isen $outdir/native_space/sensitivity"
@@ -1023,6 +1023,34 @@ if [ ! -z $calib ]; then
     bet $tempdir/calib $tempdir/calib
 fi
 
+# same thing for cref image
+if [ ! -z $cref ]; then
+    tsize=`fslinfo $cref | grep "^dim4" | sed 's:dim4[ ]*::'`
+    if [ $tsize -gt 1 ]; then
+        #cut - throw away first volume
+	Log "Removing first volume of calibration reference time series - to ensure data is in steady state"
+	tsize=`expr $tsize - 1`
+	fslroi $cref $tempdir/cref 1 $tsize
+
+	if [ ! -z $moco ]; then
+	    #motion correction
+	    mcflirt -in $tempdir/cref -o $tempdir/cref
+	fi
+	# take the mean
+	fslmaths $tempdir/cref -Tmean $tempdir/cref
+    else
+	fslmaths $calib $tempdir/cref
+    fi
+
+    # bet - using the calib image to ensure a match
+    fslmaths $tempdir/cref -mas $tempdir/calib $tempdir/cref
+
+    # calculate sensitivty image
+    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
+fi
+
+
+
 # read in ASL data
 imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
 # take a copy that will not be subject to any subsequent corrections
@@ -1352,7 +1380,7 @@ fi
 ### End of: Distortion Correction
 
 if [ ! -z $isen ]; then
-# place supplied sensitivity image in the right place (over writing the one from FAST if it exists)
+# place supplied sensitivity image in the right place (over writing the one from FAST or the cref image if it exists)
     fslmaths $isen $outdir/native_space/sensitivity
 fi
 
