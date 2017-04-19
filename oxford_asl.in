@@ -86,6 +86,7 @@ Usage_extended() {
     echo "   extended options for voxel"
     echo "    --t1t      : Assumed T1 of tissue (only used if TR<5 s) {default: 1.3 s}"
     echo "   extended options for single"
+    echo "    --tissref  : Specify tissue reference type: csf, wm, gm or none {default: csf}"
     echo "    --csf      : Manually specify csf mask for calibration"
     echo "    --t1csf    : T1 of CSF (s) - {for default see asl_calib}"
     echo "    --te       : Echo time for the readout (to correct for T2/T2* effect in calibration)"
@@ -336,6 +337,10 @@ Calibration() {
 	extraoptions=$extraoptions" --t2star"
     fi
 
+    if [ ! -z $tissref ]; then
+	# Specify reference tissue type
+	extraoptions=$extraoptions" --tissref $tissref"
+    fi
 
     if [ ! -z $t1csf ]; then
 	# supply the T1 of csf
@@ -682,6 +687,8 @@ takeargs=0;boolarg="";isbool="";
 	--noisesd) noisesd=$argument
 	    takeargs=1;;
 	--cmethod) cmethod=$argument
+	    takeargs=1;;
+	--tissref) tissref=$argument
 	    takeargs=1;;
 	--csf) csfflag=1 csf=$argument
 	    takeargs=1;;
