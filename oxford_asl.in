@@ -411,9 +411,12 @@ if [ ! -z $3 ]; then
     # we are being supplied with an intial MVN - pass to BASIL
     initmvn="--init $3"
     Log "Initial MVN for BASIL is: $3"
+else
+    initmvn=""
 fi
 
 $basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $initmvn $basil_options
+
 
 # work out which is the final step from BASIL
 finalstep=`ls -d $2/basil/step? | sed -n '$ p'`
@@ -974,6 +977,7 @@ fi
 # general pre-processing
 echo "Pre-processing"
 if [ ! -z $fslanat ]; then
+    Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
     imcp $fslanat/T1_biascorr $tempdir/struc
@@ -1774,14 +1778,16 @@ imcp $tempdir/mask $outdir/native_space/mask
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
-    # redo the mask now that we have a better registration - as this might matter for PV correction
-    # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
-    fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-    flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
-    fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
-    fslcpgeom $regfrom $tempdir/mask
-    imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
-
+    if [ -f $tempdir/struc_bet ]; then
+	# redo the mask now that we have a better registration - as this might matter for PV correction
+	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
+	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+	flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+	fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+	fslcpgeom $regfrom $tempdir/mask
+	imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
+    fi
+    
     # intructions for BASIL
     basil_options=$basil_options" --pgm $tempdir/pvgm_inasl --pwm $tempdir/pvwm_inasl "
     mkdir $tempdir/pvcorr
