@@ -338,12 +338,30 @@ class AslRun(wx.Frame):
     def get_run_sequence(self):
         run = RunSequence()
 
+        # Check input file exists, is an image and the TIs/repeats/TC pairs is consistent
         self.check_exists("Input data", self.input.data())
+        img = nib.load(self.input.data())
+        if len(img.shape) != 4:
+            raise RuntimeError("Input data is not a 4D image")
+        nvols = img.shape[3]
+
+        N = self.input.ntis()
+        if self.input.tc_pairs(): N *= 2
+        if nvols % N != 0:
+            self.input.nrepeats_label.SetLabel("<Unknown>")
+            raise RuntimeError("Input data contains %i volumes - not consistent with %i TIs and TC pairs=%s" % (img.shape[3], self.input.ntis(), self.input.tc_pairs()))
+        else:
+            self.input.nrepeats_label.SetLabel("%i" % (nvols / N))
+            self.preview.order_preview.n_tis = self.input.ntis()
+            self.preview.order_preview.n_repeats = nvols / N
+            self.preview.order_preview.tc_pairs = self.input.tc_pairs()
+            self.preview.order_preview.tagfirst = self.input.tc_ch.GetSelection() == 0
+            self.preview.order_preview.Refresh()
 
         # Create output dirs
         outdir = self.analysis.outdir()
         if outdir == "": 
-            raise RuntimeError("No output dir")
+            raise RuntimeError("Output directory not specified")
         run.add("mkdir %s" % outdir)
         run.add("mkdir %s/native_space" % outdir)
 
@@ -644,7 +662,9 @@ class AslInputOptions(TabPage):
 
         self.data_picker = self.file_picker("Input Image")
         self.ntis_int = self.integer("Number of PLDs", min=1,max=100,initial=1)
-        self.nrepeats_int = self.integer("Number of repeats", min=1,max=100,initial=1)
+        self.nrepeats_label = wx.StaticText(self, label="<Unknown>")
+        self.pack("Number of repeats", self.nrepeats_label)
+#        self.nrepeats_int = self.integer("Number of repeats", min=1,max=100,initial=1)
 
         self.section("Data order")
 
@@ -705,18 +725,11 @@ class AslInputOptions(TabPage):
         self.struc_image_brain_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
         self.pack("Brain extraction", self.struc_image_ch, self.struc_image_brain_picker)
 
-        #self.section("Data Order Preview")
-
-        #self.preview = AslDataPreview(self, self.ntis(), self.nrepeats(), self.tc_pairs(), "trp", True)
-        #self.sizer.Add(self.preview, pos=(self.row, 0), span=(1, 5), flag=wx.EXPAND | wx.ALL)
-
         self.sizer.AddGrowableCol(2, 1)
-#        self.sizer.AddGrowableRow(self.row, 1)
         self.SetSizer(self.sizer)
 
     def data(self): return self.data_picker.GetPath()
     def ntis(self): return self.ntis_int.GetValue()
-    def nrepeats(self): return self.nrepeats_int.GetValue()
     def data_order(self): return self.preview.order_preview.order, self.preview.order_preview.tagfirst
     def tc_pairs(self): return self.tc_ch.checkbox.IsChecked()
     def labelling(self): return self.labelling_ch.GetSelection()
@@ -766,11 +779,6 @@ class AslInputOptions(TabPage):
         self.tc_ch.Enable(self.tc_pairs())
         self.update_groups()
 
-        self.preview.order_preview.n_tis = self.ntis()
-        self.preview.order_preview.n_repeats = self.nrepeats()
-        self.preview.order_preview.tc_pairs = self.tc_pairs()
-        self.preview.order_preview.tagfirst = self.tc_ch.GetSelection() == 0
-        self.preview.order_preview.Refresh()
         TabPage.update(self)
 
     def labelling_changed(self, event):
@@ -1067,6 +1075,7 @@ class AslGui(wx.Frame):
         main_panel.SetSizer(main_vsizer)
         
         self.run = AslRun(self, self.run_btn, self.run_label)
+        setattr(self.run, "preview", self.preview)
         tabs = [AslInputOptions(notebook),
                 AslAnalysis(notebook),
                 AslCalibration(notebook)]
