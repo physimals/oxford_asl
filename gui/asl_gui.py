@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sys
 import os
 import colorsys
 import tempfile
@@ -30,13 +31,27 @@ class RunSequence:
 
 class AslCmd():
     def __init__(self, cmd):
-        self.cmd = cmd
+        localdir = os.path.dirname(os.path.abspath(__file__))
+        if "FSLDIR" in os.environ: 
+            fsldir = os.environ["FSLDIR"]
+        else:
+            fsldir = localdir
+        if os.path.exists(os.path.join(localdir, cmd)):
+            self.cmd = os.path.join(localdir, cmd)
+        elif os.path.exists(os.path.join(fsldir, "bin/%s" % cmd)):
+            self.cmd = os.path.join(fsldir, "bin/%s" % cmd)
+        else:
+            self.cmd = cmd
     
     def add(self, opt, val=None):
         if val is not None:
             self.cmd += " %s=%s" % (opt, str(val))
         else:
             self.cmd += " %s" % opt
+
+    def run(self):
+        print(self.cmd)
+        os.system(self.cmd)
 
     def __str__(self): return self.cmd
 
@@ -196,9 +211,9 @@ class PreviewPanel(wx.Panel):
     def update(self, evt):
         if self.run is not None:
             self.data = self.run.get_preview_data()
-            if len(self.data.shape) == 4:
+            if self.data is not None and len(self.data.shape) == 4:
                 self.data = self.data[:,:,:,0]
-
+                
         if self.data is not None:
             self.nslices = self.data.shape[2]
             if self.slice < 0 or self.slice >= self.nslices: 
@@ -240,15 +255,15 @@ class PreviewPanel(wx.Panel):
 class AslRun(wx.Frame):
 
     order_opts = {"trp" : "--ibf=tis --iaf=diff", 
-                  "trp,tc" : "--ibf=tis --iaf=tcb --diff", 
-                  "trp,ct" : "--ibf=tis --iaf=ctb --diff",
+                  "trp,tc" : "--ibf=tis --iaf=tcb", 
+                  "trp,ct" : "--ibf=tis --iaf=ctb",
                   "rtp" : "--ibf=rpt --iaf=diff",
-                  "rtp,tc" : "--rpt --iaf=tcb --diff",
-                  "rtp,ct" : "--ibf=rpt --iaf=ctb --diff",
-                  "ptr,tc" : "--ibf=tis --iaf=tc --diff",
-                  "ptr,ct" : "--ibf=tis --iaf=ct --diff",
-                  "prt,tc" : "--ibf=rpt --iaf=tc --diff",
-                  "prt,ct" : "--ibf=rpt --iaf=ct --diff"}
+                  "rtp,tc" : "--rpt --iaf=tcb",
+                  "rtp,ct" : "--ibf=rpt --iaf=ctb",
+                  "ptr,tc" : "--ibf=tis --iaf=tc",
+                  "ptr,ct" : "--ibf=tis --iaf=ct",
+                  "prt,tc" : "--ibf=rpt --iaf=tc",
+                  "prt,ct" : "--ibf=rpt --iaf=ct"}
 
     def __init__(self, parent, run_btn, run_label):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
@@ -277,7 +292,7 @@ class AslRun(wx.Frame):
         self.run_seq = None
         try:
             self.run_seq = self.get_run_sequence()
-            self.run_label.SetForegroundColour(wx.Colour(0, 255, 0))
+            self.run_label.SetForegroundColour(wx.Colour(0, 128, 0))
             self.run_label.SetLabel("Ready to Go")
             self.run_btn.Enable(True)
         except Exception, e:
@@ -295,15 +310,16 @@ class AslRun(wx.Frame):
         self.preview_data = None
         try:
             meanfile = "%s/mean.nii.gz" % tempdir
-            cmd = AslCmd("../asl_file")
+            cmd = AslCmd("asl_file")
             cmd.add("--data=%s" % self.input.data())
             cmd.add("--ntis=%i" % len(self.input.tis()))
             cmd.add("--mean=%s" % meanfile)
             cmd.add(self.get_data_order_options())
-            os.system(str(cmd))
+            cmd.run()
             img = nib.load(meanfile)
             return img.get_data()
         except:
+            traceback.print_exc()
             return None
         finally:
             shutil.rmtree(tempdir)
@@ -395,43 +411,38 @@ class AslRun(wx.Frame):
         else:
             # No structural image
             pass
-        
-        run.add(cmd)
     
         # ASL_CALIB
         if self.calibration.calib():
-            calib = AslCmd("asl_calib")
-            calib.add("-i %s/native_space/perfusion" % outdir)
-            calib.add("-o %s/calibration" % outdir)
-            calib.add("-c %s" % self.calib.calib_image())
-            if self.calib.m0_type() == 0:
-                calib.add("--mode longtr")
-                calib.add("--tr %.2f" % self.calib.seq_tr())
+            self.check_exists("Calibration image", self.calibration.calib_image())
+            cmd.add("-c %s" % self.calibration.calib_image())
+            if self.calibration.m0_type() == 0:
+                #calib.add("--mode longtr")
+                cmd.add("--tr %.2f" % self.calibration.seq_tr())
             else:
-                calib.add("--mode satrevoc")
-                calib.add("--tis %s" % ",".join([str(v) for v in self.input.tis()]))
+                raise RuntimeError("Saturation recovery not supported by oxford_asl")
+                #calib.add("--mode satrevoc")
+                #calib.add("--tis %s" % ",".join([str(v) for v in self.input.tis()]))
                 # FIXME change -c option in sat recov mode?
 
-            # FIXME structural image required?
-            #calib.add("-s %s" % self.calib.calib_image())
-            calib.add("--te %.2f" % self.calibration.seq_te())
+            cmd.add("--cgain %.2f" % self.calibration.calib_gain())
             if self.calibration.calib_mode() == 0:
-                calib.add("--tissref %s" % self.calib.ref_tissue_type_name())
-                calib.add("--t1r %.2f" % self.calibration.ref_t1())
-                calib.add("--t2r %.2f" % self.calibration.ref_t2())
-                calib.add("--t2b %.2f" % self.calibration.blood_t2())
+                cmd.add("--cmethod single")
+                cmd.add("--tissref %s" % self.calibration.ref_tissue_type_name())
+                cmd.add("--te %.2f" % self.calibration.seq_te())
+                cmd.add("--t1csf %.2f" % self.calibration.ref_t1())
+                cmd.add("--t2csf %.2f" % self.calibration.ref_t2())
+                cmd.add("--t2bl %.2f" % self.calibration.blood_t2())
                 if self.calibration.ref_tissue_mask() is not None:
                     self.check_exists("Calibration reference tissue mask", self.calibration.ref_tissue_mask())
-                    calib.add("-m %s" % self.calibration.ref_tissue_mask())
-                else:
-                    # use structural_brain? What about FSL_ANAT?
-                    calib.add("-s %s/structural_brain" % self.outdir)
-                    calib.add("-t %s/native_space/asl2struct.mat" % self.outdir)
-            if self.calibration.coil_image() is not None:
-                self.check_exists("Coil sensitivity reference image", self.calibration.coil_image())
-                calib.add("--cref %s" % self.calibration.coil_image())
-
-            run.add("FIXME need to add more calibration commands here")
+                    cmd.add("--csf %s" % self.calibration.ref_tissue_mask())
+                if self.calibration.coil_image() is not None:
+                    self.check_exists("Coil sensitivity reference image", self.calibration.coil_image())
+                    cmd.add("--cref %s" % self.calibration.coil_image())
+            else:
+                cmd.add("--cmethod voxelwise")
+        
+        run.add(cmd)
 
         return run
 
@@ -479,11 +490,11 @@ class AslCalibration(TabPage):
             return self.ref_tissue_mask_picker.GetPath()
         else:
             return None
-    def ref_t1(self): return self.ref_t1_num.getValue()
-    def ref_t2(self): return self.ref_t2_num.getValue()
-    def blood_t2(self): return self.blood_t2_num.getValue()
+    def ref_t1(self): return self.ref_t1_num.GetValue()
+    def ref_t2(self): return self.ref_t2_num.GetValue()
+    def blood_t2(self): return self.blood_t2_num.GetValue()
     def coil_image(self): 
-        if self.coil_image_picker.checkbox.IsChecked: return self.coil_image_picker.GetPath()
+        if self.coil_image_picker.checkbox.IsChecked(): return self.coil_image_picker.GetPath()
         else: return None
 
     def ref_tissue_type_changed(self, event):
@@ -547,10 +558,10 @@ class AslAnalysis(TabPage):
 
         self.section("Initial parameter values")
 
-        self.bat_num = self.number("Bolus arrival time (s)", min=0,max=2.5,initial=0.7)
+        self.bat_num = self.number("Bolus arrival time (s)", min=0,max=2.5,initial=1.3)
         self.t1_num = self.number("T1 (s)", min=0,max=3,initial=1.3)
         self.t1b_num = self.number("T1b (s)", min=0,max=3,initial=1.65)
-        self.ie_num = self.number("Inversion Efficiency", min=0,max=1,initial=0.98)
+        self.ie_num = self.number("Inversion Efficiency", min=0,max=1,initial=0.85)
         
         self.section("Analysis Options")
 
@@ -1028,8 +1039,10 @@ class AslGui(wx.Frame):
         main_panel = wx.Panel(self)
         main_vsizer = wx.BoxSizer(wx.VERTICAL)
 
-        banner = wx.StaticBitmap(main_panel, -1, wx.Bitmap("banner.png", wx.BITMAP_TYPE_ANY))
-        main_vsizer.Add(banner)
+        banner = wx.Panel(main_panel, size=(-1, 80))
+        banner.SetBackgroundColour((54, 122, 157))
+        pix = wx.StaticBitmap(banner, -1, wx.Bitmap("banner.png", wx.BITMAP_TYPE_ANY))
+        main_vsizer.Add(banner, 0, wx.EXPAND)
 
         hpanel = wx.Panel(main_panel)
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
