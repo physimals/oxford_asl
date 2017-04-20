@@ -314,7 +314,7 @@ class AslRun(wx.Frame):
             cmd.add("--data=%s" % self.input.data())
             cmd.add("--ntis=%i" % len(self.input.tis()))
             cmd.add("--mean=%s" % meanfile)
-            cmd.add(self.get_data_order_options())
+            cmd.add(" ".join(self.get_data_order_options()))
             cmd.run()
             img = nib.load(meanfile)
             return img.get_data()
@@ -327,13 +327,15 @@ class AslRun(wx.Frame):
     def get_data_order_options(self):
         # Check data order is supported and return the relevant options
         order, tagfirst = self.input.data_order()
+        diff_opt = ""
         if self.input.tc_pairs(): 
             if tagfirst: order += ",tc"
             else: order += ",ct"
+            diff_opt = "--diff"
         if order not in self.order_opts:
             raise RuntimeError("This data ordering is not supported by ASL_FILE")
         else: 
-            return self.order_opts[order]
+            return self.order_opts[order], diff_opt
 
     def get_run_sequence(self):
         run = RunSequence()
@@ -369,7 +371,7 @@ class AslRun(wx.Frame):
         cmd = AslCmd("oxford_asl")
         cmd.add("-i %s" % self.input.data())
         cmd.add("-o %s" % outdir)
-        cmd.add(self.get_data_order_options())
+        cmd.add(self.get_data_order_options()[0])
         cmd.add("--tis %s" % ",".join(["%.2f" % v for v in self.input.tis()]))
         cmd.add("--bolus %s" % ",".join(["%.2f" % v for v in self.input.bolus_dur()]))
         if self.analysis.wp(): 
@@ -379,11 +381,11 @@ class AslRun(wx.Frame):
             cmd.add("--bat %.2f" % self.analysis.bat())
         cmd.add("--t1b %.2f" % self.analysis.t1b())
         cmd.add("--alpha %.2f" % self.analysis.ie())
-        if self.analysis.spatial(): cmd.add("--spatial")
+        cmd.add("--spatial=%i" % int(self.analysis.spatial()))
+        cmd.add("--fixbolus=%i" % int(self.analysis.fixbolus()))
+        cmd.add("--mc=%i" % int(self.analysis.mc()))
         if self.analysis.infer_t1(): cmd.add("--infert1")
-        if self.analysis.fixbolus(): cmd.add("--fixbolus")
         if self.analysis.pv(): cmd.add("--pvcorr")
-        if self.analysis.mc(): cmd.add("--mc")
         if not self.analysis.macro(): cmd.add("--artoff")
         if self.analysis.mask() is not None:
             self.check_exists("Analysis mask", self.analysis.mask())
@@ -430,6 +432,12 @@ class AslRun(wx.Frame):
             # No structural image
             pass
     
+        if self.input.readout() == 1:
+            # 2D multi-slice readout
+            cmd.add("--slicedt %.2f" % self.input.time_per_slice())
+            if self.input.multiband():
+                cmd.add("--sliceband %i" % self.input.slices_per_band())
+                
         # ASL_CALIB
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
@@ -446,7 +454,7 @@ class AslRun(wx.Frame):
             cmd.add("--cgain %.2f" % self.calibration.calib_gain())
             if self.calibration.calib_mode() == 0:
                 cmd.add("--cmethod single")
-                cmd.add("--tissref %s" % self.calibration.ref_tissue_type_name())
+                cmd.add("--tissref %s" % self.calibration.ref_tissue_type_name().lower())
                 cmd.add("--te %.2f" % self.calibration.seq_te())
                 cmd.add("--t1csf %.2f" % self.calibration.ref_t1())
                 cmd.add("--t2csf %.2f" % self.calibration.ref_t2())
@@ -458,7 +466,7 @@ class AslRun(wx.Frame):
                     self.check_exists("Coil sensitivity reference image", self.calibration.coil_image())
                     cmd.add("--cref %s" % self.calibration.coil_image())
             else:
-                cmd.add("--cmethod voxelwise")
+                cmd.add("--cmethod voxel")
         
         run.add(cmd)
 
@@ -487,8 +495,8 @@ class AslCalibration(TabPage):
         self.seq_te_num = self.number("Sequence TE (ms)", min=0,max=30,initial=0)
         self.blood_t2_num = self.number("Blood T2 (s)", min=0,max=5,initial=3)
         self.coil_image_picker = self.file_picker("Coil Sensitivity Image", optional=True)
-        self.ref_t1_num = self.number("Reference T1 (s)", min=0,max=5,initial=1.3)
-        self.ref_t2_num = self.number("Reference T2 (s)", min=0,max=5,initial=1)
+        self.ref_t1_num = self.number("Reference T1 (s)", min=0,max=5,initial=4.3)
+        self.ref_t2_num = self.number("Reference T2 (s)", min=0,max=5,initial=750.0/400)
 
         self.sizer.AddGrowableCol(2, 1)
         #self.sizer.AddGrowableRow(self.row, 1)
@@ -684,7 +692,7 @@ class AslInputOptions(TabPage):
         self.bolus_dur_ch = wx.Choice(self, choices=["Constant", "Variable"])
         self.bolus_dur_ch.SetSelection(0)
         self.bolus_dur_ch.Bind(wx.EVT_CHOICE, self.update)
-        self.bolus_dur_num = NumberChooser(self, min=0, max=2.5, step=0.1, initial=0.7)
+        self.bolus_dur_num = NumberChooser(self, min=0, max=2.5, step=0.1, initial=1.8)
         self.bolus_dur_num.span = 2
         self.pack("Bolus duration (s)", self.bolus_dur_ch, self.bolus_dur_num)
         
