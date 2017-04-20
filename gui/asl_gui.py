@@ -810,7 +810,14 @@ class AslInputOptions(TabPage):
     def bolus_dur(self): 
         if self.bolus_dur_type() == 0: return [self.bolus_dur_num.GetValue(), ]
         else: return self.bolus_dur_list.GetValues()
-    def tis(self): return self.ti_list.GetValues()
+    def tis(self): 
+        tis = self.ti_list.GetValues()
+        if self.labelling() == 1:
+            # For pASL TI = bolus_dur + PLD
+            bolus_durs = self.bolus_dur()
+            if len(bolus_durs) == 1: bolus_durs *= self.ntis()
+            tis = [pld+bd for pld,bd in zip(tis, bolus_durs)]
+        return tis
     def readout(self): return self.readout_ch.GetSelection()
     def time_per_slice(self): return self.time_per_slice_num.GetValue()
     def multiband(self): return self.multiband_cb.IsChecked()
