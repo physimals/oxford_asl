@@ -1,4 +1,13 @@
 #!/usr/bin/env python
+"""
+Simple wxpython based GUI front-end to OXFORD_ASL command line tool
+
+Currently this does not use any of the FSL python libraries. Possible improvements would be:
+  - Use props library to hold run options and use the signalling mechanisms to communicate
+    values. The built-in widget builder does not seem to be flexible enough however.
+  - Use fsleyes embedded widget as the preview for a nicer, more interactive data preview
+"""
+
 import sys
 import os
 import colorsys
@@ -17,19 +26,14 @@ from matplotlib.figure import Figure
 
 import nibabel as nib
 
-class RunSequence:
-    def __init__(self):
-        self.cmds = []
-
-    def add(self, cmd):
-        self.cmds.append(cmd)
-
-    def __str__(self):
-        s = ""
-        for cmd in self.cmds: s += str(cmd) + "\n\n"
-        return s
-
-class AslCmd():
+class FslCmd():
+    """
+    An FSL command
+    
+    This will look for the executable in the same directory as the 
+    GUI script first, then look in $FSLDIR/bin. This is to enable distribution
+    of updated code as a bundle which can be run in-situ without installation
+    """
     def __init__(self, cmd):
         localdir = os.path.dirname(os.path.abspath(__file__))
         if "FSLDIR" in os.environ: 
@@ -56,7 +60,9 @@ class AslCmd():
     def __str__(self): return self.cmd
 
 class TabPage(wx.Panel):
-
+    """
+    Shared methods used by the various tab pages in the GUI
+    """
     def __init__(self, parent, title, name=None):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
  
@@ -69,6 +75,11 @@ class TabPage(wx.Panel):
             self.name = name
             
     def pack(self, label, *widgets, **kwargs):
+        """
+        Add a horizontal line to the tab with a label and series of widgets
+
+        If label is empty, first widget is used instead (usually to provide a checkbox)
+        """
         col = 0
         border = kwargs.get("border", 10)
         font = self.GetFont()
@@ -96,6 +107,9 @@ class TabPage(wx.Panel):
         self.row += 1
 
     def file_picker(self, label, dir=False, handler=None, optional=False, initial_on=False, pack=True, **kwargs):
+        """
+        Add a file picker to the tab
+        """
         if not handler: handler = self.update
         if dir: 
             picker = wx.DirPickerCtrl(self)
@@ -116,6 +130,9 @@ class TabPage(wx.Panel):
         return picker
 
     def choice(self, label, choices, initial=0, optional=False, initial_on=False, handler=None, pack=True, **kwargs):
+        """
+        Add a widget to choose from a fixed set of options
+        """
         if not handler: handler = self.update
         ch = wx.Choice(self, choices=choices)
         ch.SetSelection(initial)
@@ -124,7 +141,6 @@ class TabPage(wx.Panel):
             cb = wx.CheckBox(self, label=label)
             cb.SetValue(initial_on)
             cb.Bind(wx.EVT_CHECKBOX, self.update)
-            #cb.Bind(wx.EVT_CHECKBOX, self.enabler(ch))
             ch.checkbox = cb
             if pack: self.pack("", cb, ch, enable=initial_on, **kwargs)
         elif pack:
@@ -132,6 +148,9 @@ class TabPage(wx.Panel):
         return ch
 
     def number(self, label, handler=None, **kwargs):
+        """
+        Add a widget to choose a floating point number
+        """
         if not handler: handler = self.update
         num = NumberChooser(self, changed_handler=handler, **kwargs)
         num.span = 2
@@ -139,6 +158,9 @@ class TabPage(wx.Panel):
         return num
 
     def integer(self, label, handler=None, pack=True, **kwargs):
+        """
+        Add a widget to choose an integer
+        """
         if not handler: handler = self.update
         spin = wx.SpinCtrl(self, **kwargs)
         spin.Bind(wx.EVT_SPINCTRL, handler)
@@ -146,6 +168,9 @@ class TabPage(wx.Panel):
         return spin
 
     def checkbox(self, label, initial=False, handler=None, **kwargs):
+        """
+        Add a simple on/off option
+        """
         cb = wx.CheckBox(self, label=label)
         cb.span=2
         cb.SetValue(initial)
@@ -155,19 +180,25 @@ class TabPage(wx.Panel):
         return cb
 
     def section(self, label):
+        """
+        Add a section heading
+        """
         self.pack(label, bold=True)
 
-    def enabler(self, w):
-        def enable(evt):
-            w.Enable(evt.IsChecked())
-        return enable
-
     def update(self, evt=None):
+        """
+        Update the run module, i.e. when options have changed
+        """
         if hasattr(self, "run"): 
             self.run.update()
             if hasattr(self, "preview"): self.preview.run = self.run
 
 class PreviewPanel(wx.Panel):
+    """
+    Panel providing a simple image preview for the output of ASL_FILE.
+
+    Used so user can check their choice of data grouping/ordering looks right
+    """
     def __init__(self, parent):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
         self.data = None
@@ -178,8 +209,7 @@ class PreviewPanel(wx.Panel):
         self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
         self.axes = self.figure.add_subplot(111, axisbg='black')
         self.axes.get_xaxis().set_ticklabels([])
-        self.axes.get_yaxis().set_ticklabels([])
-        #self.img = self.axes.imshow(np.zeros([10, 10]), interpolation="nearest")            
+        self.axes.get_yaxis().set_ticklabels([])          
         self.canvas = FigureCanvas(self, -1, self.figure)
         self.canvas.mpl_connect('scroll_event', self.scroll)
         self.canvas.mpl_connect('button_press_event', self.view_change)
@@ -209,6 +239,10 @@ class PreviewPanel(wx.Panel):
         self.Layout()
 
     def update(self, evt):
+        """
+        Update the preview. This is called explicitly when the user clicks the update
+        button as it involves calling ASL_FILE and may be slow
+        """
         if self.run is not None:
             self.data = self.run.get_preview_data()
             if self.data is not None and len(self.data.shape) == 4:
@@ -221,6 +255,9 @@ class PreviewPanel(wx.Panel):
         self.redraw()
 
     def redraw(self):
+        """
+        Redraw the preview image
+        """
         self.axes.clear() 
         if self.data is None: return
 
@@ -237,6 +274,9 @@ class PreviewPanel(wx.Panel):
         self.Layout()
 
     def view_change(self, event):
+        """
+        Called on mouse click event. Double click changes the view direction and redraws
+        """
         if self.data is None: return
         if event.dblclick:
             self.view += 1
@@ -246,6 +286,9 @@ class PreviewPanel(wx.Panel):
             self.redraw()
 
     def scroll(self, event):
+        """
+        Called on mouse scroll wheel to move through the slices in the current view
+        """
         if event.button == "up":
             if self.slice != self.nslices-1: self.slice += 1
         else:
@@ -253,6 +296,9 @@ class PreviewPanel(wx.Panel):
         self.redraw()
             
 class AslRun(wx.Frame):
+    """
+    Determines the commands to run and displays them in a window
+    """
 
     order_opts = {"trp" : "--ibf=tis --iaf=diff", 
                   "trp,tc" : "--ibf=tis --iaf=tcb", 
@@ -285,10 +331,15 @@ class AslRun(wx.Frame):
     def dorun(self, evt):
         if self.run_seq: 
             self.output_text.Clear()
-            self.output_text.AppendText(str(self.run_seq))
+            self.output_text.AppendText("\n\n".join([str(cmd) for cmd in self.run_seq]))
             self.Show()
+            self.Raise()
 
     def update(self, evt=None):
+        """
+        Get the sequence of commands and enable the run button if options are valid. Otherwise
+        display the first error in the status label
+        """
         self.run_seq = None
         try:
             self.run_seq = self.get_run_sequence()
@@ -305,14 +356,16 @@ class AslRun(wx.Frame):
             raise RuntimeError("%s - no such file or directory" % label)
 
     def get_preview_data(self):
-        # Run ASL_FILE for perfusion weighted image - just for the preview
+        """
+        Run ASL_FILE for perfusion weighted image - just for the preview
+        """
         tempdir = tempfile.mkdtemp()
         self.preview_data = None
         try:
             meanfile = "%s/mean.nii.gz" % tempdir
-            cmd = AslCmd("asl_file")
+            cmd = FslCmd("asl_file")
             cmd.add("--data=%s" % self.input.data())
-            cmd.add("--ntis=%i" % len(self.input.tis()))
+            cmd.add("--ntis=%i" % self.input.ntis())
             cmd.add("--mean=%s" % meanfile)
             cmd.add(" ".join(self.get_data_order_options()))
             cmd.run()
@@ -325,7 +378,9 @@ class AslRun(wx.Frame):
             shutil.rmtree(tempdir)
 
     def get_data_order_options(self):
-        # Check data order is supported and return the relevant options
+        """
+        Check data order is supported and return the relevant options
+        """
         order, tagfirst = self.input.data_order()
         diff_opt = ""
         if self.input.tc_pairs(): 
@@ -338,7 +393,11 @@ class AslRun(wx.Frame):
             return self.order_opts[order], diff_opt
 
     def get_run_sequence(self):
-        run = RunSequence()
+        """
+        Get the sequence of commands for the selected options, throwing exception
+        if any problems are found (e.g. files don't exist, mandatory options not specified)
+        """
+        run = []
 
         # Check input file exists, is an image and the TIs/repeats/TC pairs is consistent
         self.check_exists("Input data", self.input.data())
@@ -364,11 +423,11 @@ class AslRun(wx.Frame):
         outdir = self.analysis.outdir()
         if outdir == "": 
             raise RuntimeError("Output directory not specified")
-        run.add("mkdir %s" % outdir)
-        run.add("mkdir %s/native_space" % outdir)
+        run.append("mkdir %s" % outdir)
+        run.append("mkdir %s/native_space" % outdir)
 
         # OXFORD_ASL
-        cmd = AslCmd("oxford_asl")
+        cmd = FslCmd("oxford_asl")
         cmd.add("-i %s" % self.input.data())
         cmd.add("-o %s" % outdir)
         cmd.add(self.get_data_order_options()[0])
@@ -410,22 +469,22 @@ class AslRun(wx.Frame):
             cmd.add("--fslanat=%s" % fsl_anat_dir)
         elif struc_image is not None:
             self.check_exists("Structural image", struc_image)
-            cp = AslCmd("imcp")
+            cp = FslCmd("imcp")
             cp.add(struc_image)
             cp.add("%s/structural_head" % outdir)
-            run.add(cp)
+            run.append(cp)
             if self.input.struc_image_bet() == 1:
-                bet = AslCmd("bet")
+                bet = FslCmd("bet")
                 bet.add(struc_image)
                 bet.add("%s/structural_brain" % outdir)
-                run.add(bet)
+                run.append(bet)
             else:
                 struc_image_brain = self.input.struc_image_brain()
                 self.check_exists("Structural brain image", struc_image_brain)
-                cp = AslCmd("imcp")
+                cp = FslCmd("imcp")
                 cp.add(struc_image_brain)
                 cp.add("%s/structural_brain" % outdir)
-                run.add(cp)
+                run.append(cp)
             cmd.add("--s %s/structural_head" % outdir)
             cmd.add("--sbrain %s/structural_brain" % outdir)
         else:
@@ -437,7 +496,7 @@ class AslRun(wx.Frame):
             cmd.add("--slicedt %.2f" % self.input.time_per_slice())
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
-                
+
         # ASL_CALIB
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
@@ -468,11 +527,13 @@ class AslRun(wx.Frame):
             else:
                 cmd.add("--cmethod voxel")
         
-        run.add(cmd)
-
+        run.append(cmd)
         return run
 
 class AslCalibration(TabPage):
+    """ 
+    Tab page containing calibration options
+    """
 
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Calibration")
@@ -499,7 +560,6 @@ class AslCalibration(TabPage):
         self.ref_t2_num = self.number("Reference T2 (s)", min=0,max=5,initial=750.0/400)
 
         self.sizer.AddGrowableCol(2, 1)
-        #self.sizer.AddGrowableRow(self.row, 1)
         self.SetSizer(self.sizer)
 
     def calib(self): return self.calib_cb.IsChecked()
@@ -560,6 +620,9 @@ class AslCalibration(TabPage):
         TabPage.update(self)
 
 class AslAnalysis(TabPage):
+    """
+    Tab page containing data analysis options
+    """
 
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Analysis")
@@ -659,7 +722,10 @@ class AslAnalysis(TabPage):
         self.transform_ch.Enable(self.transform())
 
 class AslInputOptions(TabPage):
-    
+    """
+    Tab page containing input data options
+    """
+
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Input Data", "input")
  
@@ -672,7 +738,6 @@ class AslInputOptions(TabPage):
         self.ntis_int = self.integer("Number of PLDs", min=1,max=100,initial=1)
         self.nrepeats_label = wx.StaticText(self, label="<Unknown>")
         self.pack("Number of repeats", self.nrepeats_label)
-#        self.nrepeats_int = self.integer("Number of repeats", min=1,max=100,initial=1)
 
         self.section("Data order")
 
@@ -841,6 +906,10 @@ class AslInputOptions(TabPage):
         w.Enable(True)
 
 class NumberChooser(wx.Panel):
+    """
+    Widget for choosing a floating point number
+    """
+
     def __init__(self, parent, label=None, min=0, max=1, initial=0.5, step=0.1, digits=2, changed_handler=None):
         super(NumberChooser, self).__init__(parent)
         self.min, self.orig_min, self.max, self.orig_max = min, min, max, max
@@ -890,6 +959,10 @@ class NumberChooser(wx.Panel):
         if self.handler: self.handler(event)
 
 class NumberList(wx.grid.Grid):
+    """
+    Widget for specifying a list of numbers
+    """
+
     def __init__(self, parent, n, default=1.8):
         super(NumberList, self).__init__(parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.n=0
@@ -899,8 +972,6 @@ class NumberList(wx.grid.Grid):
         self.SetColLabelSize(0)
         self.set_size(n)
         self.Bind(wx.EVT_SIZE, self.on_size)
-        #for i in range(self.n):
-        #    self.SetColSize(i, 20)
 
     def GetValues(self):
         try:
@@ -928,6 +999,11 @@ class NumberList(wx.grid.Grid):
         self.resize_cols()
 
 class AslDataPreview(wx.Panel):
+    """
+    Widget to display a preview of the data ordering selected (i.e. how the volumes in a 4D
+    dataset map to TIs, repeats and tag/control pairs)
+    """
+
     def __init__(self, parent, n_tis, n_repeats, tc_pairs, order, tagfirst):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
@@ -962,16 +1038,12 @@ class AslDataPreview(wx.Panel):
         leg_width = (w-100)/4
         leg_start = 50
 
-        #b = wx.Brush(self.get_col(0.5, True), wx.SOLID)
-        #dc.SetBrush(b)
         dc.SetBrush(wx.TRANSPARENT_BRUSH)
         rect = wx.Rect(leg_start, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
         dc.DrawRectangleRect(rect)
         dc.DrawText(self.tis_name, leg_start+leg_width/3, 20)
 
-        #b = wx.Brush(self.get_col(0.5, False), wx.SOLID)
-        #dc.SetBrush(b)
         rect = wx.Rect(leg_start+leg_width, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, False), self.get_col(1.0, False), wx.EAST)
         dc.DrawRectangleRect(rect)
@@ -1048,6 +1120,9 @@ class AslDataPreview(wx.Panel):
                     ti = 0
 
 class AslGui(wx.Frame):
+    """
+    Main GUI window
+    """
 
     def __init__(self):
         wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE)
@@ -1099,8 +1174,6 @@ class AslGui(wx.Frame):
             tab.update()
 
         self.Layout()
-
-
 
 if __name__ == '__main__':
     app = wx.App(redirect=False)
