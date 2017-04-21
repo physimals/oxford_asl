@@ -24,6 +24,7 @@ matplotlib.use('WXAgg')
 from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
 from matplotlib.figure import Figure
 
+import numpy as np
 import nibabel as nib
 
 class FslCmd():
@@ -163,6 +164,7 @@ class TabPage(wx.Panel):
         """
         if not handler: handler = self.update
         spin = wx.SpinCtrl(self, **kwargs)
+        spin.SetValue(kwargs.get("initial", 0))
         spin.Bind(wx.EVT_SPINCTRL, handler)
         if pack: self.pack(label, spin)
         return spin
@@ -243,15 +245,21 @@ class PreviewPanel(wx.Panel):
         Update the preview. This is called explicitly when the user clicks the update
         button as it involves calling ASL_FILE and may be slow
         """
+        self.data = None
         if self.run is not None:
             self.data = self.run.get_preview_data()
+            # If multi-TI data, take mean over volumes
             if self.data is not None and len(self.data.shape) == 4:
-                self.data = self.data[:,:,:,0]
+                self.data = np.mean(self.data, axis=3)
                 
         if self.data is not None:
-            self.nslices = self.data.shape[2]
-            if self.slice < 0 or self.slice >= self.nslices: 
-                self.slice = 0
+            self.view = 0
+            self.init_view()
+        self.redraw()
+
+    def init_view(self):
+        self.nslices = self.data.shape[2-self.view]
+        self.slice = self.nslices / 2
         self.redraw()
 
     def redraw(self):
@@ -279,10 +287,8 @@ class PreviewPanel(wx.Panel):
         """
         if self.data is None: return
         if event.dblclick:
-            self.view += 1
-            if self.view == 3: self.view = 0
-            self.nslices = self.data.shape[2-self.view]
-            self.slice = self.nslices/2
+            self.view = (self.view + 1) % 3
+            self.init_view()
             self.redraw()
 
     def scroll(self, event):
@@ -493,7 +499,7 @@ class AslRun(wx.Frame):
     
         if self.input.readout() == 1:
             # 2D multi-slice readout - must give dt in seconds
-            cmd.add("--slicedt %.5f" % self.input.time_per_slice() / 1000)
+            cmd.add("--slicedt %.5f" % (self.input.time_per_slice() / 1000))
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
 
