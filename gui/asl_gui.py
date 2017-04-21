@@ -364,9 +364,9 @@ class AslRun(wx.Frame):
         try:
             meanfile = "%s/mean.nii.gz" % tempdir
             cmd = FslCmd("asl_file")
-            cmd.add("--data=%s" % self.input.data())
+            cmd.add('--data="%s"' % self.input.data())
             cmd.add("--ntis=%i" % self.input.ntis())
-            cmd.add("--mean=%s" % meanfile)
+            cmd.add('--mean="%s"' % meanfile)
             cmd.add(" ".join(self.get_data_order_options()))
             cmd.run()
             img = nib.load(meanfile)
@@ -428,8 +428,8 @@ class AslRun(wx.Frame):
 
         # OXFORD_ASL
         cmd = FslCmd("oxford_asl")
-        cmd.add("-i %s" % self.input.data())
-        cmd.add("-o %s" % outdir)
+        cmd.add(' -i "%s"' % self.input.data())
+        cmd.add('-o "%s"' % outdir)
         cmd.add(self.get_data_order_options()[0])
         cmd.add("--tis %s" % ",".join(["%.2f" % v for v in self.input.tis()]))
         cmd.add("--bolus %s" % ",".join(["%.2f" % v for v in self.input.bolus_dur()]))
@@ -448,16 +448,16 @@ class AslRun(wx.Frame):
         if not self.analysis.macro(): cmd.add("--artoff")
         if self.analysis.mask() is not None:
             self.check_exists("Analysis mask", self.analysis.mask())
-            cmd.add("-m %s" % self.analysis.mask())
+            cmd.add('-m "%s"' % self.analysis.mask())
         if self.input.labelling() == 1: 
             cmd.add("--casl")
         if self.analysis.transform():
             if self.analysis.transform_type() == 0:
                 self.check_exists("Transformation matrix", self.analysis.transform_file())
-                cmd.add("--asl2struc %s" % self.analysis.transform_file())
+                cmd.add('--asl2struc "%s"' % self.analysis.transform_file())
             elif self.analysis.transform_type() == 1:
                 self.check_exists("Warp image", self.analysis.transform_file())
-                cmd.add("--regfrom %s" % self.analysis.transform_file())
+                cmd.add('--regfrom "%s"' % self.analysis.transform_file())
             else:
                 pass # --fslanat already set when option 2 chosen
 
@@ -466,41 +466,41 @@ class AslRun(wx.Frame):
         struc_image = self.input.struc_image()
         if fsl_anat_dir is not None:
             self.check_exists("FSL_ANAT", fsl_anat_dir)
-            cmd.add("--fslanat=%s" % fsl_anat_dir)
+            cmd.add('--fslanat="%s"' % fsl_anat_dir)
         elif struc_image is not None:
             self.check_exists("Structural image", struc_image)
             cp = FslCmd("imcp")
-            cp.add(struc_image)
-            cp.add("%s/structural_head" % outdir)
+            cp.add('"%s"' % struc_image)
+            cp.add('"%s/structural_head"' % outdir)
             run.append(cp)
             if self.input.struc_image_bet() == 1:
                 bet = FslCmd("bet")
-                bet.add(struc_image)
-                bet.add("%s/structural_brain" % outdir)
+                bet.add('"%s"' % struc_image)
+                bet.add('"%s/structural_brain"' % outdir)
                 run.append(bet)
             else:
                 struc_image_brain = self.input.struc_image_brain()
                 self.check_exists("Structural brain image", struc_image_brain)
                 cp = FslCmd("imcp")
-                cp.add(struc_image_brain)
-                cp.add("%s/structural_brain" % outdir)
+                cp.add('"%s"' % struc_image_brain)
+                cp.add('"%s/structural_brain"' % outdir)
                 run.append(cp)
-            cmd.add("--s %s/structural_head" % outdir)
-            cmd.add("--sbrain %s/structural_brain" % outdir)
+            cmd.add('--s "%s/structural_head"' % outdir)
+            cmd.add('--sbrain "%s/structural_brain"' % outdir)
         else:
             # No structural image
             pass
     
         if self.input.readout() == 1:
-            # 2D multi-slice readout
-            cmd.add("--slicedt %.2f" % self.input.time_per_slice())
+            # 2D multi-slice readout - must give dt in seconds
+            cmd.add("--slicedt %.5f" % self.input.time_per_slice() / 1000)
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
 
         # ASL_CALIB
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
-            cmd.add("-c %s" % self.calibration.calib_image())
+            cmd.add('-c "%s"' % self.calibration.calib_image())
             if self.calibration.m0_type() == 0:
                 #calib.add("--mode longtr")
                 cmd.add("--tr %.2f" % self.calibration.seq_tr())
@@ -520,10 +520,10 @@ class AslRun(wx.Frame):
                 cmd.add("--t2bl %.2f" % self.calibration.blood_t2())
                 if self.calibration.ref_tissue_mask() is not None:
                     self.check_exists("Calibration reference tissue mask", self.calibration.ref_tissue_mask())
-                    cmd.add("--csf %s" % self.calibration.ref_tissue_mask())
+                    cmd.add('--csf "%s"' % self.calibration.ref_tissue_mask())
                 if self.calibration.coil_image() is not None:
                     self.check_exists("Coil sensitivity reference image", self.calibration.coil_image())
-                    cmd.add("--cref %s" % self.calibration.coil_image())
+                    cmd.add('--cref "%s"' % self.calibration.coil_image())
             else:
                 cmd.add("--cmethod voxel")
         
@@ -554,10 +554,10 @@ class AslCalibration(TabPage):
         self.ref_tissue_type_ch = self.choice("Type", choices=["CSF", "WM", "GM", "None"], handler=self.ref_tissue_type_changed)
         self.ref_tissue_mask_picker = self.file_picker("Mask", optional=True)
         self.seq_te_num = self.number("Sequence TE (ms)", min=0,max=30,initial=0)
-        self.blood_t2_num = self.number("Blood T2 (s)", min=0,max=5,initial=3)
+        self.blood_t2_num = self.number("Blood T2 (ms)", min=0,max=1000,initial=150, step=10)
         self.coil_image_picker = self.file_picker("Coil Sensitivity Image", optional=True)
         self.ref_t1_num = self.number("Reference T1 (s)", min=0,max=5,initial=4.3)
-        self.ref_t2_num = self.number("Reference T2 (s)", min=0,max=5,initial=750.0/400)
+        self.ref_t2_num = self.number("Reference T2 (ms)", min=0,max=1000,initial=750, step=10)
 
         self.sizer.AddGrowableCol(2, 1)
         self.SetSizer(self.sizer)
@@ -586,13 +586,13 @@ class AslCalibration(TabPage):
     def ref_tissue_type_changed(self, event):
         if self.ref_tissue_type() == 0: # CSF
             self.ref_t1_num.SetValue(4.3)
-            self.ref_t2_num.SetValue(750.0/400)
+            self.ref_t2_num.SetValue(750)
         elif self.ref_tissue_type() == 1: # WM
             self.ref_t1_num.SetValue(1.0)
-            self.ref_t2_num.SetValue(50.0/50)
+            self.ref_t2_num.SetValue(50)
         elif self.ref_tissue_type() == 2: # GM
             self.ref_t1_num.SetValue(1.3)
-            self.ref_t2_num.SetValue(100.0/60)
+            self.ref_t2_num.SetValue(100)
         self.update()
 
     def wp_changed(self, wp):
@@ -637,6 +637,7 @@ class AslAnalysis(TabPage):
         self.transform_ch.SetSelection(2)
         self.transform_ch.Bind(wx.EVT_CHOICE, self.update)
         self.transform_picker = wx.FilePickerCtrl(self)
+        self.transform_picker.Bind(wx.EVT_FILEPICKER_CHANGED, self.update)
         self.pack("", self.transform_cb, self.transform_ch, self.transform_picker, enable=False)
 
         self.section("Basic analysis options")
@@ -925,9 +926,9 @@ class NumberChooser(wx.Panel):
         if label is not None:
             self.label = wx.StaticText(self, label=label)
             self.hbox.Add(self.label, proportion=0, flag=wx.ALIGN_CENTRE_VERTICAL)
-        self.spin = wx.SpinCtrlDouble(self, initial=initial)
+        # Set a very large maximum as we want to let the user override the default range
+        self.spin = wx.SpinCtrlDouble(self, min=0, max=100000, inc=step, initial=initial)
         self.spin.SetDigits(digits)
-        self.spin.SetIncrement(step)
         self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.spin_changed)
         self.slider = wx.Slider(self, value=initial, minValue=0, maxValue=100)
         self.slider.SetValue(100*(initial-self.min)/(self.max-self.min))
