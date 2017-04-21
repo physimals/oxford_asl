@@ -311,7 +311,7 @@ echo "Tissue reference : $tissref" >> $log
 
 # command line override of default T1 and T2
 if [ ! -z $T1rin ]; then
-    if [ `${FSLDIR}/bin/imtest $T1rin` ]; then
+    if [ `${FSLDIR}/bin/imtest $T1rin` -gt 0 ]; then
 	# we have been supplied with a T1 image - record that here to process later
 	T1rim=$T1rin
 	echo "Loading T1 image for reference region: T1im" >> $log
@@ -321,7 +321,7 @@ if [ ! -z $T1rin ]; then
     fi
 fi
 if [ ! -z $T2rin ]; then
-    if [ `${FSLDIR}/bin/imtest $T2rin` ]; then
+    if [ `${FSLDIR}/bin/imtest $T2rin` -gt 0 ]; then
 	# we have been supplied with a T2 image - record that here to process later
 	T2rim=$T2rin
 	echo "Loading T2 image for reference region: T2im" >> $log
