@@ -544,8 +544,6 @@ class AslCalibration(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Calibration")
 
-        self.wp = False
-
         self.calib_cb = self.checkbox("Enable Calibration", bold=True)
 
         self.calib_image_picker = self.file_picker("Calibration Image")
@@ -602,8 +600,6 @@ class AslCalibration(TabPage):
         self.update()
 
     def wp_changed(self, wp):
-        self.wp = wp
-        if wp: self.calib_mode_ch.SetSelection(1)
         self.update()
 
     def update(self, event=None):
@@ -613,7 +609,8 @@ class AslCalibration(TabPage):
         self.calib_image_picker.Enable(enable)
         self.calib_gain_num.Enable(enable)
         self.coil_image_picker.checkbox.Enable(enable)
-        self.calib_mode_ch.Enable(enable and not self.wp)
+        if self.analysis.wp(): self.calib_mode_ch.SetSelection(1)
+        self.calib_mode_ch.Enable(enable and not self.analysis.wp())
         self.ref_tissue_type_ch.Enable(enable and self.calib_mode() == 0)
         self.ref_tissue_mask_picker.checkbox.Enable(enable and self.calib_mode() == 0)
         self.ref_tissue_mask_picker.Enable(enable and self.ref_tissue_mask_picker.checkbox.IsChecked() and self.calib_mode() == 0)
@@ -696,13 +693,18 @@ class AslAnalysis(TabPage):
         self.transform_ch.Enable(self.transform())
         self.transform_picker.Enable(self.transform() and self.transform_type() != 2)
         self.mask_picker.Enable(self.mask_picker.checkbox.IsChecked())
+        self.t1_num.Enable(not self.wp())
+        self.bat_num.Enable(not self.wp())
         TabPage.update(self)
 
     def wp_changed(self, event):
         if self.wp():
             self.t1_num.SetValue(1.65)
-        self.calibration.wp_changed(self.wp())
-        self.t1_num.Enable(not self.wp())
+            self.bat_num.SetValue(0)
+        else:
+            self.t1_num.SetValue(1.3)
+            self.bat_num.SetValue(1.3)
+        self.calibration.update()
         self.update()
 
     def labelling_changed(self, pasl):
