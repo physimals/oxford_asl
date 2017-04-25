@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # QuASIL: QUASAR Bayesian Arterial SpIn Labeling parameter estimation
 #
@@ -7,6 +7,11 @@
 # Copyright (c) 2011-2012 University of Oxford
 #
 # SHCOPYRIGHT
+
+# Make script use local copies of helper scripts/programs in the same
+# directory, if present. This allows for multiple versions of the scripts
+# to be used, possibly with bundled dependencies
+PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "QUASAR Bayesian Inference for Arterial Spin Labelling MRI"
@@ -89,7 +94,7 @@ done
 
 #### --- Procedural ---
 asl_file=asl_file
-fabber=fabber
+fabber=fabber_asl
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
 #### --- Housekeeping ---
@@ -117,7 +122,7 @@ mkdir $outdir;
 stdir=`pwd`
 
 # make a temp directory to work in
-tmpbase=`$FSLDIR/bin/tmpnam`
+tmpbase=`tmpnam`
 tempdir=${tmpbase}_quasil
 mkdir $tempdir
 
