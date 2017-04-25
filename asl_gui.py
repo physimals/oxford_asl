@@ -14,6 +14,8 @@ import colorsys
 import tempfile
 import shutil
 import traceback
+import subprocess
+import shlex
 
 import wx
 import wx.grid
@@ -54,9 +56,25 @@ class FslCmd():
         else:
             self.cmd += " %s" % opt
 
-    def run(self):
-        print(self.cmd)
-        os.system(self.cmd)
+    def write(self, line, out=None):
+        if out is not None: 
+            out.AppendText(line)
+            wx.Yield()
+        else:
+            sys.stdout.write(line)
+
+    def run(self, out=None):
+        self.write(self.cmd, out)
+        args = shlex.split(self.cmd)
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        while 1:
+            retcode = p.poll() #returns None while subprocess is running
+            line = p.stdout.readline()
+            self.write(line, out)
+            if retcode is not None: break
+        self.write("Return code: %i" % retcode, out)
+        
+        return retcode
 
     def __str__(self): return self.cmd
 
@@ -336,10 +354,12 @@ class AslRun(wx.Frame):
 
     def dorun(self, evt):
         if self.run_seq: 
-            self.output_text.Clear()
-            self.output_text.AppendText("\n\n".join([str(cmd) for cmd in self.run_seq]))
             self.Show()
             self.Raise()
+            self.output_text.Clear()
+            for cmd in self.run_seq:
+                cmd.run(self.output_text)  
+                self.output_text.AppendText("\n")
 
     def update(self, evt=None):
         """
@@ -429,8 +449,6 @@ class AslRun(wx.Frame):
         outdir = self.analysis.outdir()
         if outdir == "": 
             raise RuntimeError("Output directory not specified")
-        run.append("mkdir %s" % outdir)
-        run.append("mkdir %s/native_space" % outdir)
 
         # OXFORD_ASL
         cmd = FslCmd("oxford_asl")
