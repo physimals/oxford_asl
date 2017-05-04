@@ -6,6 +6,12 @@ Currently this does not use any of the FSL python libraries. Possible improvemen
   - Use props library to hold run options and use the signalling mechanisms to communicate
     values. The built-in widget builder does not seem to be flexible enough however.
   - Use fsleyes embedded widget as the preview for a nicer, more interactive data preview
+
+Requirements:
+  - wxpython 
+  - matplotlib
+  - numpy
+  - nibabel
 """
 
 import sys
@@ -56,23 +62,23 @@ class FslCmd():
         else:
             self.cmd += " %s" % opt
 
-    def write(self, line, out=None):
-        if out is not None: 
-            out.AppendText(line)
+    def write_output(self, line, out_widget=None):
+        if out_widget is not None: 
+            out_widget.AppendText(line)
             wx.Yield()
         else:
             sys.stdout.write(line)
 
-    def run(self, out=None):
-        self.write(self.cmd, out)
+    def run(self, out_widget=None):
+        self.write_output(self.cmd, out_widget)
         args = shlex.split(self.cmd)
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
             line = p.stdout.readline()
-            self.write(line, out)
+            self.write_output(line, out_widget)
             if retcode is not None: break
-        self.write("Return code: %i" % retcode, out)
+        self.write_output("Return code: %i" % retcode, out_widget)
         
         return retcode
 
@@ -324,6 +330,7 @@ class AslRun(wx.Frame):
     Determines the commands to run and displays them in a window
     """
 
+    # The options we need to pass to oxford_asl for various data orderings
     order_opts = {"trp" : "--ibf=tis --iaf=diff", 
                   "trp,tc" : "--ibf=tis --iaf=tcb", 
                   "trp,ct" : "--ibf=tis --iaf=ctb",
@@ -521,7 +528,7 @@ class AslRun(wx.Frame):
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
 
-        # ASL_CALIB
+        # Calibration - do this via oxford_asl rather than calling asl_calib separately
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
             cmd.add('-c "%s"' % self.calibration.calib_image())
@@ -786,6 +793,8 @@ class AslInputOptions(TabPage):
         self.bolus_dur_ch.Bind(wx.EVT_CHOICE, self.update)
         self.bolus_dur_num = NumberChooser(self, min=0, max=2.5, step=0.1, initial=1.8)
         self.bolus_dur_num.span = 2
+        self.bolus_dur_num.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.bolus_dur_changed)
+        self.bolus_dur_num.slider.Bind(wx.EVT_SLIDER, self.bolus_dur_changed)
         self.pack("Bolus duration (s)", self.bolus_dur_ch, self.bolus_dur_num)
         
         self.bolus_dur_list = NumberList(self, self.ntis())
@@ -908,6 +917,14 @@ class AslInputOptions(TabPage):
         self.analysis.fsl_anat_changed(self.fsl_anat_picker.checkbox.IsChecked())
         self.update()
 
+    def bolus_dur_changed(self, event):
+        """ If constant bolus duration is changed, update the disabled list of
+            bolus durations to match, to avoid any confusion """
+        if self.bolus_dur_type() == 0:
+            for c in range(self.bolus_dur_list.n): 
+                self.bolus_dur_list.SetCellValue(0, c, str(self.bolus_dur()[0]))
+        event.Skip()
+        
     def update_groups(self, group1=True, group2=True):
         g2 = self.choice2.GetSelection()
         g1 = self.choice1.GetSelection()
@@ -975,6 +992,7 @@ class NumberChooser(wx.Panel):
         val = self.min + (self.max-self.min)*float(v)/100
         self.spin.SetValue(val)
         if self.handler: self.handler(event)
+        event.Skip()
 
     def spin_changed(self, event):
         """ If user sets the spin outside the current range, update the slider range
@@ -991,7 +1009,8 @@ class NumberChooser(wx.Panel):
             self.max = self.orig_max
         self.slider.SetValue(100*(val-self.min)/(self.max-self.min))
         if self.handler: self.handler(event)
-
+        event.Skip()
+        
 class NumberList(wx.grid.Grid):
     """
     Widget for specifying a list of numbers
@@ -1014,9 +1033,11 @@ class NumberList(wx.grid.Grid):
             raise RuntimeError("Non-numeric values in number list")
             
     def set_size(self, n):
+        if self.n == 0: default = self.default
+        else: default = self.GetCellValue(0, self.n-1)
         if n > self.n:
             self.AppendCols(n - self.n)
-            for c in range(self.n, n): self.SetCellValue(0, c, str(self.default))
+            for c in range(self.n, n): self.SetCellValue(0, c, str(default))
         elif n < self.n:
             self.DeleteCols(n, self.n-n)
         self.n = n
