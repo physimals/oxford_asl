@@ -320,6 +320,11 @@ Registration() {
 	fi
 	$asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
     fi
+
+    if [ ! -z $trans ]; then
+	# compute the transformation needed to standard space if we have the relvant structural to standard transform
+	convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struc.mat
+    fi
 }
 
 Calibration() {
