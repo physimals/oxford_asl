@@ -9,7 +9,7 @@ USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_ZLIB}
 LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
-SCRIPTS = oxford_asl asl_preproc asl_calib asl_reg quasil
+SCRIPTS = oxford_asl asl_calib asl_reg quasil
 RUNTCLS = Asl
 
 OBJS = readoptions.o asl_functions.o
