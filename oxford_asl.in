@@ -172,8 +172,13 @@ if [ ! -z $structout ]; then
 fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
-    #flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
-    applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp 
+    if [ ! -z $warp ]; then
+	applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp
+    elif [ ! -z $trans ]; then
+	flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
+    else
+	echo "ERROR: cannot do standard space out - neither warp or transformation matrix found"
+    fi
 fi
 
 }
@@ -663,12 +668,15 @@ takeargs=0;boolarg="";isbool="";
 		   takeargs=1;;
 	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
 	    takeargs=1;;
-	-t) transflag=1 trans=$argument
+	-t) transflag=1;
+	    trans=$argument;
+	    stdout=1;
 	    takeargs=1;;
 	-S) stdflag=1 std=$argument
 	    takeargs=1;;
-	--warp) transflag=1
-		warp=$argument #structural to standard warp
+	--warp) transflag=1;
+		warp=$argument; #structural to standard warp
+		stdout=1;
 		takargs=1;;
 	-m) mask=$argument
 	    takeargs=1;;
