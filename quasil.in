@@ -15,6 +15,7 @@ PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "QUASAR Bayesian Inference for Arterial Spin Labelling MRI"
+#    echo "Version: 0.95 (beta)"
     echo ""
     echo "Usage (optional parameters in {}):"
     echo " -i         : specify data file"
@@ -27,6 +28,12 @@ Usage() {
     echo " --infertau : estimate bolus duration from data"
     echo " --mfree    : Do model-free (SVD deconvolution) analysis"
     echo ""
+    echo " Partial volume effects correction options:"
+    echo " --pvcorr   : Set partial volume effect correction on. If no PV maps or structural images are provided, PV maps will be estimated using T1 image"
+    echo " --pvgm     : GM PV map"
+    echo " --pvwm     : WM PV map"
+    echo " --s        : sturctural image to estimate PV maps"
+    echo ""
     echo " Sequence parameters:"
     echo " --slicedt  : Set the increase in TI with slice {default: 0.035 s}"
     echo " --fa       : Flip angle for LL readout {default: 35 degrees}"
@@ -35,6 +42,7 @@ Usage() {
     echo "            {default: 0.04,0.34,0.64,0.94,1.24,1.54,1.84,2.14,2.44,2.74,3.04,3.34,3.64}"
     echo ""
 }
+
 
 Version() {
 echo "${GIT_SHA1} ${GIT_DATE}"
@@ -50,51 +58,65 @@ fi
 
 until [ -z $1 ]; do
     case $1 in
-	-o) outflag=1 outdir=$2
-	    shift;;
-	-i) inflag=1 infile=$2 #input/data file
-	    shift;;
-	-m) mask=$2
-	    shift;;
-	--t1b) t1b=$2
-	    shift;;
-	--t1) t1=$2
-	    shift;;
-	--slicedt) slicedt=$2
-	    shift;;
-	--fa) fa=$2
-	    shift;;
+    -o) outflag=1 outdir=$2
+        shift;;
+    -i) inflag=1 infile=$2 #input/data file
+        shift;;
+    -m) mask=$2
+        shift;;
+    --t1b) t1b=$2
+        shift;;
+    --t1) t1=$2
+        shift;;
+    --t1wm) t1wm=$2
+        shift;;
+    --fixt1) fixt1=1
+        ;;
+    --slicedt) slicedt=$2
+        shift;;
+    --fa) fa=$2
+        shift;;
        --lfa) lfa=$2
-	    shift;;
-	--disp) disp=1
-	    ;;
-	--mfree) mfree=1
-	    ;;
-	--tis) tis=$2
-	    shift;;
-	--iform) iform=$2 # to choose the input form of the data
-	    shift;;
-	--tau) tau=$2
-	    shift;;
-	--infertau) infertau=1
-	    ;;
-	--ccmds) calibcmds=$2
-	    shift;;
-	--debug) debug=1 #debugging option
-	    ;;
-	--version) Version
-	    ;;
-	*)  Usage
-	    echo "Error! Unrecognised option on command line: $1"
-	    echo ""
-	    exit 1;;
+        shift;;
+    --disp) disp=1
+        ;;
+    --kern) kern=$2
+        shift;;
+    --mfree) mfree=1
+        ;;
+    --tis) tis=$2
+        shift;;
+    --iform) iform=$2 # to choose the input form of the data
+        shift;;
+    --tau) tau=$2
+        shift;;
+    --infertau) infertau=1
+        ;;
+    --pvcorr) pvcorr=1
+        ;;
+    --pvgm) pvgm=$2
+        shift;;
+    --pvwm) pvwm=$2
+        shift;;
+    --s) strim=$2 # structure images for registration and partial volume estimation
+        shift;;
+    --ccmds) calibcmds=$2
+        shift;;
+    --debug) debug=1 #debugging option
+        ;;
+    --version) Version
+        ;;
+    *)  Usage
+        echo "Error! Unrecognised option on command line: $1"
+        echo ""
+        exit 1;;
     esac
     shift
 done
 
 #### --- Procedural ---
 asl_file=asl_file
-fabber=fabber_asl
+fabber=fabber
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
 #### --- Housekeeping ---
@@ -111,8 +133,8 @@ while [ -d $outdir ]; do
     count=`expr $count + 1`
 
     if [ $count -gt 20 ]; then
-	echo "Error: $outdir too many existing output directories (i.e. shall not add another +)"
-	exit
+    echo "Error: $outdir too many existing output directories (i.e. shall not add another +)"
+    exit
     fi
 done
 echo "Creating output directory: $outdir"
@@ -122,7 +144,7 @@ mkdir $outdir;
 stdir=`pwd`
 
 # make a temp directory to work in
-tmpbase=`tmpnam`
+tmpbase=`$FSLDIR/bin/tmpnam`
 tempdir=${tmpbase}_quasil
 mkdir $tempdir
 
@@ -162,6 +184,11 @@ if [ -z $t1 ]; then
 t1=1.3;
 fi
 
+#T1WM
+if [ -z $t1wm ]; then
+    t1wm=1.1;
+fi
+
 # sequence parameters
 # slicedt
 if [ -z $slicedt ]; then
@@ -190,10 +217,10 @@ if [ $iform = "q" ]; then
     
     # Within each TI: separate the phases 
     for ((i=0; i<$ntis; i++)); do
-	mkdir ti$i
-	tifile=`ls ti$i.nii.gz ti0$i.nii.gz ti00$i.nii.gz 2>/dev/null`
-	echo $tifile
-	$asl_file --data=$tifile --ntis=7 --ibf=rpt --iaf=tc --split=ti$i/phs
+    mkdir ti$i
+    tifile=`ls ti$i.nii.gz ti0$i.nii.gz ti00$i.nii.gz 2>/dev/null`
+    echo $tifile
+    $asl_file --data=$tifile --ntis=7 --ibf=rpt --iaf=tc --split=ti$i/phs
         # NB using asl_file to split the phases (pseudo TIs)
         # leaves TC pairs together
     done
@@ -201,17 +228,17 @@ if [ $iform = "q" ]; then
     #now assemble the multiTI files
     phslist=""
     for ((j=0; j<7; j++)); do
-	#within each phase
-	filelist=""
-	for ((i=0; i<$ntis; i++)); do
+        #within each phase
+        filelist=""
+        for ((i=0; i<$ntis; i++)); do
             #within each TI
-	    filelist=$filelist" ti$i/phs00$j"
+            filelist=$filelist" ti$i/phs00$j"
         done
-	fslmerge -t aslraw_ph$j $filelist
+        fslmerge -t aslraw_ph$j $filelist
         #take mean within TI
-	$asl_file --data=aslraw_ph$j --ntis=$ntis --ibf=tis --iaf=tc --mean=aslraw_ph$j
-	phslist=$phslist" aslraw_ph$j"
-     done
+        $asl_file --data=aslraw_ph$j --ntis=$ntis --ibf=tis --iaf=tc --mean=aslraw_ph$j
+        phslist=$phslist" aslraw_ph$j"
+    done
     fslmerge -t aslraw $phslist
 # data is now in 'f' form
 elif [ $iform = "f" ]; then
@@ -262,12 +289,22 @@ if [ -z "$calibcmds" ]; then
     immv calib/mean_g calib/g
     immv calib/mean_M0t calib/M0t
 
+    # Here we correct the PVE on the edge of M0 image
+    # 1 Use a median filter to remove some noise
+    ${FSLDIR}/bin/fslmaths calib/M0t -fmedian calib/M0t_median_filter
+    # 2 Erode some voxels
+    ${FSLDIR}/bin/fslmaths calib/M0t_median_filter -ero calib/M0t_erode
+    # 3 Extrapolate back the eroded voxels (default neighbour size is 5)
+    ${FSLDIR}/bin/asl_file --data=calib/M0t_erode --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=calib/M0t_calib
+
+
     #fslmaths instruction for calibration (for execution whilst back in starting dir)
-    cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
+    cinstr=" -div $tempdir/calib/M0t_calib -mul 0.9 " # partition coefficient 0.9
 
     #save calibration results to output directory for reference
-    imcp calib/M0t $outdir/M0t
-    imcp calib/T1t $outdir/T1t
+    imcp calib/M0t $stdir/$outdir/M0t
+    imcp calib/T1t $stdir/$outdir/T1t
+    imcp calib/M0t_calib $stdir/$outdir/M0t_calib
 
 else
     # we have some commands to pass to asl_calib
@@ -285,6 +322,93 @@ else
     imcp calib/mean_T1t $outdir/T1t
 fi
 
+## PVE images
+if [ ! -z $pvcorr ]; then
+    if [ -z $pvgm ]; then
+
+        if [ -z $strim ]; then # if structural image is not provided, use ASL T1 image to do tissue segmentation
+            echo "Extracting PVE from QUASAR data"
+    
+            # up sample the T1 image
+            ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
+            ${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
+    
+            # Segmentation with FAST (no bias field as this T1 image is not affected by it)
+            ${FSLDIR}/bin/fast -N -p T1highres # -s 2 PDhighres T1highres
+    
+            # downsample the PVE
+            ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear
+            ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear
+            #${FSLDIR}/bin/applywarp -i T1highres_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear
+            #${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvcsf -s --interp=trilinear #not currently used but here for future use
+            
+            pvgm=pvgm
+            pvwm=pvwm
+            #pvcsf=pvcsf
+
+        else # if structural image is provided, register it with ASL T1 image and then do tissue segmentation
+            echo "Extracting PVE from structural image"
+            # brain extraction
+            ${FSLDIR}/bin/bet $stdir/$strim brain 
+
+            # registration
+            ${FSLDIR}/bin/flirt -dof 6 -in calib/T1t -ref brain -out str_t1_reg  -omat T1t_to_str.mat
+
+            # Compute the inverse of registration matrix for downsampling use
+            ${FSLDIR}/bin/convert_xfm -omat T1t_to_str_inverse.mat -inverse T1t_to_str.mat
+
+            # tissue segmentation
+            ${FSLDIR}/bin/fast -p str_t1_reg
+
+            # downsample to ASL space
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            #${FSLDIR}/bin/applywarp -i str_t1_reg_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+
+            pvgm=pvgm
+            pvwm=pvwm
+            #pvcsf=pvcsf
+
+        fi
+    else
+        echo "Copy user specified PVE to temp directory (current directory)"
+        ${FSLDIR}/bin/imcp $stdir/$pvgm ./pvgm
+        ${FSLDIR}/bin/imcp $stdir/$pvwm ./pvwm
+        pvgm=pvgm
+        pvwm=pvwm
+    fi
+    
+#if [ ! -z $pvgm ] & [ ! -z $pvwm ]; then
+    # general tidying up of PVE images
+    ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 pvgm
+    ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 pvwm
+    # Do not remove the low PVE voxels - Moss
+    #${FSLDIR}/bin/fslmaths $pvgm -thr 0 -min 1 pvgm
+    #${FSLDIR}/bin/fslmaths $pvwm -thr 0 -min 1 pvwm
+    ${FSLDIR}/bin/fslmaths pvgm -bin gm_mask
+    ${FSLDIR}/bin/fslmaths pvwm -bin wm_mask
+
+    #save the PVE and masks for future reference
+    ${FSLDIR}/bin/imcp pvgm $stdir/$outdir/pvgm
+    ${FSLDIR}/bin/imcp pvwm $stdir/$outdir/pvwm
+    ${FSLDIR}/bin/imcp gm_mask $stdir/$outdir/gm_mask
+    ${FSLDIR}/bin/imcp wm_mask $stdir/$outdir/wm_mask
+
+    # Correct mask: remove voxels with zero intensity on both GM and WM
+    # Then copy the new mask to output directory
+    #${FSLDIR}/bin/fslmaths gm_mask -add wm_mask gm_wm_mask
+    #${FSLDIR}/bin/fslmaths $tempdir/mask -mas gm_wm_mask pv_mask
+    #${FSLDIR}/bin/imcp pv_mask $stdir/$outdir/pv_mask
+fi
+
+# blur the image
+#${FSLDIR}/bin/fslmaths asldata -s 5 asldata
+#${FSLDIR}/bin/fslmaths pvgm -s 10 -mas pvgm pvgm
+#${FSLDIR}/bin/fslmaths pvwm -s 10 -mas pvwm pvwm
+# Erode the mask
+#${FSLDIR}/bin/fslmaths mask -ero mask
+
+#if [ 1 -eq 0 ]; then
 
 ### --- Analysis ---
 if [ -z $mfree ]; then
@@ -299,46 +423,92 @@ echo "Begin model-based analysis"
     echo "--inferart" >> options.txt
     echo "--repeats=1" >> options.txt
     echo $tislist >> options.txt
-    echo "--t1=$t1 --t1b=$t1b --tau=$tau --fa=$fa " >> options.txt
+    echo "--t1=$t1 --t1b=$t1b --t1wm=$t1wm --tau=$tau --fa=$fa " >> options.txt
     echo "--slicedt=$slicedt" >> options.txt
     echo "--infert1 ">>options.txt
     echo "--artdir" >> options.txt
 # use calibration information within inference
     
     echo "--usecalib ">>options.txt
-   
+
+    if [ -z $fixt1 ]; then
+    t1sp=I
+    if [ ! -z $infertau ]; then
+        echo "--image-prior6=calib_latest/T1t " >> options.txt
+    else
+        echo "--image-prior5=calib_latest/T1t " >> options.txt
+    fi
+    else
+    t1sp=N
+    fi
+    
+    if [ -z $pvcorr ]; then
+        if [ ! -z $infertau ]; then
+           #infer bolus duration
+            echo "--infertau --tauboff" >> options.txt #Note we have only a single tau for both arterial and tissue signal (both also share the same dispersion properties)
+            echo "--image-prior13=calib_latest/g" >> options.txt
+            echo "--param-spatial-priors=MNNAN${t1sp}NNNNNNI" >> options.txt
+        else
+            # spatial prior list without bolus duration
+           echo "--image-prior12=calib_latest/g" >> options.txt
+           echo "--param-spatial-priors=MNAN${t1sp}NNNNNNI" >> options.txt
+    fi
+    else
+        # PV correction
+        echo "--inferwm " >> options.txt
+        echo "--usepve " >> options.txt
+        echo "--max-iterations=200" >> options.txt # Maximum 1000 iterations
+        if [ ! -z $infertau ]; then
+            #infer bolus duration
+            echo "--infertau --tauboff" >> options.txt #Note we have only a single tau for both arterial and tissue signal (both also share the same dispersion properties)
+            if [ -z $fixt1 ]; then
+                echo "--image-prior11=calib_latest/T1t " >> options.txt # WM starts with the same measured T1 value as GM
+            fi
+            echo "--image-prior12=pvgm " >> options.txt
+            echo "--image-prior13=pvwm " >> options.txt
+            echo "--image-prior19=calib_latest/g" >> options.txt
+            echo "--param-spatial-priors=MNNAN${t1sp}NMNN${t1sp}IINNNNNI" >> options.txt
+        else
+        # spatial prior list without bolus duration
+            if [ -z $fixt1 ]; then
+                echo "--image-prior9=calib_latest/T1t " >> options.txt # WM starts with the same measured T1 value as GM
+            fi
+        echo "--image-prior10=pvgm " >> options.txt
+        echo "--image-prior11=pvwm " >> options.txt
+        echo "--image-prior17=calib_latest/g" >> options.txt
+        echo "--param-spatial-priors=MNAN${t1sp}NMN${t1sp}IINNNNNI" >> options.txt
+        fi
+    fi
     
 
-    if [ ! -z $infertau ]; then
-	#infer bolus duration
-	echo "--infertau --tauboff" >> options.txt #Note we have only a single tau for both arterial and tissue signal (both also share the same dispersion properties)
-	echo "--image-prior6=calib_latest/T1t " >> options.txt
-	echo "--image-prior12=calib_latest/g" >> options.txt
-	echo "--param-spatial-priors=MNNANINNNNNI" >> options.txt
-    else
-	# spatial prior list without bolus duration
-	echo "--image-prior5=calib_latest/T1t " >> options.txt
-	echo "--image-prior11=calib_latest/g" >> options.txt
-	echo "--param-spatial-priors=MNANINNNNNI" >> options.txt
-    fi
-
-
-    kern="none"
     if [ ! -z $disp ]; then
-    # include dispersion in the model
-	kern="gamma"
+        # include dispersion in the model (default is gamma)
+        if [ ! -z $kern ]; then
+            kern="gamma"
+        fi
+    else
+        kern="none"
     fi
 
     $fabber --data=asldata --data-order=singlefile --disp=$kern --output=full -@ options.txt
 
    #copy results to output directory
     cd "$stdir"
+    if [ -z $pvcorr ]; then
     fslmaths $tempdir/full/mean_ftiss $cinstr -mul 6000 $outdir/perfusion
-    fslmaths $tempdir/full/mean_ftiss $outdir/perfusion_raw 
+    else
+    fslmaths $tempdir/full/mean_ftiss $cinstr -mul 6000 -mas $tempdir/gm_mask $outdir/perfusion_gm
+    fi
+    fslmaths $tempdir/full/mean_ftiss $outdir/perfusion_raw
     imcp $tempdir/full/mean_delttiss $outdir/arrival
     fslmaths $tempdir/full/mean_fblood $cinstr $outdir/aCBV
     if [ ! -z $infertau ]; then
-	imcp $tempdir/full/mean_tautiss $outdir/bolus_duration
+    imcp $tempdir/full/mean_tautiss $outdir/bolus_duration
+    fi
+    if [ ! -z $pvcorr ]; then
+    fslmaths $tempdir/full/mean_fwm $cinstr -mul 6000 -mas $tempdir/wm_mask $outdir/perfusion_wm
+    fslmaths $tempdir/full/mean_fwm $outdir/perfusion_wm_raw 
+    imcp $tempdir/full/mean_deltwm $outdir/arrival_wm
     fi
 else
 # --- [Model Free] ---
@@ -368,8 +538,8 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
     echo "--artdir" >> aifoptions.txt
 # use calibration information within inference
     echo " --usecalib ">> aifoptions.txt
-    echo "--image-prior9=calib/g" >> aifoptions.txt
-    echo "--param-spatial-priors=MNNNNNNNI" >> aifoptions.txt
+    echo "--image-prior10=calib/g" >> aifoptions.txt
+    echo "--param-spatial-priors=MNNNNNNNNI" >> aifoptions.txt
     echo "--save-model-fit" >> aifoptions.txt
     
     $fabber --data=asl_blood --disp=gvf --output=aif -@ aifoptions.txt
@@ -389,12 +559,13 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
 
     #copy results to output directory
     cd "$stdir"
-    fslmaths $tempdir/modfree_magntiude $cinstr -mul 6000 -div $tau $outdir/perfusion 
+    fslmaths $tempdir/modfree_magntiude $cinstr -mul 6000 -div $tau -nan $outdir/perfusion # replace NAN voxels with zero
     # note that in the calibration we have to account for the scaling of the AIF by the bolus duration
     # this is still required (even though we have tau in the model-fitting for the AIF) becuase we normalise the AIF above before deconvolution
     imcp $tempdir/aBV $outdir/aCBV
 fi
 
+#fi # end of debugging if
 
 # clearup
 cd "$stdir" # make sure we are back where we started
