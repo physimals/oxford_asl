@@ -28,6 +28,11 @@ Usage() {
     echo " --mfree    : Do model-free (SVD deconvolution) analysis"
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
     echo ""
+    echo " Partial volume effects correction options:"
+    echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates"
+    echo " --pvgm     : GM PV Estimates"
+    echo " --pvwm     : WM PV Estimates"
+    echo ""
     echo " Sequence parameters:"
     echo " --slicedt  : Set the increase in TI with slice {default: 0.035 s}"
     echo " --fa       : Flip angle for LL readout {default: 35 degrees}"
@@ -81,6 +86,16 @@ until [ -z $1 ]; do
         shift;;
     --infertau) infertau=1
         ;;
+        
+    --pvcorr) pvcorr=1
+        ;;
+    --pvgm) pvgm=$2
+        shift;;
+    --pvwm) pvwm=$2
+        shift;;
+    --s) strim=$2 # structure images for registration and partial volume estimation
+        shift;;
+
     --ccmds) calibcmds=$2
         shift;;
     --debug) debug=1 #debugging option
@@ -310,6 +325,82 @@ else
     cp calib/M0a.txt $outdir/M0a.txt
     imcp calib/mean_T1t $outdir/T1t
 fi
+
+
+# Partial Volume Correction options
+if [ ! -z $pvcorr ]; then
+    if [ -z $pvgm ]; then
+
+        if [ -z $strim ]; then # if structural image is not provided, use ASL T1 image to do tissue segmentation
+            echo "Extracting PVE from QUASAR data"
+    
+            # up sample the T1 image
+            ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
+            ${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
+    
+            # Segmentation with FAST (no bias field as this T1 image is not affected by it)
+            ${FSLDIR}/bin/fast -N -p T1highres # -s 2 PDhighres T1highres
+    
+            # downsample the PVE
+            ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear
+            ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear
+            #${FSLDIR}/bin/applywarp -i T1highres_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear
+            #${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvcsf -s --interp=trilinear #not currently used but here for future use
+            
+            pvgm=pvgm
+            pvwm=pvwm
+            #pvcsf=pvcsf
+
+        else # if structural image is provided, register it with ASL T1 image and then do tissue segmentation
+            echo "Extracting PVE from structural image"
+            # brain extraction
+            ${FSLDIR}/bin/bet $stdir/$strim brain 
+
+            # registration
+            ${FSLDIR}/bin/flirt -dof 6 -in calib/T1t -ref brain -out str_t1_reg  -omat T1t_to_str.mat
+
+            # Compute the inverse of registration matrix for downsampling use
+            ${FSLDIR}/bin/convert_xfm -omat T1t_to_str_inverse.mat -inverse T1t_to_str.mat
+
+            # tissue segmentation
+            ${FSLDIR}/bin/fast -p str_t1_reg
+
+            # downsample to ASL space
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+            #${FSLDIR}/bin/applywarp -i str_t1_reg_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear --premat=T1t_to_str_inverse.mat
+
+            pvgm=pvgm
+            pvwm=pvwm
+            #pvcsf=pvcsf
+
+        fi
+    else
+        echo "Copy user specified PVE to temp directory (current directory)"
+        echo "We are missing the registration step here. Use asl_reg"
+        ${FSLDIR}/bin/imcp $stdir/$pvgm ./pvgm
+        ${FSLDIR}/bin/imcp $stdir/$pvwm ./pvwm
+        pvgm=pvgm
+        pvwm=pvwm
+    fi
+    
+#if [ ! -z $pvgm ] & [ ! -z $pvwm ]; then
+    # general tidying up of PVE images
+    ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 pvgm
+    ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 pvwm
+    # Do not remove the low PVE voxels - Moss
+    #${FSLDIR}/bin/fslmaths $pvgm -thr 0 -min 1 pvgm
+    #${FSLDIR}/bin/fslmaths $pvwm -thr 0 -min 1 pvwm
+    ${FSLDIR}/bin/fslmaths pvgm -bin gm_mask
+    ${FSLDIR}/bin/fslmaths pvwm -bin wm_mask
+
+    #save the PVE and masks for future reference
+    ${FSLDIR}/bin/imcp pvgm $outdir/pvgm
+    ${FSLDIR}/bin/imcp pvwm $outdir/pvwm
+    ${FSLDIR}/bin/imcp gm_mask $outdir/gm_mask
+    ${FSLDIR}/bin/imcp wm_mask $outdir/wm_mask
+fi
+
 
 
 ### --- Analysis ---
