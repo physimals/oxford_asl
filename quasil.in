@@ -29,9 +29,10 @@ Usage() {
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
     echo ""
     echo " Partial volume effects correction options:"
-    echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates"
+    echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
     echo " --pvgm     : GM PV Estimates"
     echo " --pvwm     : WM PV Estimates"
+    echo " --s        : High resolution structural image"
     echo " --t1wm     : T1 for WM {default: 1.1 s}"
     echo ""
     echo " Sequence parameters:"
@@ -49,7 +50,6 @@ exit 0
 }
 
 # deal with options
-
 if [ -z $1 ]; then
     Usage
     exit 1
@@ -73,7 +73,7 @@ until [ -z $1 ]; do
         shift;;
     --fa) fa=$2
         shift;;
-       --lfa) lfa=$2
+    --lfa) lfa=$2
         shift;;
     --disp) disp=1
         ;;
@@ -92,9 +92,9 @@ until [ -z $1 ]; do
 
     --pvcorr) pvcorr=1
         ;;
-    --pvgm) pvgm=$2
+    --pvgm) pvgm_highres=$2
         shift;;
-    --pvwm) pvwm=$2
+    --pvwm) pvwm_highres=$2
         shift;;
     --s) strim=$2 # structure images for registration and partial volume estimation
         shift;;
@@ -293,8 +293,8 @@ if [ -z "$calibcmds" ]; then
     if [ ! -z $corrcal ]; then
         echo "Correct partial volume effects on the edge of M0 image"
         # First make a copy of the original M0 image
-        imcp calib/mean_M0t calib/mean_M0t_uncorr
-        imcp calib/mean_M0t_uncorr $outdir/M0t_uncorr
+        ${FSLDIR}/bin/imcp calib/mean_M0t calib/mean_M0t_uncorr
+        ${FSLDIR}/bin/imcp calib/mean_M0t_uncorr $outdir/M0t_uncorr
         # Use a median filter to correct the artefact
         fslmaths calib/mean_M0t -fmedian calib/mean_M0t_median
         # Erode the edge voxels
@@ -302,21 +302,20 @@ if [ -z "$calibcmds" ]; then
         # Extrapolate back the eroded voxels
         $asl_file --data=calib/mean_M0t_ero --ntis=1 --mask=mask --extrapolate --neighbour=5 --out=calib/mean_M0t_corr
         # Rename the corrected M0 image
-        immv calib/mean_M0t_corr immv calib/mean_M0t
+        ${FSLDIR}/bin/immv calib/mean_M0t_corr immv calib/mean_M0t
     fi
 
     # deal with outputs
-    immv calib/mean_T1t calib/T1t
-    immv calib/mean_g calib/g
-    immv calib/mean_M0t calib/M0t
+    ${FSLDIR}/bin/immv calib/mean_T1t calib/T1t
+    ${FSLDIR}/bin/immv calib/mean_g calib/g
+    ${FSLDIR}/bin/immv calib/mean_M0t calib/M0t
 
     #fslmaths instruction for calibration (for execution whilst back in starting dir)
     cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
 
     #save calibration results to output directory for reference
-    echo "This may be wrong"
-    imcp calib/M0t $outdir/M0t
-    imcp calib/T1t $outdir/T1t
+    ${FSLDIR}/bin/imcp calib/M0t $outdir/M0t
+    ${FSLDIR}/bin/imcp calib/T1t $outdir/T1t
 
 else
     # we have some commands to pass to asl_calib
@@ -337,74 +336,34 @@ fi
 
 # Partial Volume Correction options
 if [ ! -z $pvcorr ]; then
-    if [ -z $pvgm ]; then
 
-        if [ -z $strim ]; then # if structural image is not provided, use ASL T1 image to do tissue segmentation
-            echo "Extracting PVE from QUASAR data"
+    echo "Copy user specified PVE to temp directory (current directory)"
+    echo "Do ASL and Structural image registration to obtain transformation matrix"
+    echo "You need latest epi_reg that supports --init option!!!"
+    # Brain extraction
+    struct=$stdir"/"$strim
+    struct_brain=$struct"_brain"
+    ${FSLDIR}/bin/bet $struct $struct_brain
+    # Registration
+    ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
+    # Transform high resolution PV estimates to low (ASL) resolution
+    echo "Downsample to low (ASL) resolution space"
+    pvgm_highres=$stdir"/"$pvgm_highres
+    pvwm_highres=$stdir"/"$pvwm_highres
+    ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvgm_highres --out=pvgm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
+    ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvwm_highres --out=pvwm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
+    pvgm=pvgm_lowres
+    pvwm=pvwm_lowres
     
-            # up sample the T1 image
-            ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
-            ${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
-    
-            # Segmentation with FAST (no bias field as this T1 image is not affected by it)
-            ${FSLDIR}/bin/fast -N -p T1highres # -s 2 PDhighres T1highres
-    
-            # downsample the PVE
-            ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear
-            ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear
-            #${FSLDIR}/bin/applywarp -i T1highres_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear
-            #${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvcsf -s --interp=trilinear #not currently used but here for future use
-            
-            pvgm=pvgm
-            pvwm=pvwm
-            #pvcsf=pvcsf
-
-        else # if structural image is provided, register it with ASL T1 image and then do tissue segmentation
-            echo "Extracting PVE from structural image"
-            # brain extraction
-            ${FSLDIR}/bin/bet $stdir/$strim brain 
-
-            # registration
-            ${FSLDIR}/bin/flirt -dof 6 -in calib/T1t -ref brain -out str_t1_reg  -omat T1t_to_str.mat
-
-            # Compute the inverse of registration matrix for downsampling use
-            ${FSLDIR}/bin/convert_xfm -omat T1t_to_str_inverse.mat -inverse T1t_to_str.mat
-
-            # tissue segmentation
-            ${FSLDIR}/bin/fast -p str_t1_reg
-
-            # downsample to ASL space
-            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_2 -r calib/T1t -o pvgm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
-            ${FSLDIR}/bin/applywarp -i str_t1_reg_pve_1 -r calib/T1t -o pvwm -s --interp=trilinear --premat=T1t_to_str_inverse.mat
-            #${FSLDIR}/bin/applywarp -i str_t1_reg_pve_0 -r calib/T1t -o pvcsf -s --interp=trilinear --premat=T1t_to_str_inverse.mat
-
-            pvgm=pvgm
-            pvwm=pvwm
-            #pvcsf=pvcsf
-
-        fi
-    else
-        echo "Copy user specified PVE to temp directory (current directory)"
-        echo "We are missing the registration step here. Use asl_reg"
-        ${FSLDIR}/bin/imcp $stdir/$pvgm ./pvgm
-        ${FSLDIR}/bin/imcp $stdir/$pvwm ./pvwm
-        pvgm=pvgm
-        pvwm=pvwm
-    fi
-    
-#if [ ! -z $pvgm ] & [ ! -z $pvwm ]; then
-    # general tidying up of PVE images
-    ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 pvgm
-    ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 pvwm
-    # Do not remove the low PVE voxels - Moss
-    #${FSLDIR}/bin/fslmaths $pvgm -thr 0 -min 1 pvgm
-    #${FSLDIR}/bin/fslmaths $pvwm -thr 0 -min 1 pvwm
-    ${FSLDIR}/bin/fslmaths pvgm -bin gm_mask
-    ${FSLDIR}/bin/fslmaths pvwm -bin wm_mask
+    # Threshold PV estimates - remove voxels below 10%
+    ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $pvgm
+    ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $pvwm
+    ${FSLDIR}/bin/fslmaths $pvgm -bin gm_mask
+    ${FSLDIR}/bin/fslmaths $pvwm -bin wm_mask
 
     #save the PVE and masks for future reference
-    ${FSLDIR}/bin/imcp pvgm $outdir/pvgm
-    ${FSLDIR}/bin/imcp pvwm $outdir/pvwm
+    ${FSLDIR}/bin/imcp $pvgm $outdir/pvgm_lowres
+    ${FSLDIR}/bin/imcp $pvwm $outdir/pvwm_lowres
     ${FSLDIR}/bin/imcp gm_mask $outdir/gm_mask
     ${FSLDIR}/bin/imcp wm_mask $outdir/wm_mask
 fi
@@ -465,8 +424,8 @@ echo "Begin model-based analysis"
             if [ -z $fixt1 ]; then
                 echo "--image-prior11=calib_latest/T1t " >> options.txt # WM starts with the same measured T1 value as GM
             fi
-            echo "--image-prior12=pvgm " >> options.txt
-            echo "--image-prior13=pvwm " >> options.txt
+            echo "--image-prior12=pvgm_lowres " >> options.txt
+            echo "--image-prior13=pvwm_lowres " >> options.txt
             echo "--image-prior19=calib_latest/g" >> options.txt
             echo "--param-spatial-priors=MNNAN${t1sp}NMNN${t1sp}IINNNNNI" >> options.txt
         else
@@ -474,8 +433,8 @@ echo "Begin model-based analysis"
             if [ -z $fixt1 ]; then
                 echo "--image-prior9=calib_latest/T1t " >> options.txt # WM starts with the same measured T1 value as GM
             fi
-        echo "--image-prior10=pvgm " >> options.txt
-        echo "--image-prior11=pvwm " >> options.txt
+        echo "--image-prior10=pvgm_lowres " >> options.txt
+        echo "--image-prior11=pvwm_lowres " >> options.txt
         echo "--image-prior17=calib_latest/g" >> options.txt
         echo "--param-spatial-priors=MNAN${t1sp}NMN${t1sp}IINNNNNI" >> options.txt
         fi
