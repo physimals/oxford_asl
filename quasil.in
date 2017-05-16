@@ -32,7 +32,7 @@ Usage() {
     echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
     echo " --pvgm     : GM PV Estimates"
     echo " --pvwm     : WM PV Estimates"
-    echo " --s        : High resolution structural image"
+    echo " --structdir: Name of the directory containing the output from fsl_anat"
     echo " --t1wm     : T1 for WM {default: 1.1 s}"
     echo ""
     echo " Sequence parameters:"
@@ -97,6 +97,8 @@ until [ -z $1 ]; do
     --pvwm) pvwm_highres=$2
         shift;;
     --s) strim=$2 # structure images for registration and partial volume estimation
+        shift;;
+    --structdir) structdir=$2 # Directory containing the output from fsl_anat
         shift;;
 
     --ccmds) calibcmds=$2
@@ -336,25 +338,48 @@ fi
 
 # Partial Volume Correction options
 if [ ! -z $pvcorr ]; then
+    # If the output from fsl_anat is provided
+    if [ ! -z $structdir ]; then
 
     echo "Copy user specified PVE to temp directory (current directory)"
     echo "Do ASL and Structural image registration to obtain transformation matrix"
     echo "You need latest epi_reg that supports --init option!!!"
-    # Brain extraction
-    struct=$stdir"/"$strim
-    struct_brain=$struct"_brain"
-    ${FSLDIR}/bin/bet $struct $struct_brain
+    struct=$stdir"/"$structdir"/T1"
+    struct_brain=$stdir"/"$structdir"/T1_brain"
     # Registration
     ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
     # Transform high resolution PV estimates to low (ASL) resolution
     echo "Downsample to low (ASL) resolution space"
-    pvgm_highres=$stdir"/"$pvgm_highres
-    pvwm_highres=$stdir"/"$pvwm_highres
+    pvgm_highres=$stdir"/"$structdir"/T1_fast_pve_1"
+    pvwm_highres=$stdir"/"$structdir"/T1_fast_pve_2"
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvgm_highres --out=pvgm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvwm_highres --out=pvwm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     pvgm=pvgm_lowres
     pvwm=pvwm_lowres
     
+    # Use the estimated T1 image from calibration image to obtain partial volume estimates
+    else
+        echo "High resolution T1 image not provided. Using estiamted T1 image for partial volume correction..."
+
+        # Upsample the T1 image estimated from calibration
+        echo "Upsample the T1 image estimated from calibration"
+        ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
+        ${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
+
+        # Do segmentation
+        echo "Tissue segmentation"
+        ${FSLDIR}/bin/fast -N -p T1highres
+
+        # Downsample to ASL space
+        echo "Downsample to low (ASL) space"
+        ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm_lowres -s --interp=trilinear
+        ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm_lowres -s --interp=trilinear
+
+        pvgm=pvgm_lowres
+        pvwm=pvwm_lowres
+
+    fi
+
     # Threshold PV estimates - remove voxels below 10%
     ${FSLDIR}/bin/fslmaths $pvgm -thr 0.1 -min 1 $pvgm
     ${FSLDIR}/bin/fslmaths $pvwm -thr 0.1 -min 1 $pvwm
@@ -366,6 +391,7 @@ if [ ! -z $pvcorr ]; then
     ${FSLDIR}/bin/imcp $pvwm $outdir/pvwm_lowres
     ${FSLDIR}/bin/imcp gm_mask $outdir/gm_mask
     ${FSLDIR}/bin/imcp wm_mask $outdir/wm_mask
+
 fi
 
 
