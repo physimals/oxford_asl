@@ -1420,46 +1420,61 @@ fi
 if [ ! -z $cblip ]; then
     if [ -z $calib ]; then
 	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
-    fi
-    echo "Distortion correction: running topup"
-
-    #create topup params
-    case $pedir in
-	x)
-	    echo "1 0 0 $echospacing" > $tempdir/topup_params.txt
-	    echo "-1 0 0 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-    	-x)
-	    echo "-1 0 0 $echospacing" > $tempdir/topup_params.txt
-	    echo "1 0 0 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-	y)
-	    echo "0 1 0 $echospacing" > $tempdir/topup_params.txt
-	    echo "0 -1 0 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-	-y)
-	    echo "0 -1 0 $echospacing" > $tempdir/topup_params.txt
-	    echo "0 1 0 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-	z)
-	    echo "0 0 1 $echospacing" > $tempdir/topup_params.txt
-	    echo "0 0 -1 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-    	-z)
-	    echo "0 0 -1 $echospacing" > $tempdir/topup_params.txt
-	    echo "0 0 1 $echospacing" >> $tempdir/topup_params.txt
-	    ;;
-    esac
+    elif [ -z $echospacing ] || [ -z $pedir ]; then
+	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
+    else
+	echo "Distortion correction: running topup"
+	
+        #create topup params
+	case $pedir in
+	    x)
+		echo "1 0 0 $echospacing" > $tempdir/topup_params.txt
+		echo "-1 0 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+    	    -x)
+		echo "-1 0 0 $echospacing" > $tempdir/topup_params.txt
+		echo "1 0 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    y)
+		echo "0 1 0 $echospacing" > $tempdir/topup_params.txt
+		echo "0 -1 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    -y)
+		echo "0 -1 0 $echospacing" > $tempdir/topup_params.txt
+		echo "0 1 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    z)
+		echo "0 0 1 $echospacing" > $tempdir/topup_params.txt
+		echo "0 0 -1 $echospacing" >> $tempdir/topup_params.txt
+		;;
+    	    -z)
+		echo "0 0 -1 $echospacing" > $tempdir/topup_params.txt
+		echo "0 0 1 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	esac
     
-    # do topup
-    fslmerge -t $tempdir/calib_blipped $tempdir/calib_wholehead $cblip 
-    topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult
-    topupresult=$tempdir/topupresult
+	# do topup
+	fslmerge -t $tempdir/calib_blipped $tempdir/calib_wholehead $cblip 
+	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
+	topupresult=$tempdir/topupresult
+    fi
 fi
 
 #Fieldmaps
 if [ ! -z $topupresult ]; then
-    if [ 1 -eq 1 ]; then #[ ! -e `imglob -extension $tempdir/struc` ]; then
+#    if [ -e $tempdir/struc.* ]; then
+#	# currently DISABLED and applytopup is used with topup results
+#	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
+#	# the fieldmap provided is from topup and will be in ASL space
+#	# convert ot the correct units of rad/s from Hz
+#	fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
+#	# use the existing registration to get the fieldmap into T1 space
+#	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
+#	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
+#	imcp $tempdir/struc $tempdir/fmapmag
+#	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
+#	nofmapreg=1
+#    else
 	echo "Distortion Correction using TOPUP"
 	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
 	applytopup --imain=$tempdir/calib_wholehead,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
@@ -1475,18 +1490,7 @@ if [ ! -z $topupresult ]; then
 	    applytopup --imain=$tempdir/cref_wholehead --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
 	    fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
 	    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
-	fi
-    else # TODO: currently DISABLED and applytopup is used with topup results
-	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
-	# the fieldmap provided is from topup and will be in ASL space
-	# convert ot the correct units of rad/s from Hz
-	fslmaths ${topupresult}_fieldcoef -mul 3.1459 -mul 2 $tempdir/fmap
-	# use the existing registration to get the fieldmap into T1 space
-	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
-	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
-	imcp $tempdir/struc $tempdir/fmapmag
-	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
-	nofmapreg=1
+#	fi
     fi
 elif [ ! -z $fmap ]; then
     # a fieldmap has been provided that needs registration - copy images over
@@ -1495,7 +1499,7 @@ elif [ ! -z $fmap ]; then
     imcp $fmapmagbrain $tempdir/fmapmagbrain
 fi
 
-if [ -e `imglob -extension $tempdir/fmap` ]; then
+if [ -e $tempdir/fmap.* ]; then
     echo "Distortion Correction using asl_reg"
     
     # Do registration to T1 to get distortion correction warp
@@ -1947,7 +1951,7 @@ imcp $tempdir/mask $outdir/native_space/mask
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
-    if [ -f `imglob -extension $tempdir/struc_bet` ]; then
+    if [ -f $tempdir/struc_bet.* ]; then
 	# redo the mask now that we have a better registration - as this might matter for PV correction
 	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
