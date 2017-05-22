@@ -30,8 +30,8 @@ Usage() {
     echo ""
     echo " Partial volume effects correction options:"
     echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
-    echo " --pvgm     : GM PV Estimates"
-    echo " --pvwm     : WM PV Estimates"
+    #echo " --pvgm     : GM PV Estimates"
+    #echo " --pvwm     : WM PV Estimates"
     echo " --structdir: Name of the directory containing the output from fsl_anat"
     echo " --t1wm     : T1 for WM {default: 1.1 s}"
     echo ""
@@ -92,12 +92,12 @@ until [ -z $1 ]; do
 
     --pvcorr) pvcorr=1
         ;;
-    --pvgm) pvgm_highres=$2
-        shift;;
-    --pvwm) pvwm_highres=$2
-        shift;;
-    --s) strim=$2 # structure images for registration and partial volume estimation
-        shift;;
+    #--pvgm) pvgm_highres=$2
+        #shift;;
+    #--pvwm) pvwm_highres=$2
+        #shift;;
+    #--s) strim=$2 # structure images for registration and partial volume estimation
+        #shift;;
     --structdir) structdir=$2 # Directory containing the output from fsl_anat
         shift;;
 
