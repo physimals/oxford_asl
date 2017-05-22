@@ -101,13 +101,17 @@ Usage_extended() {
     echo "    --cref     : Supply a reference image for sensitivity correction"
 
     echo " Distortion correction using fieldmap (see epi_reg):"
+    echo "  requires structural image to be provided"
     echo " --fmap=<image>         : fieldmap image (in rad/s)"
     echo " --fmapmag=<image>      : fieldmap magnitude image - wholehead extracted"
     echo " --fmapmagbrain=<image> : fieldmap magnitude image - brain extracted"
-    echo " --wmseg=<image>        : white matter segmentation of T1 image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
-    echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already registered) "
+    echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already in T1-space) "
+    echo " Distortion correction using phase-encode-reversed calibration image (TOPUP):"
+    echo " --cblip                : phase-encode-reversed (blipped) calibration image"
+    echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
+    echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo ""
  
     echo "Partial volume correction"
@@ -312,19 +316,22 @@ Registration() {
     if [ -z $distout ]; then
 	# normal registration
 	$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
+
+	if [ ! -z $trans ]; then
+	    # compute the transformation needed to standard space if we have the relvant structural to standard transform
+	    convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struc.mat
+	fi
+	    
     else
 	# registration for distortion correction
 	fmapregstr=""
 	if [ ! -z $nofmapreg ]; then
 	    fmapregstr="--nofmapreg"
 	fi
-	$asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$fmap --fmapmag=$fmapmag --fmapmagbrain=$fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
+	$asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$tempdir/fmap --fmapmag=$tempdir/fmapmag --fmapmagbrain=$tempdir/fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
     fi
 
-    if [ ! -z $trans ]; then
-	# compute the transformation needed to standard space if we have the relvant structural to standard transform
-	convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struc.mat
-    fi
+
 }
 
 Calibration() {
@@ -810,6 +817,8 @@ takeargs=0;boolarg="";isbool="";
 	--nofmapreg) isbool=1
 		     boolarg=nofmapreg
 		     ;;
+	--cblip) cblip=$argument #blip reversed calibration image
+		 takeargs=1;; 
 	# 
 	--verbose) verbose=$argument
 	    takeargs=1;;
@@ -1079,14 +1088,36 @@ if [ ! -z $cref ]; then
 	# take the mean
 	fslmaths $tempdir/cref -Tmean $tempdir/cref
     else
-	fslmaths $calib $tempdir/cref
+	fslmaths $cref $tempdir/cref
     fi
 
     # bet - using the calib image to ensure a match
+    imcp $tempdir/cref $tempdir/cref_wholehead
     fslmaths $tempdir/cref -mas $tempdir/calib $tempdir/cref
 
     # calculate sensitivty image
     fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
+fi
+
+# same thing for cblip image
+if [ ! -z $cblip ]; then
+    tsize=`fslinfo $cblip | grep "^dim4" | sed 's:dim4[ ]*::'`
+    if [ $tsize -gt 1 ]; then
+        #cut - throw away first volume
+	Log "Removing first volume of blipped calibration time series - to ensure data is in steady state"
+	tsize=`expr $tsize - 1`
+	fslroi $cref $tempdir/cblip 1 $tsize
+
+	if [ ! -z $moco ]; then
+	    #motion correction
+	    mcflirt -in $tempdir/cblip -o $tempdir/cblip
+	fi
+	# take the mean
+	fslmaths $tempdir/cblip -Tmean $tempdir/cblip
+    else
+	fslmaths $cblip $tempdir/cblip
+    fi
+    # NOTE cblip is still wholehead, we dont need it masked
 fi
 
 
@@ -1361,7 +1392,7 @@ elif [ ! -z $regfrom ]; then
 # We are unlikey to use these options as regfrom has probably been set above - leave for future reference
 # next option is to use betted version of mean M0 calib image as mask
 elif [ ! -z $calib ]; then
-    bet $tempdir/calib $tempdir/calib_bet -f 0.2 
+    bet $tempdir/calib_wholehead $tempdir/calib_bet
     fslmaths $tempdir/calib_bet -bin $tempdir/mask
     Log "Mask generated from calibration image (post BET)"
  # use the low resolution strucutral image to create mask (ahould already be BETed)
@@ -1385,15 +1416,99 @@ fi
 ### End of: Generate mask
 
 ### Distortion Correction
-if [ ! -z $fmap ]; then
-    echo 'Distortion Correction'
+# Do TOPUP if applicable
+if [ ! -z $cblip ]; then
+    if [ -z $calib ]; then
+	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
+    elif [ -z $echospacing ] || [ -z $pedir ]; then
+	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
+    else
+	echo "Distortion correction: running topup"
+	
+        #create topup params
+	case $pedir in
+	    x)
+		echo "1 0 0 $echospacing" > $tempdir/topup_params.txt
+		echo "-1 0 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+    	    -x)
+		echo "-1 0 0 $echospacing" > $tempdir/topup_params.txt
+		echo "1 0 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    y)
+		echo "0 1 0 $echospacing" > $tempdir/topup_params.txt
+		echo "0 -1 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    -y)
+		echo "0 -1 0 $echospacing" > $tempdir/topup_params.txt
+		echo "0 1 0 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	    z)
+		echo "0 0 1 $echospacing" > $tempdir/topup_params.txt
+		echo "0 0 -1 $echospacing" >> $tempdir/topup_params.txt
+		;;
+    	    -z)
+		echo "0 0 -1 $echospacing" > $tempdir/topup_params.txt
+		echo "0 0 1 $echospacing" >> $tempdir/topup_params.txt
+		;;
+	esac
+    
+	# do topup
+	fslmerge -t $tempdir/calib_blipped $tempdir/calib_wholehead $cblip 
+	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
+	topupresult=$tempdir/topupresult
+    fi
+fi
+
+#Fieldmaps
+if [ ! -z $topupresult ]; then
+#    if [ -e $tempdir/struc.* ]; then
+#	# currently DISABLED and applytopup is used with topup results
+#	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
+#	# the fieldmap provided is from topup and will be in ASL space
+#	# convert ot the correct units of rad/s from Hz
+#	fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
+#	# use the existing registration to get the fieldmap into T1 space
+#	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
+#	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
+#	imcp $tempdir/struc $tempdir/fmapmag
+#	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
+#	nofmapreg=1
+#    else
+	echo "Distortion Correction using TOPUP"
+	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
+	applytopup --imain=$tempdir/calib_wholehead,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
+	repeatsubtract=1;
+	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
+	if [ ! $cmethod="voxel" ]; then
+	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
+	fi
+	imcp $tempdir/calib $tempdir/calib_wholehead
+	fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib #NB we keep the old mask here
+	if [ ! -z $cref ]; then
+	    #repeat the sensitivity correction calcuation with distortion corrected images
+	    applytopup --imain=$tempdir/cref_wholehead --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
+	    fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
+	    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+#	fi
+    fi
+elif [ ! -z $fmap ]; then
+    # a fieldmap has been provided that needs registration - copy images over
+    imcp $fmap $tempdir/fmap
+    imcp $fmapmag $tempdir/fmapmag
+    imcp $fmapmagbrain $tempdir/fmapmagbrain
+fi
+
+if [ -e $tempdir/fmap.* ]; then
+    echo "Distortion Correction using asl_reg"
     
     # Do registration to T1 to get distortion correction warp
     # use whatever registration matrix we already have to initialise here 
     distbase=$tempdir/pwi # use the perfusion-weighted image (mean over all TIs) as the best basis we have for registration at this point
-    if [ -z finalreg ]; then
+    if [ -z $finalreg ]; then
 	distbase=$regfrom # use whatever image we have been using for (inital) registration
     fi
+
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
     
     # generate the correction warp
@@ -1402,9 +1517,35 @@ if [ ! -z $fmap ]; then
     
     # Now apply the correction to the data.
     # note that we use the orignal data here and apply the motion correction as part of the process
-    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata --premat=$tempdir/asldata.cat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    appremat=""
+    if [ ! -z $moco ]; then
+	appremat="--premat=$tempdir/asldata.cat"
+    fi
+    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
     fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
-    # Repeat the label-control subtraction on the corrected data
+    repeatsubtract=1;
+        
+    # Now apply the correction to the calibration image
+    applywarp -i $tempdir/calib_wholehead -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
+ 
+    imcp $tempdir/calib $tempdir/calib_wholehead
+    fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib
+
+    if [ ! -z $cref ]; then
+	#repeat the sensitivity correction calcuation with distortion corrected images
+	applywarp -i $tempdir/cref_wholehead -r $tempdir/calib -o $tempdir/cref -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+	fslmaths $tempdir/cref -mul $tempdir/distcorr/jacobian $tempdir/cref
+	fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
+	fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+    fi
+
+    
+    
+fi
+
+# Repeat the label-control subtraction on the corrected data
+if [ ! -z $repeatsubtract ]; then
     if [ $iaf = 'diff' ]; then
 	# make sure the block format is correct for BASIL
 	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
@@ -1412,10 +1553,6 @@ if [ ! -z $fmap ]; then
 	# create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
 	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     fi
-    
-    # Now apply the correction to the calibration image
-    applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-    fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
 fi
 ### End of: Distortion Correction
 
@@ -1814,7 +1951,7 @@ imcp $tempdir/mask $outdir/native_space/mask
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
-    if [ -f $tempdir/struc_bet ]; then
+    if [ -f $tempdir/struc_bet.* ]; then
 	# redo the mask now that we have a better registration - as this might matter for PV correction
 	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
