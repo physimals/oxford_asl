@@ -528,6 +528,22 @@ class AslRun(wx.Frame):
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
 
+        # Distortion correction
+        if self.analysis.distcorr():
+            if self.analysis.distcorr_type() == 0:
+                # Fieldmap
+                self.check_exists("Fieldmap image", self.analysis.fmap())
+                cmd.add('--fmap="%s"' % self.analysis.fmap())
+                self.check_exists("Fieldmap magnitude image", self.analysis.fmap_mag())
+                if self.analysis.fmap_be():
+                    cmd.add('--fmapmagbrain="%s"' % self.analysis.fmap_mag())
+                else:
+                    cmd.add('--fmapmag="%s"' % self.analysis.fmap_mag())
+            else:
+                if self.analysis.cblip(): cmd.add("--cblip")
+            cmd.add("--echospacing=%.5f" % self.analysis.echosp())
+            cmd.add("--pedir=%s" % self.analysis.pedir())
+            
         # Calibration - do this via oxford_asl rather than calling asl_calib separately
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
@@ -657,6 +673,8 @@ class AslAnalysis(TabPage):
 
         self.transform_choices = ["Matrix", "Warp image", "Use FSL_ANAT output"]
 
+        self.distcorr_choices = ["Fieldmap", "Calibration image"]
+
         self.section("Registration")
 
         self.transform_cb = wx.CheckBox(self, label="Transform to standard space")
@@ -691,6 +709,26 @@ class AslAnalysis(TabPage):
         self.pv_cb = self.checkbox("Partial Volume Correction")
         self.mc_cb = self.checkbox("Motion Correction (MCFLIRT)")
 
+        self.section("Distortion Correction")
+
+        self.distcorr_cb = wx.CheckBox(self, label="Apply distortion correction")
+        self.distcorr_cb.Bind(wx.EVT_CHECKBOX, self.update)
+        self.distcorr_ch = wx.Choice(self, choices=self.distcorr_choices)
+        self.distcorr_ch.SetSelection(0)
+        self.distcorr_ch.Bind(wx.EVT_CHOICE, self.update)
+        self.pack("", self.distcorr_cb, self.distcorr_ch, enable=False)
+
+        self.echosp_num = self.number("Effective EPI echo spacing", min=0, max=10)
+        self.pedir_ch = self.choice("Phase encoding direction", choices=["x", "y", "z", "-x", "-y", "-z"])
+        
+        # Fieldmap options
+        self.fmap_picker = self.file_picker("Fieldmap image (in rad/s)")
+        self.fmap_mag_picker = self.file_picker("Fieldmap magnitude image")
+        self.fmap_mag_be_cb = self.checkbox("Magnitude image is brain extracted")
+        
+        # Calibration image options
+        self.cblip_cb = self.checkbox("Phase-encode-reversed calibration image")
+        
         self.sizer.AddGrowableCol(1, 1)
         #sizer.AddGrowableRow(5, 1)
         self.SetSizer(self.sizer)
@@ -713,6 +751,14 @@ class AslAnalysis(TabPage):
     def fixbolus(self): return self.fixbolus_cb.IsChecked()
     def pv(self): return self.pv_cb.IsChecked()
     def mc(self): return self.mc_cb.IsChecked()
+    def distcorr(self): return self.distcorr_cb.IsChecked()
+    def distcorr_type(self): return self.distcorr_ch.GetSelection()
+    def fmap(self): return self.fmap_picker.GetPath()
+    def fmap_mag(self): return self.fmap_mag_picker.GetPath()
+    def fmap_mag_be(self): return self.fmap_mag_be_cb.IsChecked()
+    def echosp(self): return self.echosp_num.GetValue()
+    def pedir(self): return self.pedir_ch.GetStringSelection()
+    def cblip(self): return self.cblip_cb.IsChecked()
 
     def update(self, event=None):
         self.transform_ch.Enable(self.transform())
@@ -720,6 +766,15 @@ class AslAnalysis(TabPage):
         self.mask_picker.Enable(self.mask_picker.checkbox.IsChecked())
         self.t1_num.Enable(not self.wp())
         self.bat_num.Enable(not self.wp())
+        self.distcorr_ch.Enable(self.distcorr())
+        self.pedir_ch.Enable(self.distcorr())
+        self.echosp_num.Enable(self.distcorr())
+        fmap = self.distcorr() and self.distcorr_type() == 0
+        cal = self.distcorr() and self.distcorr_type() == 1
+        self.fmap_picker.Enable(fmap)
+        self.fmap_mag_picker.Enable(fmap)
+        self.fmap_mag_be_cb.Enable(fmap)
+        self.cblip_cb.Enable(cal)
         TabPage.update(self)
 
     def wp_changed(self, event):
