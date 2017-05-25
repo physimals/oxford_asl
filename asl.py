@@ -585,7 +585,7 @@ class AslCalibration(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Calibration")
 
-        self.calib_cb = self.checkbox("Enable Calibration", bold=True)
+        self.calib_cb = self.checkbox("Enable Calibration", bold=True, handler=self.calib_changed)
 
         self.calib_image_picker = self.file_picker("Calibration Image")
         self.m0_type_ch = self.choice("M0 Type", choices=["Proton Density (long TR)", "Saturation Recovery"])
@@ -638,6 +638,10 @@ class AslCalibration(TabPage):
         elif self.ref_tissue_type() == 2: # GM
             self.ref_t1_num.SetValue(1.3)
             self.ref_t2_num.SetValue(100)
+        self.update()
+
+    def calib_changed(self, event):
+        self.analysis.calib_changed(self.calib())
         self.update()
 
     def wp_changed(self, wp):
@@ -713,7 +717,7 @@ class AslAnalysis(TabPage):
 
         self.distcorr_cb = wx.CheckBox(self, label="Apply distortion correction")
         self.distcorr_cb.Bind(wx.EVT_CHECKBOX, self.update)
-        self.distcorr_ch = wx.Choice(self, choices=self.distcorr_choices)
+        self.distcorr_ch = wx.Choice(self, choices=self.distcorr_choices[:1])
         self.distcorr_ch.SetSelection(0)
         self.distcorr_ch.Bind(wx.EVT_CHOICE, self.update)
         self.pack("", self.distcorr_cb, self.distcorr_ch, enable=False)
@@ -795,6 +799,21 @@ class AslAnalysis(TabPage):
             self.bat_num.SetValue(1.3)
             self.ie_num.SetValue(0.85)
         
+    def calib_changed(self, enabled):
+        """ If calibration enabled, add the calibration image option for distortion correction"""
+        sel = self.distcorr_ch.GetSelection()
+        if enabled: 
+            choices = self.distcorr_choices
+            sel = 1
+        else: 
+            choices = self.distcorr_choices[:1]
+            sel = 0
+        self.distcorr_ch.Enable(False)
+        self.distcorr_ch.Clear()
+        self.distcorr_ch.AppendItems(choices)
+        self.distcorr_ch.SetSelection(sel)
+        self.update()
+
     def fsl_anat_changed(self, enabled):
         """ If FSL_ANAT is selected, use it by default, otherwise do not allow it """
         sel = self.transform_ch.GetSelection()
@@ -1235,7 +1254,7 @@ class AslGui(wx.Frame):
     """
 
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE)
+        wx.Frame.__init__(self, None, title="Basil", size=(1200, 950), style=wx.DEFAULT_FRAME_STYLE)
         #wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
         main_panel = wx.Panel(self)
         main_vsizer = wx.BoxSizer(wx.VERTICAL)
