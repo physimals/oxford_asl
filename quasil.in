@@ -118,8 +118,8 @@ done
 #### --- Procedural ---
 asl_file=asl_file
 # Modified by Moss because he is currently using old fabber structure
-#fabber=fabber_asl
-fabber=fabber
+fabber=fabber_asl
+#fabber=fabber
 # End of Moss modification
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
