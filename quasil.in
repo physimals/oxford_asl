@@ -524,8 +524,8 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
     echo "--artdir" >> aifoptions.txt
 # use calibration information within inference
     echo " --usecalib ">> aifoptions.txt
-    echo "--image-prior9=calib/g" >> aifoptions.txt
-    echo "--param-spatial-priors=MNNNNNNNI" >> aifoptions.txt
+    echo "--image-prior10=calib/g" >> aifoptions.txt
+    echo "--param-spatial-priors=MNNNNNNNNI" >> aifoptions.txt
     echo "--save-model-fit" >> aifoptions.txt
     
     $fabber --data=asl_blood --disp=gvf --output=aif -@ aifoptions.txt
