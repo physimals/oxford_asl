@@ -118,8 +118,8 @@ done
 #### --- Procedural ---
 asl_file=asl_file
 # Modified by Moss because he is currently using old fabber structure
-fabber=fabber_asl
-#fabber=fabber
+#fabber=fabber_asl
+fabber=fabber
 # End of Moss modification
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
@@ -304,7 +304,7 @@ if [ -z "$calibcmds" ]; then
         # Extrapolate back the eroded voxels
         $asl_file --data=calib/mean_M0t_ero --ntis=1 --mask=mask --extrapolate --neighbour=5 --out=calib/mean_M0t_corr
         # Rename the corrected M0 image
-        ${FSLDIR}/bin/immv calib/mean_M0t_corr immv calib/mean_M0t
+        ${FSLDIR}/bin/immv calib/mean_M0t_corr calib/mean_M0t
     fi
 
     # deal with outputs
