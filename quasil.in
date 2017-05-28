@@ -346,6 +346,10 @@ if [ ! -z $pvcorr ]; then
     echo "You need latest epi_reg that supports --init option!!!"
     struct=$stdir"/"$structdir"/T1"
     struct_brain=$stdir"/"$structdir"/T1_brain"
+    # Brain extraction
+    # This step may be optional if fsl_anat has done the same job
+    # But we perform it here just in case
+    ${FSLDIR}/bin/bet $struct $struct_brain
     # Registration
     ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
     # Transform high resolution PV estimates to low (ASL) resolution
