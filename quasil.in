@@ -304,7 +304,7 @@ if [ -z "$calibcmds" ]; then
         # Extrapolate back the eroded voxels
         $asl_file --data=calib/mean_M0t_ero --ntis=1 --mask=mask --extrapolate --neighbour=5 --out=calib/mean_M0t_corr
         # Rename the corrected M0 image
-        ${FSLDIR}/bin/immv calib/mean_M0t_corr immv calib/mean_M0t
+        ${FSLDIR}/bin/immv calib/mean_M0t_corr calib/mean_M0t
     fi
 
     # deal with outputs
@@ -346,6 +346,10 @@ if [ ! -z $pvcorr ]; then
     echo "You need latest epi_reg that supports --init option!!!"
     struct=$stdir"/"$structdir"/T1"
     struct_brain=$stdir"/"$structdir"/T1_brain"
+    # Brain extraction
+    # This step may be optional if fsl_anat has done the same job
+    # But we perform it here just in case
+    ${FSLDIR}/bin/bet $struct $struct_brain
     # Registration
     ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
     # Transform high resolution PV estimates to low (ASL) resolution
@@ -524,8 +528,8 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
     echo "--artdir" >> aifoptions.txt
 # use calibration information within inference
     echo " --usecalib ">> aifoptions.txt
-    echo "--image-prior9=calib/g" >> aifoptions.txt
-    echo "--param-spatial-priors=MNNNNNNNI" >> aifoptions.txt
+    echo "--image-prior10=calib/g" >> aifoptions.txt
+    echo "--param-spatial-priors=MNNNNNNNNI" >> aifoptions.txt
     echo "--save-model-fit" >> aifoptions.txt
     
     $fabber --data=asl_blood --disp=gvf --output=aif -@ aifoptions.txt
