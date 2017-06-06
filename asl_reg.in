@@ -15,7 +15,7 @@ PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "ASL_REG"
-    echo "Version: ${GIT_SHA1} ${GIT_DATE}"
+    echo "Version: @GIT_SHA1@ @GIT_DATE@"
     echo "Registration for ASL data"
     echo ""
     echo "Usage (optional parameters in {}):"
