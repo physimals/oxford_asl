@@ -37,7 +37,7 @@ Usage() {
 }
 
 Version() {
-echo "${GIT_SHA1} ${GIT_DATE}"
+echo "@GIT_SHA1@ @GIT_DATE@"
 exit 0
 }
 

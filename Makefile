@@ -28,7 +28,7 @@ asl_file: ${OBJS} asl_file.o
 	${CXX}  ${CXXFLAGS} ${LDFLAGS} -o $@ ${OBJS} asl_file.o ${LIBS}
 
 $(SCRIPTS): %: %.in FORCE
-	sed -e "s/\$${GIT_SHA1}/${GIT_SHA1}/" -e "s/\$${GIT_DATE}/${GIT_DATE}/" $< >$@
+	sed -e "s/@GIT_SHA1@/${GIT_SHA1}/" -e "s/@GIT_DATE@/${GIT_DATE}/" $< >$@
 
 clean:
 	rm ${SCRIPTS}
