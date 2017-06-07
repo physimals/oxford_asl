@@ -117,7 +117,10 @@ done
 
 #### --- Procedural ---
 asl_file=asl_file
-fabber=fabber_asl
+#fabber=fabber_asl
+# Moss modify
+fabber=fabber
+# End of Moss modify
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
 #### --- Housekeeping ---
@@ -362,10 +365,16 @@ if [ ! -z $pvcorr ]; then
     else
         echo "High resolution T1 image not provided. Using estiamted T1 image for partial volume correction..."
 
-        # Upsample the T1 image estimated from calibration
-        echo "Upsample the T1 image estimated from calibration"
-        ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
-        ${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
+        # Upsample the T1 image estimated from calibration and use standard brain as reference
+        echo "Upsample the T1 image estimated from calibration and use standard brain as reference"
+        standard_brain=$FSLDIR/data/standard/MNI152lin_T1_2mm_brain
+        ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -ref $standard_brain -dof 6 -omat regmat.mat
+        #${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
+        #${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
+
+        # Compute Standard to ASL space transformation matrix
+        echo "Compute Standard to ASL space transformation matrix"
+        ${FSLDIR}/bin/convert_xfm -omat regmat_inv.mat -inverse regmat.mat
 
         # Do segmentation
         echo "Tissue segmentation"
@@ -373,8 +382,12 @@ if [ ! -z $pvcorr ]; then
 
         # Downsample to ASL space
         echo "Downsample to low (ASL) space"
-        ${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm_lowres -s --interp=trilinear
-        ${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm_lowres -s --interp=trilinear
+        ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=T1highres_pve_0 --out=pvcsf_lowres --premat=regmat_inv.mat --super --interp=spline --superlevel=4
+        ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=T1highres_pve_1 --out=pvwm_lowres --premat=regmat_inv.mat --super --interp=spline --superlevel=4
+        ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=T1highres_pve_2 --out=pvgm_lowres --premat=regmat_inv.mat --super --interp=spline --superlevel=4
+
+        #${FSLDIR}/bin/applywarp -i T1highres_pve_2 -r calib/T1t -o pvgm_lowres -s --interp=trilinear
+        #${FSLDIR}/bin/applywarp -i T1highres_pve_1 -r calib/T1t -o pvwm_lowres -s --interp=trilinear
 
         pvgm=pvgm_lowres
         pvwm=pvwm_lowres
@@ -414,9 +427,14 @@ echo "Begin model-based analysis"
     echo "--slicedt=$slicedt" >> options.txt
     echo "--infert1 ">>options.txt
     echo "--artdir" >> options.txt
+
 # use calibration information within inference
     
     echo "--usecalib ">>options.txt
+
+    # Save model fitting results and residue
+    echo "--save-model-fit" >> options.txt
+    echo "--save-residuals" >> options.txt
 
     if [ -z $fixt1 ]; then
     t1sp=I
