@@ -117,10 +117,7 @@ done
 
 #### --- Procedural ---
 asl_file=asl_file
-#fabber=fabber_asl
-# Moss modify
-fabber=fabber
-# End of Moss modify
+fabber=fabber_asl
 asl_mfree=asl_mfree ###~/cproject/asl_mfree/asl_mfree
 
 #### --- Housekeeping ---
@@ -290,6 +287,7 @@ if [ -z "$calibcmds" ]; then
     echo $tislist >> calib_options.txt
     echo "--t1=$t1 --FA=$fa --LFA=$lfa" >> calib_options.txt
     echo "--slicedt=$slicedt" >> calib_options.txt
+    echo "--link-to-latest" >> calib_options.txt # Here we create a shortcut to the latest results directory
     $fabber --data=aslcontrol --data-order=singlefile --output=calib -@ calib_options.txt
 
     if [ ! -z $corrcal ]; then
@@ -435,6 +433,9 @@ echo "Begin model-based analysis"
     # Save model fitting results and residue
     echo "--save-model-fit" >> options.txt
     echo "--save-residuals" >> options.txt
+
+    # Here we create a shortcut to the latest results directory
+    echo "--link-to-latest" >> options.txt
 
     if [ -z $fixt1 ]; then
     t1sp=I
