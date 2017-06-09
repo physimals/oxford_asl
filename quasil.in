@@ -546,7 +546,11 @@ fslmaths asl_nocrush -sub asl_tissue asl_blood
     echo " --usecalib ">> aifoptions.txt
     echo "--image-prior10=calib/g" >> aifoptions.txt
     echo "--param-spatial-priors=MNNNNNNNNI" >> aifoptions.txt
+    # Save model fitting results and residue
     echo "--save-model-fit" >> aifoptions.txt
+    echo "--save-residuals" >> aifoptions.txt
+    # Here we create a shortcut to the latest results directory
+    echo "--link-to-latest" >> aifoptions.txt
     
     $fabber --data=asl_blood --disp=gvf --output=aif -@ aifoptions.txt
 
