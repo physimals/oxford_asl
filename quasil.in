@@ -395,10 +395,9 @@ if [ ! -z $pvcorr ]; then
     # If the output from fsl_anat is provided
     if [ ! -z $fslanat ]; then
 
-    fslanat = $(abspath $fslanat)
+    fslanat=$(abspath $fslanat)
     echo "Copy user specified PVE to temp directory (current directory)"
     echo "Do ASL and Structural image registration to obtain transformation matrix"
-    echo "You need latest epi_reg that supports --init option!!!"
     struct=$fslanat/T1
     struct_brain=$fslanat/T1_brain
     # Brain extraction
