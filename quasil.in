@@ -32,7 +32,7 @@ Usage() {
     echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
     #echo " --pvgm     : GM PV Estimates"
     #echo " --pvwm     : WM PV Estimates"
-    echo " --structdir: Name of the directory containing the output from fsl_anat"
+    echo " --fslanat  : Name of the directory containing the output from fsl_anat"
     echo " --t1wm     : T1 for WM {default: 1.1 s}"
     echo ""
     echo " Sequence parameters:"
@@ -56,52 +56,67 @@ if [ -z $1 ]; then
 fi
 
 until [ -z $1 ]; do
-    case $1 in
-    -o) outflag=1 outdir=$2
+
+# look at this option and determine if has an argument specified by an =
+option=`echo $1 | sed s/=.*//`
+arg="" #specifies if an argument is to be read from next item on command line (=1 is is when = is used)
+if [ $option = $1 ]; then
+# no argument to this command has been found with it (i.e. after an =)
+# if there is an argument it will be the next option
+    argument=$2
+else
+    arg=1
+    argument=`echo $1 | sed s/.*=//`
+fi
+takeargs=0;boolarg="";isbool="";
+
+    case $option in
+    -o) outflag=1 outdir=$argument
         shift;;
-    -i) inflag=1 infile=$2 #input/data file
+    -i) inflag=1 infile=$argument #input/data file
         shift;;
-    -m) mask=$2
+    -m) mask=$argument
         shift;;
-    --t1b) t1b=$2
+    --t1b) t1b=$argument
         shift;;
-    --t1) t1=$2
+    --t1) t1=$argument
         shift;;
-    --t1wm) t1wm=$2
+    --t1wm) t1wm=$argument
         shift;;
-    --slicedt) slicedt=$2
+    --slicedt) slicedt=$argument
         shift;;
-    --fa) fa=$2
+    --fa) fa=$argument
         shift;;
-    --lfa) lfa=$2
+    --lfa) lfa=$argument
         shift;;
     --disp) disp=1
         ;;
     --mfree) mfree=1
         ;;
-    --corrcal) corrcal=1
-        ;;
-    --tis) tis=$2
+    --edgecorr) isbool=1;
+		boolarg=edgecorr;
+		;;
+    --tis) tis=$argument
         shift;;
-    --iform) iform=$2 # to choose the input form of the data
+    --iform) iform=$argument # to choose the input form of the data
         shift;;
-    --tau) tau=$2
+    --tau) tau=$argument
         shift;;
     --infertau) infertau=1
         ;;
 
     --pvcorr) pvcorr=1
         ;;
-    #--pvgm) pvgm_highres=$2
+    #--pvgm) pvgm_highres=$argument
         #shift;;
-    #--pvwm) pvwm_highres=$2
+    #--pvwm) pvwm_highres=$argument
         #shift;;
-    #--s) strim=$2 # structure images for registration and partial volume estimation
+    #--s) strim=$argument # structure images for registration and partial volume estimation
         #shift;;
-    --structdir) structdir=$2 # Directory containing the output from fsl_anat
+    --fslanat) fslanat=$argument # Directory containing the output from fsl_anat
         shift;;
 
-    --ccmds) calibcmds=$2
+    --ccmds) calibcmds=$argument
         shift;;
     --debug) debug=1 #debugging option
         ;;
@@ -112,6 +127,41 @@ until [ -z $1 ]; do
         echo ""
         exit 1;;
     esac
+
+    # sort out a shift required by a command line option that takes arguments
+    if [ -z $arg ]; then
+	# an argument has been supplied on the command NOT using an =
+	if [ $takeargs -eq 1 ]; then
+	    shift;
+	fi
+    fi
+    
+    if [ ! -z $isbool ]; then
+	    # this is an (explicit) boolean setting
+	if [ ! -z $arg ]; then
+	    # an argument has been supplied on the command using an =
+	    # set the variable based on the argument
+	    case $argument in
+		on) eval $boolarg=1
+		    ;;
+		off) eval $boolarg=""
+		     ;;
+		1) eval $boolarg=1
+		   ;;
+		0) eval $boolarg=""
+		   ;;
+		*)  Usage
+		    echo "Error! Unrecognised setting for boolean option: $1"
+		    echo ""
+		    exit 1;;
+	    esac
+	else
+	    # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
+	    # this sets the variable to true
+	    eval $boolarg=1;
+	fi
+    fi
+
     shift
 done
 
@@ -337,13 +387,13 @@ fi
 # Partial Volume Correction options
 if [ ! -z $pvcorr ]; then
     # If the output from fsl_anat is provided
-    if [ ! -z $structdir ]; then
+    if [ ! -z $fslanat ]; then
 
     echo "Copy user specified PVE to temp directory (current directory)"
     echo "Do ASL and Structural image registration to obtain transformation matrix"
     echo "You need latest epi_reg that supports --init option!!!"
-    struct=$stdir"/"$structdir"/T1"
-    struct_brain=$stdir"/"$structdir"/T1_brain"
+    struct=$stdir"/"$fslanat"/T1"
+    struct_brain=$stdir"/"$fslanat"/T1_brain"
     # Brain extraction
     # This step may be optional if fsl_anat has done the same job
     # But we perform it here just in case
@@ -352,8 +402,8 @@ if [ ! -z $pvcorr ]; then
     ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
     # Transform high resolution PV estimates to low (ASL) resolution
     echo "Downsample to low (ASL) resolution space"
-    pvgm_highres=$stdir"/"$structdir"/T1_fast_pve_1"
-    pvwm_highres=$stdir"/"$structdir"/T1_fast_pve_2"
+    pvgm_highres=$stdir"/"$fslanat"/T1_fast_pve_1"
+    pvwm_highres=$stdir"/"$fslanat"/T1_fast_pve_2"
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvgm_highres --out=pvgm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvwm_highres --out=pvwm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     pvgm=pvgm_lowres
