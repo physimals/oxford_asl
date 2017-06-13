@@ -13,6 +13,12 @@
 # to be used, possibly with bundled dependencies
 PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
 
+abspath() {                                               
+    # Return an absolute path if the input is relative
+    cd "$(dirname "$1")"
+    printf "%s/%s\n" "$(pwd)" "$(basename "$1")"
+}
+
 Usage() {
     echo "QUASAR Bayesian Inference for Arterial Spin Labelling MRI"
     echo ""
@@ -195,7 +201,7 @@ mkdir $outdir;
 stdir=`pwd`
 
 # Full path of output directory
-outdir=$stdir"/"$outdir
+outdir=$(abspath $outdir)
 
 # make a temp directory to work in
 tmpbase=`tmpnam`
@@ -389,11 +395,12 @@ if [ ! -z $pvcorr ]; then
     # If the output from fsl_anat is provided
     if [ ! -z $fslanat ]; then
 
+    fslanat = $(abspath $fslanat)
     echo "Copy user specified PVE to temp directory (current directory)"
     echo "Do ASL and Structural image registration to obtain transformation matrix"
     echo "You need latest epi_reg that supports --init option!!!"
-    struct=$stdir"/"$fslanat"/T1"
-    struct_brain=$stdir"/"$fslanat"/T1_brain"
+    struct=$fslanat/T1
+    struct_brain=$fslanat/T1_brain
     # Brain extraction
     # This step may be optional if fsl_anat has done the same job
     # But we perform it here just in case
@@ -402,8 +409,8 @@ if [ ! -z $pvcorr ]; then
     ${FSLDIR}/bin/asl_reg -i calib/T1t -o reg_dir -s $struct --sbet $struct_brain -c calib/M0t -m mask
     # Transform high resolution PV estimates to low (ASL) resolution
     echo "Downsample to low (ASL) resolution space"
-    pvgm_highres=$stdir"/"$fslanat"/T1_fast_pve_1"
-    pvwm_highres=$stdir"/"$fslanat"/T1_fast_pve_2"
+    pvgm_highres=$fslanat/T1_fast_pve_1
+    pvwm_highres=$fslanat/T1_fast_pve_2
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvgm_highres --out=pvgm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     ${FSLDIR}/bin/applywarp --ref=calib/T1t --in=$pvwm_highres --out=pvwm_lowres --premat=reg_dir/struct2asl.mat --super --interp=spline --superlevel=4
     pvgm=pvgm_lowres
