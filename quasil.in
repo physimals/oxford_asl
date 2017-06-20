@@ -367,7 +367,8 @@ if [ -z "$calibcmds" ]; then
     ${FSLDIR}/bin/immv calib/mean_M0t calib/M0t
 
     #fslmaths instruction for calibration (for execution whilst back in starting dir)
-    cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
+    #cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
+    cinstr=" -div $tempdir/calib/M0t -div 0.9 " # partition coefficient 0.9
 
     #save calibration results to output directory for reference
     ${FSLDIR}/bin/imcp calib/M0t $outdir/M0t
