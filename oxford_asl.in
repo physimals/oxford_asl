@@ -1716,7 +1716,7 @@ if [ ! -z $noiseprior ]; then
      if [ -z $noisesd ]; then
 	 Log "Using SNR of $snr to set noise std dev"
 	# estimate signal magntiude
-	fslmaths $datafile -Tmax $tempdir/datamax
+	fslmaths $tempdir/diffdata_mean -Tmax $tempdir/datamax
 	brain_mag=`fslstats $tempdir/datamax -k $tempdir/mask -M`
 	# this will correspond to whole brain CBF (roughly) - about 0.5 of GM
 	noisesd=`echo "scale=2;sqrt( $brain_mag * 2 / $snr )" | bc`
