@@ -1106,7 +1106,7 @@ if [ ! -z $cblip ]; then
         #cut - throw away first volume
 	Log "Removing first volume of blipped calibration time series - to ensure data is in steady state"
 	tsize=`expr $tsize - 1`
-	fslroi $cref $tempdir/cblip 1 $tsize
+	fslroi $cblip $tempdir/cblip 1 $tsize
 
 	if [ ! -z $moco ]; then
 	    #motion correction
@@ -1556,9 +1556,13 @@ if [ ! -z $repeatsubtract ]; then
 fi
 ### End of: Distortion Correction
 
+# Sensitivty Map - overwrite the FAST biasfield one (if this has already been created) if another map has been supplied
 if [ ! -z $isen ]; then
 # place supplied sensitivity image in the right place (over writing the one from FAST or the cref image if it exists)
     fslmaths $isen $outdir/native_space/sensitivity
+elif [ ! -z $cref ]; then
+    # calculate sensitivty image
+    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
 fi
 
 # Defaults for (some) parameters
