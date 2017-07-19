@@ -233,7 +233,7 @@ class PreviewPanel(wx.Panel):
         self.nslices = 1
         self.view = 0
         self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, axisbg='black')
+        self.axes = self.figure.add_subplot(111, facecolor='black')
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])          
         self.canvas = FigureCanvas(self, -1, self.figure)
@@ -379,7 +379,7 @@ class AslRun(wx.Frame):
             self.run_label.SetForegroundColour(wx.Colour(0, 128, 0))
             self.run_label.SetLabel("Ready to Go")
             self.run_btn.Enable(True)
-        except Exception, e:
+        except Exception as e:
             self.run_btn.Enable(False)
             self.run_label.SetForegroundColour(wx.Colour(255, 0, 0))
             self.run_label.SetLabel(str(e))
@@ -392,6 +392,11 @@ class AslRun(wx.Frame):
         """
         Run ASL_FILE for perfusion weighted image - just for the preview
         """
+        infile = self.input.data()
+        if infile == "":
+            # Don't bother if we have not input file yet!
+            return None
+        
         tempdir = tempfile.mkdtemp()
         self.preview_data = None
         try:
@@ -442,7 +447,7 @@ class AslRun(wx.Frame):
         N = self.input.ntis()
         if self.input.tc_pairs(): N *= 2
         if nvols % N != 0:
-            self.input.nrepeats_label.SetLabel("<Unknown>")
+            self.input.nrepeats_label.SetLabel("Unknown - Number of PLDs inconsistent with number of volumes")
             raise RuntimeError("Input data contains %i volumes - not consistent with %i TIs and TC pairs=%s" % (img.shape[3], self.input.ntis(), self.input.tc_pairs()))
         else:
             self.input.nrepeats_label.SetLabel("%i" % (nvols / N))
@@ -793,7 +798,8 @@ class AslInputOptions(TabPage):
         self.bolus_dur_ch.Bind(wx.EVT_CHOICE, self.update)
         self.bolus_dur_num = NumberChooser(self, min=0, max=2.5, step=0.1, initial=1.8)
         self.bolus_dur_num.span = 2
-        self.bolus_dur_num.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.bolus_dur_changed)
+        #self.bolus_dur_num.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.bolus_dur_changed)
+        self.bolus_dur_num.spin.Bind(wx.EVT_SPINCTRL, self.bolus_dur_changed)
         self.bolus_dur_num.slider.Bind(wx.EVT_SLIDER, self.bolus_dur_changed)
         self.pack("Bolus duration (s)", self.bolus_dur_ch, self.bolus_dur_num)
         
@@ -970,6 +976,8 @@ class NumberChooser(wx.Panel):
             self.label = wx.StaticText(self, label=label)
             self.hbox.Add(self.label, proportion=0, flag=wx.ALIGN_CENTRE_VERTICAL)
         # Set a very large maximum as we want to let the user override the default range
+        #self.spin = wx.SpinCtrl(self, min=0, max=100000, initial=initial)
+        #self.spin.Bind(wx.EVT_SPINCTRL, self.spin_changed)
         self.spin = wx.SpinCtrlDouble(self, min=0, max=100000, inc=step, initial=initial)
         self.spin.SetDigits(digits)
         self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.spin_changed)
@@ -1029,7 +1037,7 @@ class NumberList(wx.grid.Grid):
     def GetValues(self):
         try:
             return [float(self.GetCellValue(0, c)) for c in range(self.n)]
-        except ValueError, e:
+        except ValueError as e:
             raise RuntimeError("Non-numeric values in number list")
             
     def set_size(self, n):
@@ -1096,12 +1104,12 @@ class AslDataPreview(wx.Panel):
         dc.SetBrush(wx.TRANSPARENT_BRUSH)
         rect = wx.Rect(leg_start, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
-        dc.DrawRectangleRect(rect)
+        dc.DrawRectangle(rect.Get())
         dc.DrawText(self.tis_name, leg_start+leg_width/3, 20)
 
         rect = wx.Rect(leg_start+leg_width, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, False), self.get_col(1.0, False), wx.EAST)
-        dc.DrawRectangleRect(rect)
+        dc.DrawRectangle(rect.Get())
         dc.DrawText("Repeats", leg_start+4*leg_width/3, 20)
 
         if self.tc_pairs:
