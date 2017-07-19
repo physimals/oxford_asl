@@ -533,6 +533,22 @@ class AslRun(wx.Frame):
             if self.input.multiband():
                 cmd.add("--sliceband %i" % self.input.slices_per_band())
 
+        # Distortion correction
+        if self.distcorr.distcorr():
+            if self.distcorr.distcorr_type() == 0:
+                # Fieldmap
+                self.check_exists("Fieldmap image", self.distcorr.fmap())
+                cmd.add('--fmap="%s"' % self.distcorr.fmap())
+                self.check_exists("Fieldmap magnitude image", self.distcorr.fmap_mag())
+                if self.distcorr.fmap_be():
+                    cmd.add('--fmapmagbrain="%s"' % self.distcorr.fmap_mag())
+                else:
+                    cmd.add('--fmapmag="%s"' % self.distcorr.fmap_mag())
+            else:
+                if self.distcorr.cblip(): cmd.add("--cblip")
+            cmd.add("--echospacing=%.5f" % self.distcorr.echosp())
+            cmd.add("--pedir=%s" % self.distcorr.pedir())
+            
         # Calibration - do this via oxford_asl rather than calling asl_calib separately
         if self.calibration.calib():
             self.check_exists("Calibration image", self.calibration.calib_image())
@@ -574,7 +590,7 @@ class AslCalibration(TabPage):
     def __init__(self, parent):
         TabPage.__init__(self, parent, "Calibration")
 
-        self.calib_cb = self.checkbox("Enable Calibration", bold=True)
+        self.calib_cb = self.checkbox("Enable Calibration", bold=True, handler=self.calib_changed)
 
         self.calib_image_picker = self.file_picker("Calibration Image")
         self.m0_type_ch = self.choice("M0 Type", choices=["Proton Density (long TR)", "Saturation Recovery"])
@@ -629,6 +645,10 @@ class AslCalibration(TabPage):
             self.ref_t2_num.SetValue(100)
         self.update()
 
+    def calib_changed(self, event):
+        self.distcorr.calib_changed(self.calib())
+        self.update()
+
     def wp_changed(self, wp):
         self.update()
 
@@ -652,6 +672,76 @@ class AslCalibration(TabPage):
         self.ref_t2_num.Enable(enable and self.calib_mode() == 0)
         TabPage.update(self)
 
+class AslDistCorr(TabPage):
+    """
+    Tab page containing distortion correction options
+    """
+
+    def __init__(self, parent):
+        TabPage.__init__(self, parent, "Distortion Correction", "distcorr")
+
+        self.distcorr_choices = ["Fieldmap", "Calibration image"]
+
+        self.section("Distortion Correction")
+
+        self.distcorr_cb = wx.CheckBox(self, label="Apply distortion correction")
+        self.distcorr_cb.Bind(wx.EVT_CHECKBOX, self.update)
+        self.distcorr_ch = wx.Choice(self, choices=self.distcorr_choices[:1])
+        self.distcorr_ch.SetSelection(0)
+        self.distcorr_ch.Bind(wx.EVT_CHOICE, self.update)
+        self.pack("", self.distcorr_cb, self.distcorr_ch, enable=False)
+
+        self.echosp_num = self.number("Effective EPI echo spacing", min=0, max=10)
+        self.pedir_ch = self.choice("Phase encoding direction", choices=["x", "y", "z", "-x", "-y", "-z"])
+        
+        # Fieldmap options
+        self.fmap_picker = self.file_picker("Fieldmap image (in rad/s)")
+        self.fmap_mag_picker = self.file_picker("Fieldmap magnitude image")
+        self.fmap_mag_be_cb = self.checkbox("Magnitude image is brain extracted")
+        
+        # Calibration image options
+        self.cblip_cb = self.checkbox("Phase-encode-reversed calibration image")
+        
+        self.sizer.AddGrowableCol(1, 1)
+        #sizer.AddGrowableRow(5, 1)
+        self.SetSizer(self.sizer)
+
+    def distcorr(self): return self.distcorr_cb.IsChecked()
+    def distcorr_type(self): return self.distcorr_ch.GetSelection()
+    def fmap(self): return self.fmap_picker.GetPath()
+    def fmap_mag(self): return self.fmap_mag_picker.GetPath()
+    def fmap_mag_be(self): return self.fmap_mag_be_cb.IsChecked()
+    def echosp(self): return self.echosp_num.GetValue()
+    def pedir(self): return self.pedir_ch.GetStringSelection()
+    def cblip(self): return self.cblip_cb.IsChecked()
+
+    def update(self, event=None):
+        self.distcorr_ch.Enable(self.distcorr())
+        self.pedir_ch.Enable(self.distcorr())
+        self.echosp_num.Enable(self.distcorr())
+        fmap = self.distcorr() and self.distcorr_type() == 0
+        cal = self.distcorr() and self.distcorr_type() == 1
+        self.fmap_picker.Enable(fmap)
+        self.fmap_mag_picker.Enable(fmap)
+        self.fmap_mag_be_cb.Enable(fmap)
+        self.cblip_cb.Enable(cal)
+        TabPage.update(self)
+        
+    def calib_changed(self, enabled):
+        """ If calibration enabled, add the calibration image option for distortion correction"""
+        sel = self.distcorr_ch.GetSelection()
+        if enabled: 
+            choices = self.distcorr_choices
+            sel = 1
+        else: 
+            choices = self.distcorr_choices[:1]
+            sel = 0
+        self.distcorr_ch.Enable(False)
+        self.distcorr_ch.Clear()
+        self.distcorr_ch.AppendItems(choices)
+        self.distcorr_ch.SetSelection(sel)
+        self.update()
+
 class AslAnalysis(TabPage):
     """
     Tab page containing data analysis options
@@ -661,6 +751,8 @@ class AslAnalysis(TabPage):
         TabPage.__init__(self, parent, "Analysis")
 
         self.transform_choices = ["Matrix", "Warp image", "Use FSL_ANAT output"]
+
+        self.distcorr_choices = ["Fieldmap", "Calibration image"]
 
         self.section("Registration")
 
@@ -744,7 +836,7 @@ class AslAnalysis(TabPage):
         else:
             self.bat_num.SetValue(1.3)
             self.ie_num.SetValue(0.85)
-        
+
     def fsl_anat_changed(self, enabled):
         """ If FSL_ANAT is selected, use it by default, otherwise do not allow it """
         sel = self.transform_ch.GetSelection()
@@ -1188,7 +1280,7 @@ class AslGui(wx.Frame):
     """
 
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE)
+        wx.Frame.__init__(self, None, title="Basil", size=(1200, 750), style=wx.DEFAULT_FRAME_STYLE)
         #wx.Frame.__init__(self, None, title="Basil", size=(1200, 700), style=wx.DEFAULT_FRAME_STYLE ^ wx.RESIZE_BORDER)
         main_panel = wx.Panel(self)
         main_vsizer = wx.BoxSizer(wx.VERTICAL)
@@ -1224,6 +1316,7 @@ class AslGui(wx.Frame):
         setattr(self.run, "preview", self.preview)
         tabs = [AslInputOptions(notebook),
                 AslAnalysis(notebook),
+                AslDistCorr(notebook),
                 AslCalibration(notebook)]
 
         for tab in tabs:
