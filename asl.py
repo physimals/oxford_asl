@@ -1196,12 +1196,12 @@ class AslDataPreview(wx.Panel):
         dc.SetBrush(wx.TRANSPARENT_BRUSH)
         rect = wx.Rect(leg_start, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
-        dc.DrawRectangle(rect.Get())
+        dc.DrawRectangle(*rect.Get())
         dc.DrawText(self.tis_name, leg_start+leg_width/3, 20)
 
         rect = wx.Rect(leg_start+leg_width, 20, leg_width/4, 20)
         dc.GradientFillLinear(rect, self.get_col(0, False), self.get_col(1.0, False), wx.EAST)
-        dc.DrawRectangle(rect.Get())
+        dc.DrawRectangle(*rect.Get())
         dc.DrawText("Repeats", leg_start+4*leg_width/3, 20)
 
         if self.tc_pairs:
