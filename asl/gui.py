@@ -1331,9 +1331,13 @@ class AslGui(wx.Frame):
 
         self.Layout()
 
-if __name__ == '__main__':
+def main():
     app = wx.App(redirect=False)
     top = AslGui()
     top.Show()
     app.MainLoop()
+
+if __name__ == '__main__':
+    main()
+
 
