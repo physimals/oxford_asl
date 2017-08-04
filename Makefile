@@ -9,7 +9,7 @@ LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui
-PYMODULES = asl/fslhelpers.py asl/gui.py
+PYMODULES = asl/fslhelpers.py asl/gui.py asl/__init__.py
 RUNTCLS = Asl
 VERSIONED = oxford_asl asl_calib asl_reg quasil
 
@@ -33,7 +33,6 @@ $(VERSIONED): %: %.in FORCE
 
 postinstallscript: $(PYMODULES)
 	mkdir -p $(FSLDEVDIR)/python/asl ; \
-	touch $(FSLDEVDIR)/python/asl/__init__.py ; \
 	cp $(PYMODULES) $(FSLDEVDIR)/python/asl/ ; \
 	cd ..
 
