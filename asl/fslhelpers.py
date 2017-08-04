@@ -91,7 +91,7 @@ class Image:
             raise RuntimeError("%s file %s is ambiguous" % (file_type, fname))
     
         self.ext = matches[0]
-        self.full = os.path.abspath("%s%s" % (fname, ext))
+        self.full = os.path.abspath("%s%s" % (self.base, ext))
         self.nii = nib.load(self.full)
         self.shape = self.nii.shape
          
