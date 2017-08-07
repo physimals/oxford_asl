@@ -742,8 +742,6 @@ namespace OXASL {
     int t = max(x_boundary, y_boundary);
     int max_i = t * t;
 
-    int count = 1;
-
     for (int i = 0; i < max_i; i++) {
 
       // Position found

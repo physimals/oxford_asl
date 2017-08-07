@@ -57,15 +57,15 @@ public:
   Option<string> deconvout;
   Option<string> aif;
 
-  // Partial volume correction (linear regression method) parameters
-  Option<string> pv_gm_file;
-  Option<string> pv_wm_file;
-  Option<int> kernel;
-
   // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
   // Assumes an eroded brain
   Option<bool> extrapolate_option;
   Option<int> neighbour;
+
+  // Partial volume correction (linear regression method) parameters
+  Option<string> pv_gm_file;
+  Option<string> pv_wm_file;
+  Option<int> kernel;
 
   void parse_command_line(int argc, char** argv);
 
@@ -135,23 +135,6 @@ help(string("-h,--help"), false,
 	      string("Do surround subtraction on the pairs\n"),
 	      false,no_argument),
 
-  // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
-    // Assumes an eroded brain
-    extrapolate_option(string("--extrapolate"), false, 
-      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
-      false, no_argument),
-    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
-      false, requires_argument),
-
-   // Partial volume (linear regression) options
-    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
-      false, requires_argument),
-    pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
-      false, requires_argument),
-    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
-      false, requires_argument),
-  
-
    //basic output
    outblockform(string("--obf,--outblockform"),string("notset"),
 	       string("Output block format (for --out=):\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI\n          Default is same as input block format (--ibf)"),
@@ -188,10 +171,22 @@ help(string("-h,--help"), false,
       string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)\n"),
       false,requires_argument),
 
-   
+    // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
+    // Assumes an eroded brain
+    extrapolate_option(string("--extrapolate"), false, 
+      string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"), 
+      false, no_argument),
+    neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
 
-    
-
+   // Partial volume (linear regression) options
+    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
+      false, requires_argument),
+    pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
+      false, requires_argument),
+    kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
+      false, requires_argument),
+  
     options("asl_file","asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n") {
       try {
        options.add(help);

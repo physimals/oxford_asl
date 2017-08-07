@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     // Partail volume correction variables
     volume<float> pv_gm_map;
     volume<float> pv_wm_map;
-    int kernel;
+    int kernel=0;
     vector<Matrix> output_data_gm;
     vector<Matrix> output_data_wm;
     // Read partial volume map and kernel size
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     // To save output data
     vector<Matrix> output_data_extrapolated;
     // Extrapolation options
-    int neighbour_size;
+    int neighbour_size=0;
     if (opts.extrapolate_option.value()) {
       // Get the neighbourhood size
       neighbour_size = opts.neighbour.value();
@@ -161,7 +161,7 @@ int main(int argc, char *argv[])
 
 	
       }
-      if (nrpts.size()<ntis) throw Exception("Insufficient entries in list fo repeats (--rpts) compared to number of TIs");
+      if (int(nrpts.size())<ntis) throw Exception("Insufficient entries in list fo repeats (--rpts) compared to number of TIs");
     }
 
    
