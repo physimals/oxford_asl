@@ -1,0 +1,13 @@
+BasedOnStyle: WebKit
+AccessModifierOffset: -4
+AlignTrailingComments: true
+BreakBeforeBraces: Allman
+ColumnLimit: 0
+IndentWidth: 4
+KeepEmptyLinesAtTheStartOfBlocks: false
+PointerBindsToType: false
+SpacesBeforeTrailingComments: 1
+TabWidth: 4
+UseTab: Never
+Standard: Cpp03
+
