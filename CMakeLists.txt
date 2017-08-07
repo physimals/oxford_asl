@@ -68,9 +68,11 @@ configure_file(asl_reg.in asl_reg @ONLY)
 configure_file(quasil.in quasil @ONLY)
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oxford_asl 
-        ${CMAKE_CURRENT_BINARY_DIR}/asl_calib
+  ${CMAKE_CURRENT_BINARY_DIR}/asl_calib
 	${CMAKE_CURRENT_BINARY_DIR}/asl_reg
 	${CMAKE_CURRENT_BINARY_DIR}/quasil
 	${CMAKE_CURRENT_BINARY_DIR}/asl_file
+	asl_gui
 	DESTINATION bin)
 
+INSTALL(FILES asl/fslhelpers.py asl/gui.py asl/__init__.py DESTINATION python/asl)
