@@ -37,7 +37,7 @@ postinstallscript: $(PYMODULES)
 	cd ..
 
 clean:
-	rm ${SCRIPTS}
+	rm -f ${SCRIPTS} asl_file *.o
 
 FORCE:
 
