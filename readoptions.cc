@@ -23,7 +23,7 @@ namespace OXASL
 {
 ReadOptions *ReadOptions::ropt = NULL;
 
-void ReadOptions::parse_command_line(int argc, char **argv)
+bool ReadOptions::parse_command_line(int argc, char **argv)
 {
     Tracer_Plus("ReadOptions::parse_command_line");
 
@@ -41,10 +41,20 @@ void ReadOptions::parse_command_line(int argc, char **argv)
     //  logger.str() << argv[a] << " ";
     //logger.str() << endl << "---------------------------------------------" << endl << endl;
 
-    if (help.value() || !options.check_compulsory_arguments())
+    if (help.value())
     {
         options.usage();
+        return false;
+    }
+    else if (version.value()) 
+    {
+        cout << "asl_file " << GIT_SHA1 << " (" << GIT_DATE << ")" << endl;
+        return false;
+    }
+    else if (!options.check_compulsory_arguments()) 
+    {
         throw Exception("Not all of the compulsory arguments have been provided");
     }
+    return true;
 }
 }

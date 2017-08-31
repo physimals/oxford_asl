@@ -35,7 +35,10 @@ int main(int argc, char *argv[])
     {
         //parse command line (puts these into the log file)
         ReadOptions &opts = ReadOptions::getInstance();
-        opts.parse_command_line(argc, argv);
+        if (!opts.parse_command_line(argc, argv))
+        {
+            return 0;
+        }
 
         //deal with input data type options
         bool isblocked = false;  //indicates if data is in blocks of repeats (of all TIs) rather than TIs
