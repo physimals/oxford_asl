@@ -48,7 +48,7 @@ bool ReadOptions::parse_command_line(int argc, char **argv)
     }
     else if (version.value()) 
     {
-        cout << "asl_file " << GIT_SHA1 << " (" << GIT_DATE << ")" << endl;
+        cout << GIT_SHA1 << " (" << GIT_DATE << ")" << endl;
         return false;
     }
     else if (!options.check_compulsory_arguments()) 
