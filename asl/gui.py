@@ -233,7 +233,7 @@ class PreviewPanel(wx.Panel):
         self.nslices = 1
         self.view = 0
         self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, facecolor='black')
+        self.axes = self.figure.add_subplot(111, axis_bgcolor='black')
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])          
         self.canvas = FigureCanvas(self, -1, self.figure)
@@ -1331,9 +1331,13 @@ class AslGui(wx.Frame):
 
         self.Layout()
 
-if __name__ == '__main__':
+def main():
     app = wx.App(redirect=False)
     top = AslGui()
     top.Show()
     app.MainLoop()
+
+if __name__ == '__main__':
+    main()
+
 
