@@ -29,6 +29,7 @@ public:
     static ReadOptions &getInstance();
     ~ReadOptions() { delete ropt; }
     Option<bool> help;
+    Option<bool> version;
 
     Option<string> datafile;
     Option<string> maskfile;
@@ -67,7 +68,7 @@ public:
     Option<string> pv_wm_file;
     Option<int> kernel;
 
-    void parse_command_line(int argc, char **argv);
+    bool parse_command_line(int argc, char **argv);
 
 private:
     ReadOptions();
@@ -92,6 +93,11 @@ inline ReadOptions::ReadOptions()
 
     help(string("-h,--help"), false,
         string("display this message"),
+        false, no_argument)
+    ,
+
+    version(string("-v,--version"), false,
+        string("display version identification"),
         false, no_argument)
     ,
 
@@ -203,6 +209,7 @@ inline ReadOptions::ReadOptions()
     try
     {
         options.add(help);
+        options.add(version);
 
         options.add(datafile);
         options.add(maskfile);
