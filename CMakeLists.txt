@@ -62,6 +62,8 @@ execute_process(COMMAND
   OUTPUT_VARIABLE GIT_DATE
   ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
 
+add_definitions(-DGIT_SHA1="${GIT_SHA1}" -DGIT_DATE="${GIT_DATE}")
+
 configure_file(oxford_asl.in oxford_asl @ONLY)
 configure_file(asl_calib.in asl_calib @ONLY)
 configure_file(asl_reg.in asl_reg @ONLY)
