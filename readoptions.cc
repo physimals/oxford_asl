@@ -53,6 +53,7 @@ bool ReadOptions::parse_command_line(int argc, char **argv)
     }
     else if (!options.check_compulsory_arguments()) 
     {
+        options.usage();
         throw Exception("Not all of the compulsory arguments have been provided");
     }
     return true;
