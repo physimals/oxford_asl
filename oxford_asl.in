@@ -668,7 +668,8 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
 	    ;;
-	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
+	-s) strucflag=1  #NOTE: use strucflag to determin if structural information (in any form) has been provided
+	    struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
 	--sbrain) strucbet=$argument # user supplied BETed structural
 		  takeargs=1;;
@@ -1379,7 +1380,7 @@ if [ -z $mask ]; then
 echo "Creating mask"
 Log "Automatic mask generation"
 # preferred option is to use brain extracted structural
-if [ ! -z $struc ]; then
+if [ ! -z $strucflag ]; then
     fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
     flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
     fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
