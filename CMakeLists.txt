@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 2.7)
 add_executable(asl_file asl_file.cc readoptions.cc asl_functions.cc)
 
 if(APPLE)
-  # Uncomment to force use of libstdc++ on Mac as FSL uses this and we cannot link otherwise
-  # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libstdc++")
+  # Uncomment to force use of libstdc++ on Mac if FSL libraries use thi
+  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -stdlib=libstdc++")
   # Get rid of CMake warning
   set(CMAKE_MACOSX_RPATH ON)
 endif(APPLE)
@@ -61,6 +61,8 @@ execute_process(COMMAND
   WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
   OUTPUT_VARIABLE GIT_DATE
   ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+add_definitions(-DGIT_SHA1="${GIT_SHA1}" -DGIT_DATE="${GIT_DATE}")
 
 configure_file(oxford_asl.in oxford_asl @ONLY)
 configure_file(asl_calib.in asl_calib @ONLY)
