@@ -1015,14 +1015,14 @@ echo "Pre-processing"
 if [ ! -z $fslanat ]; then
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
-    if [ -z $fslanat/T1_biascorr ]; then
+    if ls $fslanat/T1_biascorr.* 1> /dev/null 2>&1; then
 	Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
 	imcp $fslanat/T1_biascorr $tempdir/struc
 	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     else
 	Log "Using structural images from fsl_anat: $fslanat"
 	imcp $fslanat/T1 $tempdir/struc
-	imcp $fslanat/T1_brain $tempdir/struc_bet
+	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     fi
     
     # use the registration to standard space - if it is there
