@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
                 cout << "Start extrapolation!" << endl;
 
                 // Perform extrapolation, result in output_data_extrapolated
-                extrapolate(asldata, ndata, mask, neighbour_size, output_data_extrapolated, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
+                extrapolate(asldata, ndata, ntis, mask, neighbour_size, output_data_extrapolated, outblocked, outpairs, nrpts, isblocked, ispairs, blockpairs);
             }
 
             else if (!opts.extrapolate_option.value())

@@ -68,7 +68,7 @@ volume<float> correct_NaN(const volume<float> &data_in);
 
 // Extrapolation functions
 // function to extrapolate voxels
-void extrapolate(vector<Matrix> &data_in, int ndata_in, volume<float> &mask, int neighbour_size, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+void extrapolate(vector<Matrix> &data_in, int ndata_in, int ntis, volume<float> &mask, int neighbour_size, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 
 // Function to do spiral search on 2D images and extrapolate edge voxels
 Matrix extrapolate_avg(Matrix data_in, Matrix mask, int neighbour_size);

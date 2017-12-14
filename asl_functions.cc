@@ -20,8 +20,6 @@ void data2stdform(Matrix &datamtx, vector<Matrix> &asldata, int ntis, vector<int
     //if (ispairs) nrpts=nmeas/2;
     // else nrpts=nmeas;
 
-    //cout << nmeas << " " << nrpts << " " << endl;
-
     if (isblocked)
     {
         // blocks of repateed measurements - each block contains one version of each TI
@@ -883,7 +881,7 @@ Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size)
 }
 
 // Function to extrapolate voxels on the edge
-void extrapolate(vector<Matrix> &data_in, int ndata_in, volume<float> &mask, int neighbour_size, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs)
+void extrapolate(vector<Matrix> &data_in, int ndata_in, int ntis, volume<float> &mask, int neighbour_size, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs)
 {
     // Version control
     //cout << "Extrapolation. version 1.0.1 (beta). Last compiled on 20170315" << endl;
@@ -953,6 +951,6 @@ void extrapolate(vector<Matrix> &data_in, int ndata_in, volume<float> &mask, int
     // convert data_extrapolated to vector<Matrix> format
     Matrix datamtx;
     datamtx = data_extrapolated.matrix(mask);
-    data2stdform(datamtx, data_out, ndata_in, nrpts, isblocked, ispairs, blockpairs);
+    data2stdform(datamtx, data_out, ntis, nrpts, isblocked, ispairs, blockpairs);
 }
 }
