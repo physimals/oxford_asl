@@ -204,6 +204,30 @@ OutputMasked() {
     fi
 }
 
+Outputvoxcal() {
+    parname=$1
+    subdir=$2
+
+    if [ ! -z $structout ]; then
+        if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
+            flirt -in $outdir/native_space/$subdir/$parname -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname
+            echo "Calibrated perfusion map transformed into structural space"
+    fi
+
+    if [ ! -z $stdout ]; then
+        if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
+        if [ ! -z $warp ]; then
+	        applywarp --in=$outdir/native_space/$subdir/$parname --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp
+            echo "Calibrated perfusion map transformed into structural space"
+        elif [ ! -z $trans ]; then
+	        flirt -in $outdir/native_space/$subdir/$parname -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
+            echo "Calibrated perfusion map transformed into structural space"
+        else
+	        echo "ERROR: cannot do standard space out - neither warp or transformation matrix found"
+        fi
+    fi
+}
+
 Calibrate() {
     parname=$1
     Moval=$2
@@ -218,7 +242,7 @@ Calibrate() {
 # fourth argument is a subdirectory to use for finding and saving the result
     subdir=$4;
 
-if [ ! -z $stdout ]; then
+if [ ! -z $stdout ] && [ $cmethod = 'single' ]; then 
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
     fslmaths  $outdir/std_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/std_space/$subdir/${parname}_calib 
 fi
@@ -226,7 +250,7 @@ if [ ! -z $nativeout ]; then
     if [ ! -d  $outdir/native_space/$subdir ]; then mkdir $outdir/native_space/$subdir; fi
     fslmaths $outdir/native_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/native_space/$subdir/${parname}_calib 
 fi
-if [ ! -z $structout ]; then
+if [ ! -z $structout ] && [ $cmethod = 'single' ]; then
     if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
     fslmaths $outdir/struct_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/struct_space/$subdir/${parname}_calib 
 fi
@@ -572,6 +596,9 @@ if [ ! -z $calibflag ]; then
     fi
 
     Calibrate perfusion $malpha 6000 $subdir
+    if [ $cmethod = 'voxel' ]; then 
+        Outputvoxcal perfusion_calib $subdir
+    fi
     Report perfusion_calib $subdir gm
    
     if [ $subdir = "pvcorr" ]; then
@@ -592,6 +619,9 @@ if [ ! -z $calibflag ]; then
 	fi
 	
 	Calibrate perfusion_var $Mosq 36000000 $subdir
+    if [ $cmethod = 'voxel' ]; then 
+        Outputvoxcal perfusion_var_calib $subdir
+    fi
     fi
 
     if [ -z $artoff ];then
