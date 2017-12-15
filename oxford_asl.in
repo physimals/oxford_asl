@@ -128,6 +128,10 @@ Usage_extended() {
     echo " --elen      : Length of each epoch in TIs"
     echo " --eol       : Overlap of each epoch in TIs- {deafult: 0}"
     echo ""
+    echo " Miscellaneous "
+    echo " --model-options=<file>  : File containing additional model options to be passed to BASIL/Fabber"
+    echo "                           This is an advanced setting for model-specific options ONLY"
+    echo "                           Do NOT include any standard oxford_asl options here" 
     echo ""
     echo " Notes:"
     echo " Input data - Any combination of label (tag) control images is accepted, see asl_file for more detailed"
@@ -613,6 +617,12 @@ Log() {
     fi
 }
 
+Warn() {
+    # save a warning to the log and echo to the terminal
+    echo "WARNING: $1"
+    echo "WARNING: $1" >> $log
+}
+
 # deal with options
 
 if [ -z $1 ]; then
@@ -668,7 +678,8 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--wp) whitepaper=1; # operate in 'white paper' mode
 	    ;;
-	-s) strucflag=1 struc=$argument # strucutral image (not BETed)
+	-s) strucflag=1  #NOTE: use strucflag to determin if structural information (in any form) has been provided
+	    struc=$argument # strucutral image (not BETed)
 	    takeargs=1;;
 	--sbrain) strucbet=$argument # user supplied BETed structural
 		  takeargs=1;;
@@ -820,6 +831,8 @@ takeargs=0;boolarg="";isbool="";
 	--cblip) cblip=$argument #blip reversed calibration image
 		 takeargs=1;; 
 	# 
+	--model-options) model_options=$argument
+	    takeargs=1;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -1000,12 +1013,18 @@ fi
 # general pre-processing
 echo "Pre-processing"
 if [ ! -z $fslanat ]; then
-    Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
-    imcp $fslanat/T1_biascorr $tempdir/struc
-    imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
-
+    if ls $fslanat/T1_biascorr.* 1> /dev/null 2>&1; then
+	Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
+	imcp $fslanat/T1_biascorr $tempdir/struc
+	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    else
+	Log "Using structural images from fsl_anat: $fslanat"
+	imcp $fslanat/T1 $tempdir/struc
+	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    fi
+    
     # use the registration to standard space - if it is there
     if [ -e $fslanat/T1_to_MNI_nonlin_coeff.nii.gz ]; then
         stdout=1; transflag=1;
@@ -1332,7 +1351,12 @@ if [ ! -z $fslanat ]; then
     imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
     imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
 
-    imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+    if [ ! -z $fslanat/T1_fast_bias ]; then # test to check that there is a bias field here
+       Log "Bias field extracted from $fslanat sucessfully"
+       imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+    else
+	Log "No Bias field found in $fslanat"
+    fi
     
 elif [ ! -z $struc ]; then
     # do we have the results from FAST already? If not run it
@@ -1354,7 +1378,12 @@ elif [ ! -z $struc ]; then
     imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
     imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
 
-    imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    if [ ! -z ${fastsrc}_bias ]; then # test to see if there is a bias field in the FAST output
+	Log "Bias field extracted from ${fastsrc} sucessfully"
+	imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    else
+	Log "No Bias field found with ${fastsrc}"
+    fi
      
 fi
 
@@ -1363,12 +1392,18 @@ if [ ! -z $fasthasrun ]; then
     # create a tissseg (wmseg) image for BBR in asl_reg
     fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
 
-    # transform the bias field and invert to use for sensitivity correction in calibration
-    applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    if [ ! -z $tempdir/biasfield_struct ]; then
+	# transform the bias field and invert to use for sensitivity correction in calibration
+	applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    fi
 
     if [ ! -z $senscorr ]; then
-	fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+	if [ ! -z $tempdir/biasfield ]; then #make sure we have the biasfield (from above) before attempting this
+	    Log "Creating sensitivity map from biasfield"
+	    fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+	fi	    
     fi
+
 fi
     
 ### End of: Segmentation
@@ -1379,7 +1414,7 @@ if [ -z $mask ]; then
 echo "Creating mask"
 Log "Automatic mask generation"
 # preferred option is to use brain extracted structural
-if [ ! -z $struc ]; then
+if [ ! -z $strucflag ]; then
     fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
     flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
     fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
@@ -1564,6 +1599,13 @@ elif [ ! -z $cref ]; then
     # calculate sensitivty image
     fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
 fi
+if [ -z $outdir/native_space/sensitivity ]; then
+    # Senstivity correction cannot be done if this image hasn't been generated by this point
+    senscorr=""
+    # Throw a warning
+    Warn "sensitivity correction has been requested, but suitable map is not available, skipping that step"
+fi
+    
 
 # Defaults for (some) parameters
 # deal with T1
@@ -1761,6 +1803,11 @@ fi
 
 if [ ! -z $devel ]; then
     basil_options=$basil_options" --devel "
+fi
+
+if [ ! -z $model_options ]; then
+    echo "Appending additional BASIL options to $tempdir/basil_options.txt"
+    cat $model_options >> $tempdir/basil_options.txt
 fi
 
 Log "BASIL options ($tempdir/basil_options.txt):"
