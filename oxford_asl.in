@@ -11,7 +11,7 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "OXFORD_ASL"
@@ -109,7 +109,7 @@ Usage_extended() {
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already in T1-space) "
     echo " Distortion correction using phase-encode-reversed calibration image (TOPUP):"
-    echo " --cblip                : phase-encode-reversed (blipped) calibration image"
+    echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo ""
