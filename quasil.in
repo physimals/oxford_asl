@@ -33,6 +33,7 @@ Usage() {
     echo " --infertau : estimate bolus duration from data"
     echo " --mfree    : Do model-free (SVD deconvolution) analysis"
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
+    echo " --alpha    : Inversion efficiency {default: 0.91}"
     echo ""
     echo " Partial volume effects correction options:"
     echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
@@ -110,6 +111,8 @@ takeargs=0;boolarg="";isbool="";
         shift;;
     --corrcal) corrcal=1
         ;;
+    --alpha) alpha=$argument
+        shift;;
     --infertau) infertau=1
         ;;
 
@@ -373,9 +376,13 @@ if [ -z "$calibcmds" ]; then
     ${FSLDIR}/bin/immv calib/mean_g calib/g
     ${FSLDIR}/bin/immv calib/mean_M0t calib/M0t
 
+    if [ ! -z $alpha ]; then
+        alpha=0.91
+    fi
+
     #fslmaths instruction for calibration (for execution whilst back in starting dir)
     #cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
-    cinstr=" -div $tempdir/calib/M0t -div 0.9 " # partition coefficient 0.9
+    cinstr=" -div $tempdir/calib/M0t -div 0.9 -div $alpha" # partition coefficient 0.9
 
     #save calibration results to output directory for reference
     ${FSLDIR}/bin/imcp calib/M0t $outdir/M0t
