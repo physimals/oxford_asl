@@ -9,7 +9,8 @@ LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui
-PYMODULES = asl/fslhelpers.py asl/gui.py asl/__init__.py
+PYMODULES = asl/fslhelpers.py asl/__init__.py
+PYGUI = asl/gui/*.py
 RUNTCLS = Asl
 VERSIONED = oxford_asl asl_calib asl_reg quasil
 
@@ -30,10 +31,12 @@ asl_file: ${OBJS} asl_file.o
 
 $(VERSIONED): %: %.in FORCE
 	sed -e "s/@GIT_SHA1@/${GIT_SHA1}/" -e "s/@GIT_DATE@/${GIT_DATE}/" $< >$@
+	chmod a+x $@
 
-postinstallscript: $(PYMODULES)
-	mkdir -p $(FSLDEVDIR)/python/asl ; \
+postinstallscript: $(PYMODULES) $(PYGUI)
+	mkdir -p $(FSLDEVDIR)/python/asl/gui ; \
 	cp $(PYMODULES) $(FSLDEVDIR)/python/asl/ ; \
+	cp $(PYGUI) $(FSLDEVDIR)/python/asl/gui ; \
 	cd ..
 
 clean:

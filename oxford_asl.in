@@ -11,7 +11,7 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "OXFORD_ASL"
@@ -109,7 +109,7 @@ Usage_extended() {
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already in T1-space) "
     echo " Distortion correction using phase-encode-reversed calibration image (TOPUP):"
-    echo " --cblip                : phase-encode-reversed (blipped) calibration image"
+    echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo ""
@@ -205,31 +205,14 @@ OutputMasked() {
 }
 
 Calibrate() {
-    parname=$1
-    Moval=$2
-
-    # third argument is an extra multiplier that we might use to get parameter into physiological units
-    if [ -z $3 ]; then
-	multiplier=1
-    else
-	multiplier=$3
-    fi
-
-# fourth argument is a subdirectory to use for finding and saving the result
-    subdir=$4;
-
-if [ ! -z $stdout ]; then
-    if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
-    fslmaths  $outdir/std_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/std_space/$subdir/${parname}_calib 
-fi
-if [ ! -z $nativeout ]; then
-    if [ ! -d  $outdir/native_space/$subdir ]; then mkdir $outdir/native_space/$subdir; fi
-    fslmaths $outdir/native_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/native_space/$subdir/${parname}_calib 
-fi
-if [ ! -z $structout ]; then
-    if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    fslmaths $outdir/struct_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/struct_space/$subdir/${parname}_calib 
-fi
+    param=$1 #parameter as know by basil (and related scripts)
+    parname=$2 #parameter name as called in the output directory
+    Moval=$3 # Either a number or an image in native space for the calibration scaling
+    multiplier=$4 # multiplier that we might use to get parameter into physiological units
+    subdir=$5; # subdirectory to use for finding and saving the result
+    
+    fslmaths  $tempdir/$subdir/$param -div $Moval -mul $multiplier $tempdir/$subdir/${param}_calib 
+    Output ${param}_calib ${parname}_calib $subdir
 }
 
 Report() {
@@ -571,12 +554,12 @@ if [ ! -z $calibflag ]; then
 	malpha=$tempdir/malpha
     fi
 
-    Calibrate perfusion $malpha 6000 $subdir
+    Calibrate ftiss perfusion $malpha 6000 $subdir
     Report perfusion_calib $subdir gm
    
     if [ $subdir = "pvcorr" ]; then
 	OutputMasked perfusion_calib $subdir gm
-	Calibrate perfusion_wm $malpha 6000 $subdir
+	Calibrate ftisswm perfusion_wm $malpha 6000 $subdir
 	Report perfusion_wm_calib $subdir wm
 	OutputMasked perfusion_wm_calib $subdir wm
     else
@@ -588,15 +571,15 @@ if [ ! -z $calibflag ]; then
 	    Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
 	elif [ $cmethod = 'voxel' ]; then
 	    fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
-	    Mosq=$tempdir/mosq
+        Mosq=$tempdir/mosq
 	fi
 	
-	Calibrate perfusion_var $Mosq 36000000 $subdir
+	Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir
     fi
 
     if [ -z $artoff ];then
         # output aCBV as a percentage
-	Calibrate aCBV $malpha 100 $subdir
+	    Calibrate fblood aCBV $malpha 100 $subdir
     fi
 fi
 
