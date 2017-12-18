@@ -106,7 +106,15 @@ class AslInputOptions(TabPage):
         d = os.path.dirname(self.data_picker.GetPath())
         for w in [self.structure.fsl_anat_picker,
                   self.structure.struc_image_picker,
-                  self.structure.brain_image_picker,]:
+                  self.structure.brain_image_picker,
+                  self.calibration.calib_image_picker,
+                  self.calibration.ref_tissue_mask_picker,
+                  self.calibration.coil_image_picker,
+                  self.analysis.mask_picker,
+                  self.distcorr.calib_picker,
+                  self.distcorr.fmap_picker,
+                  self.distcorr.fmap_mag_picker,
+                  self.distcorr.fmap_be_picker]:
             try:
                 # WX version dependent...
                 w.SetInitialDirectory(d)

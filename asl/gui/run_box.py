@@ -27,7 +27,6 @@ class FslCmd():
 
         self.cmd = cmd
         for d in (script_dir, fsldevdir, fsldir):
-            print("Checking ", os.path.join(d, cmd))
             if os.path.exists(os.path.join(d, cmd)):
                 self.cmd = os.path.join(d, cmd)
                 break
@@ -233,7 +232,7 @@ class AslRun(wx.Frame):
             fsl_anat.add('-i "%s"' % struc_image)
             fsl_anat.add('-o "%s/struc"' % outdir)
             run.append(fsl_anat)
-            cmd.add('--fslanat="%s/struc"' % outdir)
+            cmd.add('--fslanat="%s/struc.anat"' % outdir)
         elif struc_image is not None:
             # Providing independent structural data
             self.check_exists("Structural image", struc_image)
@@ -335,9 +334,9 @@ class AslRun(wx.Frame):
             cmd.add("--bat %.2f" % self.analysis.bat())
         cmd.add("--t1b %.2f" % self.analysis.t1b())
         cmd.add("--alpha %.2f" % self.analysis.ie())
-        cmd.add("--spatial=%i" % int(self.analysis.spatial()))
-        cmd.add("--fixbolus=%i" % int(self.analysis.fixbolus()))
-        cmd.add("--mc=%i" % int(self.analysis.mc()))
+        if self.analysis.fixbolus(): cmd.add("--fixbolus")
+        if self.analysis.spatial(): cmd.add("--spatial")
+        if self.analysis.mc(): cmd.add("--mc")
         if self.analysis.infer_t1(): cmd.add("--infert1")
         if self.analysis.pv(): cmd.add("--pvcorr")
         if not self.analysis.macro(): cmd.add("--artoff")

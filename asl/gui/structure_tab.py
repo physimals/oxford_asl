@@ -22,7 +22,7 @@ class StructureTab(TabPage):
         self.section("Structure")
 
         self.struc_ch = wx.Choice(self, choices=["Existing FSL_ANAT output", "Run FSL_ANAT on structural image", "Independent structural data", "None"])
-        self.struc_ch.SetSelection(self.NEW_FSLANAT)
+        self.struc_ch.SetSelection(self.NONE)
         self.struc_ch.Bind(wx.EVT_CHOICE, self.update)
         self.struc_ch.span = 2
         self.pack("Structural data from", self.struc_ch)

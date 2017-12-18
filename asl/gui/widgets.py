@@ -438,7 +438,7 @@ class AslDataPreview(wx.Panel):
         if self.tc_pairs:
             dc.SetBrush(wx.TRANSPARENT_BRUSH)
             dc.DrawRectangle(leg_start+leg_width*2, 20, leg_width/4, 20)
-            dc.DrawText("Tag", leg_start+7*leg_width/3, 20)
+            dc.DrawText("Label", leg_start+7*leg_width/3, 20)
 
             b = wx.Brush('black', wx.BDIAGONAL_HATCH)
             dc.SetBrush(b)
