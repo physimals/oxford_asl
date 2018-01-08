@@ -12,7 +12,7 @@ SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui
 PYMODULES = asl/__init__.py asl/fslhelpers.py asl/reg.py
 PYGUI = asl/gui/*.py
 RUNTCLS = Asl
-VERSIONED = oxford_asl asl_calib quasil asl/__init__.py
+VERSIONED = oxford_asl asl_calib quasil asl_reg
 
 OBJS = readoptions.o asl_functions.o
 
