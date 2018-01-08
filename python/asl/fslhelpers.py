@@ -25,7 +25,7 @@ def set_localdir(localdir):
     LOCAL_DIR = localdir
 
 class Prog:
-    def __init__(self, cmd, localdir=""):
+    def __init__(self, cmd):
         self.cmd = cmd
 
     def _find(self):
@@ -34,31 +34,28 @@ class Prog:
         This is called each time the program is run so the caller can control where programs
         are searched for at any time
         """
-        if "FSLDIR" in os.environ: 
-            fsldir = os.environ["FSLDIR"]
-        else:
-            fsldir = LOCAL_DIR
-        if "FSLDEVDIR" in os.environ: 
-            fsldevdir = os.environ["FSLDEVDIR"]
-        else:
-            fsldevdir = LOCAL_DIR
+        dirs = [
+            os.path.join(os.environ.get("FSLDIR", LOCAL_DIR), "bin"), 
+            os.path.join(os.environ.get("FSLDEVDIR", LOCAL_DIR), "bin"),
+            LOCAL_DIR
+        ]
 
-        local_path = os.path.join(LOCAL_DIR, self.cmd)
-        if os.path.isfile(local_path) and os.access(local_path, os.X_OK):
-            return local_path
-        elif os.path.exists(os.path.join(fsldevdir, "bin/%s" % self.cmd)):
-            return os.path.join(fsldevdir, "bin/%s" % self.cmd)
-        elif os.path.exists(os.path.join(fsldir, "bin/%s" % self.cmd)):
-            return os.path.join(fsldir, "bin/%s" % self.cmd)
-        else:
-            return self.cmd
+        for d in dirs:
+            ex = os.path.join(d, self.cmd)
+            if os.path.isfile(ex) and os.access(ex, os.X_OK):
+                return ex
+        
+        return self.cmd
     
     def run(self, args):
+        self(args)
+
+    def __call__(self, args):
         """ Run, writing output to stdout and returning retcode """
         cmd = self._find()
         cmd_args = shlex.split(cmd + " " + args)
         out = ""
-       #print(" ".join(cmd_args))
+        #print(" ".join(cmd_args))
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
@@ -120,7 +117,7 @@ flirt = Prog("flirt")
 fast = Prog("fast")
 
 def imcp(src, dest):
-    Prog("imcp").run("%s %s" % (src, dest))
+    Prog("imcp")("%s %s" % (src, dest))
     
 def mkdir(dir, fail_if_exists=False, warn_if_exists=True):
     try:
