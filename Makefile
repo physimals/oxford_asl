@@ -9,7 +9,7 @@ LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui
-PYMODULES = asl/__init__.py asl/fslhelpers.py asl/reg.py
+PYMODULES = asl/__init__.py asl/fslhelpers.py asl/reg.py 
 PYGUI = asl/gui/*.py
 RUNTCLS = Asl
 VERSIONED = oxford_asl asl_calib quasil asl_reg

@@ -123,7 +123,6 @@ class AslInputOptions(TabPage):
         self.update()
 
     def update(self, event=None):
-        print("Updating")
         self.ti_list.set_size(self.ntis())
         self.bolus_dur_list.set_size(self.ntis())
 
@@ -136,7 +135,6 @@ class AslInputOptions(TabPage):
         self.bolus_dur_list.Enable(self.bolus_dur_type() == 1)
 
         self.tc_ch.Enable(self.tc_pairs())
-        print("Updating groups")
         self.update_groups()
 
         TabPage.update(self)
@@ -176,10 +174,8 @@ class AslInputOptions(TabPage):
             g2 = self.choice2.GetString(self.choice2.GetSelection())
         else:
             g2 = self.groups[0]
-        print(g1, g2)
         if g1 == g2:
             g2 = self.groups[(self.groups.index(g1) + 1) % 3]
-            print("Match", g1, g2)
 
         self.choice2.Show()
         choices_st, choices_end = 0, 3
@@ -190,7 +186,6 @@ class AslInputOptions(TabPage):
             self.choice2.Hide() 
             if g1 == self.groups[2]: g1 = self.groups[0]
             if g2 in (g1, self.groups[2]): g2 = self.groups[1-self.groups.index(g1)]
-            print("TC removed", g1, g2)
             choices_end = 2
         
         # If only one TI/PLD, don't offer to group by TIs/PLDs
@@ -200,7 +195,6 @@ class AslInputOptions(TabPage):
             self.choice2.Hide()   
             if g1 == self.groups[0]: g1 = self.groups[1]
             g2 = self.groups[0]
-            print("TIs removed", g1, g2)
             choices_st = 1
             
         group1_items = []
@@ -222,7 +216,6 @@ class AslInputOptions(TabPage):
 
         # Need to do this as we may have unhidden the second menu
         self.GetSizer().Layout() 
-        print(order)
 
     def update_group_choice(self, w, items, sel):
         w.Enable(False)

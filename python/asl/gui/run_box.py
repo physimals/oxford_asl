@@ -37,23 +37,23 @@ class FslCmd():
         else:
             self.cmd += " %s" % opt
 
-    def write_output(self, line, out_widget=None):
+    def write_output(self, line, out_widget=None, out_stream=None):
         if out_widget is not None: 
             out_widget.AppendText(line)
             wx.Yield()
-        else:
-            sys.stdout.write(line)
+        if out_stream is not None:
+            out_stream.write(line)
 
-    def run(self, out_widget=None):
-        self.write_output(self.cmd, out_widget)
+    def run(self, out_widget=None, out_stream=None):
+        self.write_output(self.cmd, out_widget, out_stream)
         args = shlex.split(self.cmd)
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
             line = p.stdout.readline()
-            self.write_output(line, out_widget)
+            self.write_output(line, out_widget, out_stream)
             if retcode is not None: break
-        self.write_output("Return code: %i" % retcode, out_widget)
+        self.write_output("Return code: %i\n" % retcode, out_widget, out_stream)
         
         return retcode
 
@@ -101,7 +101,7 @@ class AslRun(wx.Frame):
             self.Raise()
             self.output_text.Clear()
             for cmd in self.run_seq:
-                cmd.run(self.output_text)  
+                cmd.run(out_widget=self.output_text)  
                 self.output_text.AppendText("\n")
 
     def update(self, evt=None):
