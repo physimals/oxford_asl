@@ -48,14 +48,14 @@ class Prog:
         return self.cmd
     
     def run(self, args):
-        self(args)
+        return self(args)
 
     def __call__(self, args):
         """ Run, writing output to stdout and returning retcode """
         cmd = self._find()
         cmd_args = shlex.split(cmd + " " + args)
         out = ""
-        #print(" ".join(cmd_args))
+        print(" ".join(cmd_args))
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
@@ -73,13 +73,15 @@ class Image:
             raise RuntimeError("%s file not specified" % file_type)
 
         self.file_type = file_type
-        self.base = fname.split(".", 1)[0]
+        d, name = os.path.split(fname)
+        self.base = name.split(".", 1)[0]
+        self.noext = os.path.join(os.path.abspath(d), self.base)
 
         # Try to figure out the extension
         exts = ["", ".nii", ".nii.gz"]
         matches = []
         for ext in exts:
-            if os.path.exists("%s%s" % (self.base, ext)):
+            if os.path.exists("%s%s" % (self.noext, ext)):
                 matches.append(ext)
 
         if len(matches) == 0:
@@ -88,7 +90,7 @@ class Image:
             raise RuntimeError("%s file %s is ambiguous" % (file_type, fname))
     
         self.ext = matches[0]
-        self.full = os.path.abspath("%s%s" % (self.base, ext))
+        self.full = os.path.abspath("%s%s" % (self.noext, ext))
         self.nii = nib.load(self.full)
         self.shape = self.nii.shape
          
