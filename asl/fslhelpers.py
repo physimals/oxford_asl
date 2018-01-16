@@ -20,9 +20,15 @@ import numpy as np
 LOCAL_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 #print("FSLHELPERS: using local binaries dir: %s" % LOCAL_DIR)
 
+ECHO = False
+
 def set_localdir(localdir):
     global LOCAL_DIR
     LOCAL_DIR = localdir
+
+def set_echo(echo):
+    global ECHO
+    ECHO = echo
 
 class Prog:
     def __init__(self, cmd):
@@ -35,9 +41,9 @@ class Prog:
         are searched for at any time
         """
         dirs = [
-            os.path.join(os.environ.get("FSLDIR", LOCAL_DIR), "bin"), 
+            LOCAL_DIR,
             os.path.join(os.environ.get("FSLDEVDIR", LOCAL_DIR), "bin"),
-            LOCAL_DIR
+            os.path.join(os.environ.get("FSLDIR", LOCAL_DIR), "bin"), 
         ]
 
         for d in dirs:
@@ -55,7 +61,9 @@ class Prog:
         cmd = self._find()
         cmd_args = shlex.split(cmd + " " + args)
         out = ""
-        print(" ".join(cmd_args))
+        global ECHO
+        if ECHO:
+            print(" ".join(cmd_args))
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
@@ -128,3 +136,12 @@ def mkdir(dir, fail_if_exists=False, warn_if_exists=True):
         if e.errno == errno.EEXIST:
             if fail_if_exists: raise
             elif warn_if_exists: print("WARNING: mkdir - Directory %s already exists" % dir)
+
+def tmpdir(suffix, debug=False):
+    if debug:
+        tmpdir = os.path.join(os.getcwd(), "tmp_%s" % suffix)
+        fsl.mkdir(tmpdir)
+    else:
+        tmpdir = tempfile.mkdtemp("_%s" % suffix)
+    print("Using temporary dir: %s" % tmpdir)
+    return tmpdir
