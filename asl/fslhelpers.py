@@ -20,12 +20,18 @@ import numpy as np
 LOCAL_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 #print("FSLHELPERS: using local binaries dir: %s" % LOCAL_DIR)
 
+ECHO = False
+
 def set_localdir(localdir):
     global LOCAL_DIR
     LOCAL_DIR = localdir
 
+def set_echo(echo):
+    global ECHO
+    ECHO = echo
+
 class Prog:
-    def __init__(self, cmd, localdir=""):
+    def __init__(self, cmd):
         self.cmd = cmd
 
     def _find(self):
@@ -34,31 +40,30 @@ class Prog:
         This is called each time the program is run so the caller can control where programs
         are searched for at any time
         """
-        if "FSLDIR" in os.environ: 
-            fsldir = os.environ["FSLDIR"]
-        else:
-            fsldir = LOCAL_DIR
-        if "FSLDEVDIR" in os.environ: 
-            fsldevdir = os.environ["FSLDEVDIR"]
-        else:
-            fsldevdir = LOCAL_DIR
+        dirs = [
+            LOCAL_DIR,
+            os.path.join(os.environ.get("FSLDEVDIR", LOCAL_DIR), "bin"),
+            os.path.join(os.environ.get("FSLDIR", LOCAL_DIR), "bin"), 
+        ]
 
-        local_path = os.path.join(LOCAL_DIR, self.cmd)
-        if os.path.isfile(local_path) and os.access(local_path, os.X_OK):
-            return local_path
-        elif os.path.exists(os.path.join(fsldevdir, "bin/%s" % self.cmd)):
-            return os.path.join(fsldevdir, "bin/%s" % self.cmd)
-        elif os.path.exists(os.path.join(fsldir, "bin/%s" % self.cmd)):
-            return os.path.join(fsldir, "bin/%s" % self.cmd)
-        else:
-            return self.cmd
+        for d in dirs:
+            ex = os.path.join(d, self.cmd)
+            if os.path.isfile(ex) and os.access(ex, os.X_OK):
+                return ex
+        
+        return self.cmd
     
     def run(self, args):
+        return self(args)
+
+    def __call__(self, args):
         """ Run, writing output to stdout and returning retcode """
         cmd = self._find()
         cmd_args = shlex.split(cmd + " " + args)
         out = ""
-       #print(" ".join(cmd_args))
+        global ECHO
+        if ECHO:
+            print(" ".join(cmd_args))
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
@@ -76,13 +81,15 @@ class Image:
             raise RuntimeError("%s file not specified" % file_type)
 
         self.file_type = file_type
-        self.base = fname.split(".", 1)[0]
+        d, name = os.path.split(fname)
+        self.base = name.split(".", 1)[0]
+        self.noext = os.path.join(os.path.abspath(d), self.base)
 
         # Try to figure out the extension
         exts = ["", ".nii", ".nii.gz"]
         matches = []
         for ext in exts:
-            if os.path.exists("%s%s" % (self.base, ext)):
+            if os.path.exists("%s%s" % (self.noext, ext)):
                 matches.append(ext)
 
         if len(matches) == 0:
@@ -91,7 +98,7 @@ class Image:
             raise RuntimeError("%s file %s is ambiguous" % (file_type, fname))
     
         self.ext = matches[0]
-        self.full = os.path.abspath("%s%s" % (self.base, ext))
+        self.full = os.path.abspath("%s%s" % (self.noext, ext))
         self.nii = nib.load(self.full)
         self.shape = self.nii.shape
          
@@ -120,7 +127,7 @@ flirt = Prog("flirt")
 fast = Prog("fast")
 
 def imcp(src, dest):
-    Prog("imcp").run("%s %s" % (src, dest))
+    Prog("imcp")("%s %s" % (src, dest))
     
 def mkdir(dir, fail_if_exists=False, warn_if_exists=True):
     try:
@@ -129,3 +136,12 @@ def mkdir(dir, fail_if_exists=False, warn_if_exists=True):
         if e.errno == errno.EEXIST:
             if fail_if_exists: raise
             elif warn_if_exists: print("WARNING: mkdir - Directory %s already exists" % dir)
+
+def tmpdir(suffix, debug=False):
+    if debug:
+        tmpdir = os.path.join(os.getcwd(), "tmp_%s" % suffix)
+        fsl.mkdir(tmpdir)
+    else:
+        tmpdir = tempfile.mkdtemp("_%s" % suffix)
+    print("Using temporary dir: %s" % tmpdir)
+    return tmpdir

@@ -11,7 +11,7 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
 abspath() {                                               
     # Return an absolute path if the input is relative
@@ -33,6 +33,7 @@ Usage() {
     echo " --infertau : estimate bolus duration from data"
     echo " --mfree    : Do model-free (SVD deconvolution) analysis"
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
+    echo " --alpha    : Inversion efficiency {default: 0.91}"
     echo ""
     echo " Partial volume effects correction options:"
     echo " --pvcorr   : Set partial volume effect correction on. You should provide high resolution partial volume estimates and a structural image."
@@ -107,6 +108,10 @@ takeargs=0;boolarg="";isbool="";
     --iform) iform=$argument # to choose the input form of the data
         shift;;
     --tau) tau=$argument
+        shift;;
+    --corrcal) corrcal=1
+        ;;
+    --alpha) alpha=$argument
         shift;;
     --infertau) infertau=1
         ;;
@@ -261,10 +266,18 @@ fi
 if [ -z $lfa ]; then
     lfa=11.7;
 fi
+if [ -z $alpha ]; then
+    alpha=0.91;
+fi
 
 #### --- Pre-processing ---
 echo "Pre-processing"
 imcp $infile $tempdir/data
+
+if [ ! -z $fslanat ]; then
+    cp -R $fslanat $tempdir
+fi
+
 cd $tempdir
 if [ $iform = "q" ]; then
 # input is one big file 13x84 volumes containing raw data (TC pairs) grouped as phases(7) - repeats(6) - tis(13)
@@ -368,7 +381,9 @@ if [ -z "$calibcmds" ]; then
 
     #fslmaths instruction for calibration (for execution whilst back in starting dir)
     #cinstr=" -div $tempdir/calib/M0t -mul 0.9 " # partition coefficient 0.9
-    cinstr=" -div $tempdir/calib/M0t -div 0.9 " # partition coefficient 0.9
+    cinstr=" -div $tempdir/calib/M0t -div 0.9 -div $alpha " # partition coefficient 0.9
+
+    echo $cinstr
 
     #save calibration results to output directory for reference
     ${FSLDIR}/bin/imcp calib/M0t $outdir/M0t
@@ -396,7 +411,7 @@ if [ ! -z $pvcorr ]; then
     # If the output from fsl_anat is provided
     if [ ! -z $fslanat ]; then
 
-    fslanat=$(abspath $fslanat)
+    #fslanat=$(abspath $fslanat)
     echo "Copy user specified PVE to temp directory (current directory)"
     echo "Do ASL and Structural image registration to obtain transformation matrix"
     struct=$fslanat/T1

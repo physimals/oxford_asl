@@ -11,7 +11,7 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
 Usage() {
     echo "OXFORD_ASL"
@@ -109,7 +109,7 @@ Usage_extended() {
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already in T1-space) "
     echo " Distortion correction using phase-encode-reversed calibration image (TOPUP):"
-    echo " --cblip                : phase-encode-reversed (blipped) calibration image"
+    echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo ""
@@ -204,56 +204,16 @@ OutputMasked() {
     fi
 }
 
-Outputvoxcal() {
-    parname=$1
-    subdir=$2
-
-    if [ ! -z $structout ]; then
-        if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-            flirt -in $outdir/native_space/$subdir/$parname -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname
-            echo "Calibrated perfusion map transformed into structural space"
-    fi
-
-    if [ ! -z $stdout ]; then
-        if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
-        if [ ! -z $warp ]; then
-	        applywarp --in=$outdir/native_space/$subdir/$parname --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp
-            echo "Calibrated perfusion map transformed into structural space"
-        elif [ ! -z $trans ]; then
-	        flirt -in $outdir/native_space/$subdir/$parname -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
-            echo "Calibrated perfusion map transformed into structural space"
-        else
-	        echo "ERROR: cannot do standard space out - neither warp or transformation matrix found"
-        fi
-    fi
-}
-
 Calibrate() {
-    parname=$1
-    Moval=$2
 
-    # third argument is an extra multiplier that we might use to get parameter into physiological units
-    if [ -z $3 ]; then
-	multiplier=1
-    else
-	multiplier=$3
-    fi
-
-# fourth argument is a subdirectory to use for finding and saving the result
-    subdir=$4;
-
-if [ ! -z $stdout ] && [ $cmethod = 'single' ]; then 
-    if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
-    fslmaths  $outdir/std_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/std_space/$subdir/${parname}_calib 
-fi
-if [ ! -z $nativeout ]; then
-    if [ ! -d  $outdir/native_space/$subdir ]; then mkdir $outdir/native_space/$subdir; fi
-    fslmaths $outdir/native_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/native_space/$subdir/${parname}_calib 
-fi
-if [ ! -z $structout ] && [ $cmethod = 'single' ]; then
-    if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    fslmaths $outdir/struct_space/$subdir/$parname -div $Moval -mul $multiplier $outdir/struct_space/$subdir/${parname}_calib 
-fi
+    param=$1 #parameter as know by basil (and related scripts)
+    parname=$2 #parameter name as called in the output directory
+    Moval=$3 # Either a number or an image in native space for the calibration scaling
+    multiplier=$4 # multiplier that we might use to get parameter into physiological units
+    subdir=$5; # subdirectory to use for finding and saving the result
+    
+    fslmaths  $tempdir/$subdir/$param -div $Moval -mul $multiplier $tempdir/$subdir/${param}_calib 
+    Output ${param}_calib ${parname}_calib $subdir
 }
 
 Report() {
@@ -595,15 +555,12 @@ if [ ! -z $calibflag ]; then
 	malpha=$tempdir/malpha
     fi
 
-    Calibrate perfusion $malpha 6000 $subdir
-    if [ $cmethod = 'voxel' ]; then 
-        Outputvoxcal perfusion_calib $subdir
-    fi
+    Calibrate ftiss perfusion $malpha 6000 $subdir
     Report perfusion_calib $subdir gm
    
     if [ $subdir = "pvcorr" ]; then
 	OutputMasked perfusion_calib $subdir gm
-	Calibrate perfusion_wm $malpha 6000 $subdir
+	Calibrate ftisswm perfusion_wm $malpha 6000 $subdir
 	Report perfusion_wm_calib $subdir wm
 	OutputMasked perfusion_wm_calib $subdir wm
     else
@@ -615,18 +572,15 @@ if [ ! -z $calibflag ]; then
 	    Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
 	elif [ $cmethod = 'voxel' ]; then
 	    fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
-	    Mosq=$tempdir/mosq
+        Mosq=$tempdir/mosq
 	fi
 	
-	Calibrate perfusion_var $Mosq 36000000 $subdir
-    if [ $cmethod = 'voxel' ]; then 
-        Outputvoxcal perfusion_var_calib $subdir
-    fi
+	Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir
     fi
 
     if [ -z $artoff ];then
         # output aCBV as a percentage
-	Calibrate aCBV $malpha 100 $subdir
+	    Calibrate fblood aCBV $malpha 100 $subdir
     fi
 fi
 
@@ -950,7 +904,7 @@ else
 fi
 
 echo "OXFORD_ASL - running"
-echo "File ID: $Id: 2c6d7384a2d68c9f7de650df6bd1bc17d368fb2f $"
+echo "Version: @GIT_SHA1@ @GIT_DATE@"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
@@ -1115,10 +1069,6 @@ if [ ! -z $calib ]; then
     else
 	fslmaths $calib $tempdir/calib
     fi
-
-    # bet
-    imcp $tempdir/calib $tempdir/calib_wholehead # keep the whole head for motion correction later if reqd
-    bet $tempdir/calib $tempdir/calib
 fi
 
 # same thing for cref image
@@ -1139,13 +1089,6 @@ if [ ! -z $cref ]; then
     else
 	fslmaths $cref $tempdir/cref
     fi
-
-    # bet - using the calib image to ensure a match
-    imcp $tempdir/cref $tempdir/cref_wholehead
-    fslmaths $tempdir/cref -mas $tempdir/calib $tempdir/cref
-
-    # calculate sensitivty image
-    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
 fi
 
 # same thing for cblip image
@@ -1169,8 +1112,6 @@ if [ ! -z $cblip ]; then
     # NOTE cblip is still wholehead, we dont need it masked
 fi
 
-
-
 # read in ASL data
 imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
 # take a copy that will not be subject to any subsequent corrections
@@ -1184,7 +1125,7 @@ if [ ! -z $moco ]; then
 	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
 	# this also removes motion effects between asldata and calibration image
 	Log "Motion correction to calibration image"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib_wholehead -mats
+	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib -mats
 
 	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
 	# Extract the middle transformation
@@ -1195,8 +1136,14 @@ if [ ! -z $moco ]; then
 	    convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
 	done
 	applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
-	# Convert the calibration image to align with asldata
+	# Convert all calibration images to align with asldata
 	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+    if [ ! -z $cref ]; then
+        flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+    fi
+    if [ ! -z $cblip ]; then
+        flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+    fi
     else
 	Log "Motion correction to middle volume of ASL data"
 	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
@@ -1346,7 +1293,8 @@ if [ -z $regfrom ]; then
     # NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
     if [ $iaf = "diff" ] && [ ! -z $calib ]; then
 	#if available use calibration image
-	regfrom=$tempdir/calib
+	bet $tempdir/calib $tempdir/calib_brain 
+	regfrom=$tempdir/calib_brain
     else
 	# brain extract the meanasl image
 	bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
@@ -1457,7 +1405,7 @@ elif [ ! -z $regfrom ]; then
 # We are unlikey to use these options as regfrom has probably been set above - leave for future reference
 # next option is to use betted version of mean M0 calib image as mask
 elif [ ! -z $calib ]; then
-    bet $tempdir/calib_wholehead $tempdir/calib_bet
+    bet $tempdir/calib $tempdir/calib_bet
     fslmaths $tempdir/calib_bet -bin $tempdir/mask
     Log "Mask generated from calibration image (post BET)"
  # use the low resolution strucutral image to create mask (ahould already be BETed)
@@ -1519,7 +1467,7 @@ if [ ! -z $cblip ]; then
 	esac
     
 	# do topup
-	fslmerge -t $tempdir/calib_blipped $tempdir/calib_wholehead $cblip 
+	fslmerge -t $tempdir/calib_blipped $tempdir/calib $cblip 
 	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
 	topupresult=$tempdir/topupresult
     fi
@@ -1542,19 +1490,15 @@ if [ ! -z $topupresult ]; then
 #    else
 	echo "Distortion Correction using TOPUP"
 	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
-	applytopup --imain=$tempdir/calib_wholehead,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
+	applytopup --imain=$tempdir/calib,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
 	repeatsubtract=1;
 	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
 	if [ ! $cmethod="voxel" ]; then
 	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
 	fi
-	imcp $tempdir/calib $tempdir/calib_wholehead
-	fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib #NB we keep the old mask here
+    
 	if [ ! -z $cref ]; then
-	    #repeat the sensitivity correction calcuation with distortion corrected images
-	    applytopup --imain=$tempdir/cref_wholehead --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
-	    fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
-	    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
 #	fi
     fi
 elif [ ! -z $fmap ]; then
@@ -1591,22 +1535,13 @@ if [ -e $tempdir/fmap.* ]; then
     repeatsubtract=1;
         
     # Now apply the correction to the calibration image
-    applywarp -i $tempdir/calib_wholehead -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+    applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
     fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
  
-    imcp $tempdir/calib $tempdir/calib_wholehead
-    fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib
-
     if [ ! -z $cref ]; then
-	#repeat the sensitivity correction calcuation with distortion corrected images
-	applywarp -i $tempdir/cref_wholehead -r $tempdir/calib -o $tempdir/cref -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
+	applywarp -i $tempdir/cref -r $tempdir/calib -o $tempdir/cref -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
 	fslmaths $tempdir/cref -mul $tempdir/distcorr/jacobian $tempdir/cref
-	fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
-	fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
     fi
-
-    
-    
 fi
 
 # Repeat the label-control subtraction on the corrected data
@@ -1621,21 +1556,32 @@ if [ ! -z $repeatsubtract ]; then
 fi
 ### End of: Distortion Correction
 
-# Sensitivty Map - overwrite the FAST biasfield one (if this has already been created) if another map has been supplied
-if [ ! -z $isen ]; then
-# place supplied sensitivity image in the right place (over writing the one from FAST or the cref image if it exists)
-    fslmaths $isen $outdir/native_space/sensitivity
-elif [ ! -z $cref ]; then
-    # calculate sensitivty image
-    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/calib $outdir/native_space/sensitivity
+# Mask the calibration images, saving the wholehead images (although currently unused)
+if [ ! -z $calib ]; then
+    imcp $tempdir/calib $tempdir/calib_wholehead
+    fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib
 fi
+if [ ! -z $cref ]; then
+    imcp $tempdir/cref $tempdir/cref_wholehead
+    fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
+fi
+
+# Copy or recalculate the sensitivity map (overwriting any created
+# by FAST) if we have a cref image or a sensitivity image has been supplied directly
+if [ ! -z $isen ]; then
+    # User-supplied sensitivity image
+    Warn "User supplied sens image"
+    fslmaths $isen -mas $tempdir/mask $outdir/native_space/sensitivity
+elif [ ! -z $cref ]; then
+    # Calculate sensitivty image using user-supplied cref image
+    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+fi
+
+# Senstivity correction cannot be done if this image hasn't been generated by this point
 if [ -z $outdir/native_space/sensitivity ]; then
-    # Senstivity correction cannot be done if this image hasn't been generated by this point
     senscorr=""
-    # Throw a warning
     Warn "sensitivity correction has been requested, but suitable map is not available, skipping that step"
 fi
-    
 
 # Defaults for (some) parameters
 # deal with T1
