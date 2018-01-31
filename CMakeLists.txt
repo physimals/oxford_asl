@@ -77,4 +77,4 @@ INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oxford_asl
 	asl_gui
 	DESTINATION bin)
 
-INSTALL(FILES asl/fslhelpers.py asl/gui.py asl/__init__.py DESTINATION python/asl)
+INSTALL(DIRECTORY python/asl DESTINATION python/)

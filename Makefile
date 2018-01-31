@@ -9,9 +9,10 @@ LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui
-PYMODULES = asl/fslhelpers.py asl/gui.py asl/__init__.py
+PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py 
+PYGUI = python/asl/gui/*.py
 RUNTCLS = Asl
-VERSIONED = oxford_asl asl_calib asl_reg quasil
+VERSIONED = oxford_asl asl_calib quasil asl_reg python/asl/__init__.py
 
 OBJS = readoptions.o asl_functions.o
 
@@ -23,17 +24,19 @@ CXXFLAGS += -DGIT_SHA1=\"${GIT_SHA1}\" -DGIT_DATE="\"${GIT_DATE}\""
 # Always rebuild scripts
 .PHONY: FORCE
 
-all:	${XFILES} ${SCRIPTS}
+all:	${XFILES} ${VERSIONED}
 
 asl_file: ${OBJS} asl_file.o 
 	${CXX}  ${CXXFLAGS} ${LDFLAGS} -o $@ ${OBJS} asl_file.o ${LIBS}
 
 $(VERSIONED): %: %.in FORCE
 	sed -e "s/@GIT_SHA1@/${GIT_SHA1}/" -e "s/@GIT_DATE@/${GIT_DATE}/" $< >$@
+	chmod a+x $@
 
-postinstallscript: $(PYMODULES)
-	mkdir -p $(FSLDEVDIR)/python/asl ; \
+postinstallscript: $(PYMODULES) $(PYGUI)
+	mkdir -p $(FSLDEVDIR)/python/asl/gui ; \
 	cp $(PYMODULES) $(FSLDEVDIR)/python/asl/ ; \
+	cp $(PYGUI) $(FSLDEVDIR)/python/asl/gui ; \
 	cd ..
 
 clean:

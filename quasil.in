@@ -11,7 +11,7 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDIR}/bin:${PATH}
+PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
 abspath() {                                               
     # Return an absolute path if the input is relative
