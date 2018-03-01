@@ -32,8 +32,15 @@ find_library(NIFTIIO_LIBRARY NAMES niftiio libniftiio
              HINTS $ENV{FSLDIR}/lib REQUIRED )
 find_library(ZNZ_LIBRARY NAMES znz libznz
              HINTS $ENV{FSLDIR}/lib REQUIRED )
-find_library(Z_LIBRARY NAMES z libz zlib zlibd 
+if(WIN32)
+  # Only use FSL zlib on windows as other versions are unlikely to be
+  # binary-compatibly
+  find_library(Z_LIBRARY NAMES z libz zlib zlibd
                HINTS $ENV{FSLDIR}/lib REQUIRED NO_DEFAULT_PATH)
+else(WIN32)
+  find_library(Z_LIBRARY NAMES z libz zlib zlibd
+               HINTS $ENV{FSLDIR}/lib REQUIRED)
+endif(WIN32)
 
 set(LIBS ${UTILS_LIBRARY} ${NEWIMAGE_LIBRARY} ${FSLIO_LIBRARY} ${MISCMATHS_LIBRARY} ${NIFTIIO_LIBRARY} ${ZNZ_LIBRARY} ${Z_LIBRARY} ${NEWMAT_LIBRARY})
 
