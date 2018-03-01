@@ -11,7 +11,7 @@ from optparse import OptionParser, OptionGroup
 import numpy as np
 import nibabel as nib
 
-import asl.fslwrap as fsl
+from .import fslwrap as fsl
 
 class AslOptionParser(OptionParser):
     """
