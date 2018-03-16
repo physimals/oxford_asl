@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 import traceback
 import tempfile
 import shutil
@@ -12,25 +13,10 @@ import wx
 class OptionError(RuntimeError):
     pass
 
-class FslCmd():
-    """
-    An FSL command
-    
-    This will look for the executable in the same directory as the 
-    GUI script first, then look in $FSLDEVDIR/bin, then $FSLDIR/bin. This is to enable 
-    distribution of updated code as a bundle which can be run in-situ without installation
-    """
+class Cmd():
     def __init__(self, cmd):
-        script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
-        fsldevdir = os.path.join(os.environ.get("FSLDEVDIR", ""), "bin")
-        fsldir = os.path.join(os.environ.get("FSLDIR", ""), "bin")
-
         self.cmd = cmd
-        for d in (script_dir, fsldevdir, fsldir):
-            if os.path.exists(os.path.join(d, cmd)):
-                self.cmd = os.path.join(d, cmd)
-                break
-    
+
     def add(self, opt, val=None):
         if val is not None:
             self.cmd += " %s=%s" % (opt, str(val))
@@ -50,14 +36,34 @@ class FslCmd():
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
+            print("polled, retcode=", retcode)
             line = p.stdout.readline()
             self.write_output(line, out_widget, out_stream)
             if retcode is not None: break
-        self.write_output("Return code: %i\n" % retcode, out_widget, out_stream)
+        self.write_output("\nReturn code: %i\n" % retcode, out_widget, out_stream)
         
         return retcode
 
     def __str__(self): return self.cmd
+
+class FslCmd(Cmd):
+    """
+    An FSL command
+    
+    This will look for the executable in the same directory as the 
+    GUI script first, then look in $FSLDEVDIR/bin, then $FSLDIR/bin. This is to enable 
+    distribution of updated code as a bundle which can be run in-situ without installation
+    """
+    def __init__(self, cmd):
+        script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+        fsldevdir = os.path.join(os.environ.get("FSLDEVDIR", ""), "bin")
+        fsldir = os.path.join(os.environ.get("FSLDIR", ""), "bin")
+
+        self.cmd = cmd
+        for d in (script_dir, fsldevdir, fsldir):
+            if os.path.exists(os.path.join(d, cmd)):
+                self.cmd = os.path.join(d, cmd)
+                break
 
 class AslRun(wx.Frame):
     """
@@ -79,6 +85,7 @@ class AslRun(wx.Frame):
     def __init__(self, parent, run_btn, run_label):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
 
+        self.run_seq = None
         self.run_btn = run_btn
         self.run_btn.Bind(wx.EVT_BUTTON, self.dorun)
         self.run_label = run_label
@@ -92,10 +99,10 @@ class AslRun(wx.Frame):
         self.SetSizer(self.sizer)
         self.Bind(wx.EVT_CLOSE, self.close)
 
-    def close(self, evt):
+    def close(self, _):
         self.Hide()
 
-    def dorun(self, evt):
+    def dorun(self, _):
         if self.run_seq: 
             self.Show()
             self.Raise()
@@ -104,7 +111,7 @@ class AslRun(wx.Frame):
                 cmd.run(out_widget=self.output_text)  
                 self.output_text.AppendText("\n")
 
-    def update(self, evt=None):
+    def update(self, _):
         """
         Get the sequence of commands and enable the run button if options are valid. Otherwise
         display the first error in the status label
@@ -126,8 +133,8 @@ class AslRun(wx.Frame):
             self.run_label.SetLabel("Unexpected error - see console and report as a bug")
             traceback.print_exc(sys.exc_info()[1])
 
-    def check_exists(self, label, file):
-        if not os.path.exists(file):
+    def check_exists(self, label, fname):
+        if not os.path.exists(fname):
             raise OptionError("%s - no such file or directory" % label)
 
     def get_preview_data(self):
@@ -203,6 +210,9 @@ class AslRun(wx.Frame):
 
         # Build OXFORD_ASL command 
         outdir = self.analysis.outdir()
+        if os.path.exists(outdir) and not os.path.isdir(outdir):
+            raise OptionError("Output directory already exists and is a file")
+        run.append(Cmd("mkdir %s" % outdir))
 
         # Input data
         cmd = FslCmd("oxford_asl")
