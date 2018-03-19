@@ -18,8 +18,7 @@ class TabPage(wx.Panel):
     """
     def __init__(self, parent, title, idx, n, name=None):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
- 
-	self.notebook = parent
+        self.notebook = parent
         self.idx = idx
         self.n = n
         self.sizer = wx.GridBagSizer(vgap=5, hgap=5)
@@ -39,7 +38,7 @@ class TabPage(wx.Panel):
             self.next_btn.Bind(wx.EVT_BUTTON, self.next)
         else:
             self.next_btn = wx.StaticText(self, label="")
-	
+
         if self.idx > 0:
             self.prev_btn = wx.Button(self, label="Previous", id=wx.ID_BACKWARD)
             self.prev_btn.Bind(wx.EVT_BUTTON, self.prev)
@@ -54,10 +53,10 @@ class TabPage(wx.Panel):
         self.sizer.Add(self.next_btn, pos=(self.row, 3), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_RIGHT)
 
     def next(self, evt):
-	self.notebook.SetSelection(self.idx+1)
+        self.notebook.SetSelection(self.idx+1)
 
     def prev(self, evt):
-	self.notebook.SetSelection(self.idx-1)
+        self.notebook.SetSelection(self.idx-1)
 
     def pack(self, label, *widgets, **kwargs):
         """
@@ -292,7 +291,7 @@ class PreviewPanel(wx.Panel):
         self.nslices = 1
         self.view = 0
         self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, axis_bgcolor='black')
+        self.axes = self.figure.add_subplot(111, facecolor='black')
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])          
         self.canvas = FigureCanvas(self, -1, self.figure)
