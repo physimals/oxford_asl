@@ -5,55 +5,26 @@ import tempfile
 import shutil
 import shlex
 import subprocess
+from threading import Thread
 
 import nibabel as nib
 
 import wx
+from wx.lib.pubsub import pub
 
 class OptionError(RuntimeError):
     pass
 
-class Cmd():
-    def __init__(self, cmd):
-        self.cmd = cmd
+class Mkdir:
+    def __init__(self, dirname):
+        self.dirname = dirname
 
-    def add(self, opt, val=None):
-        if val is not None:
-            self.cmd += " %s=%s" % (opt, str(val))
-        else:
-            self.cmd += " %s" % opt
+    def run(self):
+        if not os.path.exists(self.dirname):
+            os.makedirs(self.dirname)
+        return 0
 
-    def write_output(self, line, out_widget=None, out_stream=None):
-        if out_widget is not None: 
-            out_widget.AppendText(line)
-            wx.Yield()
-        if out_stream is not None:
-            out_stream.write(line)
-
-    def run(self, out_widget=None, out_stream=None):
-        self.write_output(self.cmd, out_widget, out_stream)
-        args = shlex.split(self.cmd)
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        while 1:
-            retcode = p.poll() #returns None while subprocess is running
-            print("polled, retcode=", retcode)
-            line = p.stdout.readline()
-            self.write_output(line, out_widget, out_stream)
-            if retcode is not None: break
-        self.write_output("\nReturn code: %i\n" % retcode, out_widget, out_stream)
-        
-        return retcode
-
-    def __str__(self): return self.cmd
-
-class FslCmd(Cmd):
-    """
-    An FSL command
-    
-    This will look for the executable in the same directory as the 
-    GUI script first, then look in $FSLDEVDIR/bin, then $FSLDIR/bin. This is to enable 
-    distribution of updated code as a bundle which can be run in-situ without installation
-    """
+class FslCmd:
     def __init__(self, cmd):
         script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         fsldevdir = os.path.join(os.environ.get("FSLDEVDIR", ""), "bin")
@@ -64,6 +35,46 @@ class FslCmd(Cmd):
             if os.path.exists(os.path.join(d, cmd)):
                 self.cmd = os.path.join(d, cmd)
                 break
+            
+    def add(self, opt, val=None):
+        if val is not None:
+            self.cmd += " %s=%s" % (opt, str(val))
+        else:
+            self.cmd += " %s" % opt
+
+    def write_output(self, line):
+        wx.CallAfter(pub.sendMessage, "run_stdout", line=line)
+
+    def run(self):
+        self.write_output(self.cmd + "\n")
+        args = shlex.split(self.cmd)
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        while 1:
+            retcode = p.poll() #returns None while subprocess is running
+            line = p.stdout.readline()
+            self.write_output(line)
+            if retcode is not None: break
+        self.write_output("\nReturn code: %i\n\n" % retcode)
+        return retcode
+
+    def __str__(self): return self.cmd
+
+class CmdRunner(Thread):
+    def __init__(self, cmds, done_cb):
+        Thread.__init__(self)
+        self.cmds = cmds
+        self.done_cb = done_cb
+
+    def run(self):
+        ret = -1
+        try:
+            for cmd in self.cmds:
+                ret = -1
+                ret = cmd.run()
+                if ret != 0:
+                    break
+        finally:
+            self.done_cb(ret)
 
 class AslRun(wx.Frame):
     """
@@ -89,6 +100,7 @@ class AslRun(wx.Frame):
         self.run_btn = run_btn
         self.run_btn.Bind(wx.EVT_BUTTON, self.dorun)
         self.run_label = run_label
+        self.preview_data = None
     
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.output_text = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE)
@@ -98,20 +110,31 @@ class AslRun(wx.Frame):
             
         self.SetSizer(self.sizer)
         self.Bind(wx.EVT_CLOSE, self.close)
+        pub.subscribe(self.write_output, "run_stdout")
+
+    def write_output(self, line):
+        self.output_text.AppendText(line)
 
     def close(self, _):
         self.Hide()
+
+    def finished(self, retcode):
+        if retcode != 0:
+            self.write_output("\nWARNING: command failed\n")
+        self.update()
 
     def dorun(self, _):
         if self.run_seq: 
             self.Show()
             self.Raise()
             self.output_text.Clear()
-            for cmd in self.run_seq:
-                cmd.run(out_widget=self.output_text)  
-                self.output_text.AppendText("\n")
+            self.run_btn.Enable(False)
+            self.run_label.SetForegroundColour(wx.Colour(0, 0, 128))
+            self.run_label.SetLabel("Running - Please Wait")
+            runner = CmdRunner(self.run_seq, self.finished)
+            runner.start()
 
-    def update(self, _):
+    def update(self):
         """
         Get the sequence of commands and enable the run button if options are valid. Otherwise
         display the first error in the status label
@@ -212,7 +235,7 @@ class AslRun(wx.Frame):
         outdir = self.analysis.outdir()
         if os.path.exists(outdir) and not os.path.isdir(outdir):
             raise OptionError("Output directory already exists and is a file")
-        run.append(Cmd("mkdir %s" % outdir))
+        run.append(Mkdir(outdir))
 
         # Input data
         cmd = FslCmd("oxford_asl")
