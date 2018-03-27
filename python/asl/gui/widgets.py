@@ -341,7 +341,7 @@ class PreviewPanel(wx.Panel):
 
     def init_view(self):
         self.nslices = self.data.shape[2-self.view]
-        self.slice = self.nslices / 2
+        self.slice = int(self.nslices / 2)
         self.redraw()
 
     def redraw(self):
@@ -350,7 +350,6 @@ class PreviewPanel(wx.Panel):
         """
         self.axes.clear() 
         if self.data is None: return
-
         if self.view == 0:
             sl = self.data[:,:,self.slice]
         elif self.view == 1:
