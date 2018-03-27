@@ -74,7 +74,7 @@ class CmdRunner(Thread):
                 if ret != 0:
                     break
         finally:
-            self.done_cb(ret)
+            wx.CallAfter(pub.sendMessage, "run_finished", retcode=ret)
 
 class AslRun(wx.Frame):
     """
@@ -111,6 +111,7 @@ class AslRun(wx.Frame):
         self.SetSizer(self.sizer)
         self.Bind(wx.EVT_CLOSE, self.close)
         pub.subscribe(self.write_output, "run_stdout")
+        pub.subscribe(self.finished, "run_finished")
 
     def write_output(self, line):
         self.output_text.AppendText(line)
