@@ -395,7 +395,7 @@ class AslDataPreview(wx.Panel):
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.n_tis = n_tis
-        self.n_repeats = n_repeats
+        self.n_repeats = int(n_repeats)
         self.tc_pairs = tc_pairs
         self.tagfirst = tagfirst
         self.order = order
@@ -415,7 +415,7 @@ class AslDataPreview(wx.Panel):
 
     def on_paint(self, event):
         w, h = self.GetClientSize()
-        N = self.n_tis * self.n_repeats
+        N = self.n_tis * int(self.n_repeats)
         if self.tc_pairs: N *= 2
         dc = wx.AutoBufferedPaintDC(self)
         dc.Clear()
@@ -467,7 +467,7 @@ class AslDataPreview(wx.Panel):
                         seq.append(i)
                 elif t == "r":
                     seq.append(i)
-                    seq += [i+2,] * (self.n_repeats - 1)
+                    seq += [i+2,] * (int(self.n_repeats) - 1)
         
         tistart = -1
         ti_sep = 1
