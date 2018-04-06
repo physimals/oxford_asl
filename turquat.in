@@ -930,7 +930,9 @@ if [ ! -z $calib_data ]; then
         #echo b
         # Register ASL to Structure
         echo "Running Turbo QUASAR ASL to structure registration..."
-        flirt -ref $struct_brain -in $output_dir_temp/CBF_relative -out CBF_high -omat turbo_to_struct.mat
+        
+        #flirt -ref $struct_brain -in $output_dir_temp/CBF_relative -out CBF_high -omat turbo_to_struct.mat
+        flirt -ref $struct_brain -in $output_dir_temp/T1_tissue -out CBF_high -omat turbo_to_struct.mat
         echo "Running calibration image to structure registration..."
         flirt -ref $struct_brain -in $calib_brain -out calib_high -out calib_high -omat calib_to_struct.mat
         echo "Matrix inversion and concatenation..."
@@ -939,7 +941,8 @@ if [ ! -z $calib_data ]; then
         convert_xfm -omat calib_to_turbo.mat -concat struct_to_turbo.mat calib_to_struct.mat
         convert_xfm -omat turbo_to_calib.mat -concat struct_to_calib.mat turbo_to_struct.mat
         echo "Transforming calibration image to Turbo QUASAR ASL resolution..."
-        applywarp --ref=$output_dir_temp/CBF_relative --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
+        #applywarp --ref=$output_dir_temp/CBF_relative --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
+        applywarp --ref=$output_dir_temp/T1_tissue --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
 
         # Copy the trasnformation matrices to result dirctory
         cp turbo_to_struct.mat calib_to_struct.mat struct_to_turbo.mat struct_to_calib.mat calib_to_turbo.mat turbo_to_calib.mat $output_dir_temp
