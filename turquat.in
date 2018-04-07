@@ -898,7 +898,7 @@ if [ ! -z $infertau ]; then
     fslmaths output_dir_temp/Bolus_duration_raw -mul 2 -exp -sub 1 output_dir_temp/numerator
     fslmaths output_dir_temp/Bolus_duration_raw -mul 2 -exp -add 1 output_dir_temp/denominator
     fslmaths output_dir_temp/numerator -div output_dir_temp/denominator output_dir_temp/tanh
-    fslmaths output_dir_temp/tanh -mul $slope -add $intercept output_dir_temp/Bolus_duration
+    fslmaths output_dir_temp/tanh -mul $slope -add $intercept -mas mask output_dir_temp/Bolus_duration
     #imrm Bolus_duration_raw numerator denominator tanh
 fi
 # Arterial blood colume and arrival time to macrovasculature
@@ -929,8 +929,7 @@ if [ ! -z $calib_data ]; then
         bet $calib_data $calib_brain
         #echo b
         # Register ASL to Structure
-        echo "Running Turbo QUASAR ASL to structure registration..."
-        
+        echo "Running Turbo QUASAR ASL to structure registration..." 
         #flirt -ref $struct_brain -in $output_dir_temp/CBF_relative -out CBF_high -omat turbo_to_struct.mat
         flirt -ref $struct_brain -in $output_dir_temp/T1_tissue -out CBF_high -omat turbo_to_struct.mat
         echo "Running calibration image to structure registration..."
@@ -942,7 +941,6 @@ if [ ! -z $calib_data ]; then
         convert_xfm -omat turbo_to_calib.mat -concat struct_to_calib.mat turbo_to_struct.mat
         echo "Transforming calibration image to Turbo QUASAR ASL resolution..."
         #applywarp --ref=$output_dir_temp/CBF_relative --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
-        echo "T1 T1 T1 T1 T1"
         applywarp --ref=$output_dir_temp/T1_tissue --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
 
         # Copy the trasnformation matrices to result dirctory
