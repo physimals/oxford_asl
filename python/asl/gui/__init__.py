@@ -43,7 +43,8 @@ class AslGui(wx.Frame):
 
         banner = wx.Panel(main_panel, size=(-1, 80))
         banner.SetBackgroundColour((54, 122, 157))
-        pix = wx.StaticBitmap(banner, -1, wx.Bitmap("banner.png", wx.BITMAP_TYPE_ANY))
+        banner_fname = os.path.join(os.path.abspath(os.path.dirname(__file__)), "banner.png")
+        wx.StaticBitmap(banner, -1, wx.Bitmap(banner_fname, wx.BITMAP_TYPE_ANY))
         main_vsizer.Add(banner, 0, wx.EXPAND)
 
         hpanel = wx.Panel(main_panel)
@@ -70,7 +71,7 @@ class AslGui(wx.Frame):
         
         self.run = AslRun(self, self.run_btn, self.run_label)
         setattr(self.run, "preview", self.preview)
-        tab_cls = [AslInputOptions,StructureTab,AslCalibration,AslDistCorr,AslAnalysis,]
+        tab_cls = [AslInputOptions, StructureTab, AslCalibration, AslDistCorr, AslAnalysis,]
         tabs = [cls(notebook, idx, len(tab_cls)) for idx, cls in enumerate(tab_cls)]
         
         for idx, tab in enumerate(tabs):
@@ -93,5 +94,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

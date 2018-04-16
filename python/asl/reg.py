@@ -14,8 +14,7 @@ import tempfile
 import collections
 from optparse import OptionParser, OptionGroup
 
-import asl.fslhelpers as fsl
-import asl
+from . import __version__, fslhelpers as fsl
 
 def main():
     usage = """ASL_REG
@@ -23,7 +22,7 @@ def main():
 
     asl_reg -i <input> -s <struct> [options]"""
 
-    p = OptionParser(usage=usage, version=asl.__version__)
+    p = OptionParser(usage=usage, version=__version__)
     g = OptionGroup(p, "Required arguments")
     g.add_option("-i", dest="input", help="input image - e.g. perfusion-weighted image")
     g.add_option("-s", dest="struct", help="structural brain image - wholehead")
