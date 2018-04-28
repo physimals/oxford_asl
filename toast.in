@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TURQUAT: Turbo QUASAR ASL Bayesian Analysis Tool
+# TOAST: TurbO quasar asl bayesian AnalySis Tool
 #
 # Moss Zhao, Michael Chappell, QUBIC Group, IBME, University of Oxford Image
 #
@@ -21,7 +21,7 @@ abspath() {
 
 Usage() {
     # For future development, I have commented some potentially useful options
-    echo "Turbo QUASAR ASL Bayesian Analysis Tool"
+    echo "TOAST: TurbO quasar asl bayesian AnalySis Tool"
     echo "Beta version: it only works for AMC's file format:"
     echo "Shift 1 Repeat 1 Tag, Shift 1 Repeat 1 Control, Shift 2 Repeat 1 Tag, Shift 2 Repeat 1 Control."
     echo ""
@@ -899,6 +899,9 @@ if [ ! -z $infertau ]; then
     fslmaths output_dir_temp/Bolus_duration_raw -mul 2 -exp -add 1 output_dir_temp/denominator
     fslmaths output_dir_temp/numerator -div output_dir_temp/denominator output_dir_temp/tanh
     fslmaths output_dir_temp/tanh -mul $slope -add $intercept -mas mask output_dir_temp/Bolus_duration
+
+    # We now use the estimated bolus duration as the final result
+    fslmaths output_tissue_shift_1/mean_tautiss -add output_tissue_shift_2/mean_tautiss_result -div 2 -thr 0 $output_dir_temp/Bolus_duration
     #imrm Bolus_duration_raw numerator denominator tanh
 fi
 # Arterial blood colume and arrival time to macrovasculature

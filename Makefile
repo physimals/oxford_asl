@@ -8,11 +8,11 @@ USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_ZLIB}
 LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
 
 XFILES = asl_file
-SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui turquat
+SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui toast
 PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py python/asl/fslwrap.py python/asl/image.py
 PYGUI = python/asl/gui/*.py
 RUNTCLS = Asl
-VERSIONED = oxford_asl asl_calib quasil asl_reg turquat python/asl/__init__.py
+VERSIONED = oxford_asl asl_calib quasil asl_reg toast python/asl/__init__.py
 
 OBJS = readoptions.o asl_functions.o
 
