@@ -452,7 +452,7 @@ if [ -z $artoff ]; then
 fi
 
 #Partial volume correction - sort out basil results when PV corrected
-if [ ! -z $pvcorr ]; then
+if [ ! -z $basil_pvcorr ]; then
     fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
     if [ ! -z $senscorr ]; then
         # sensitivity correction
@@ -532,7 +532,7 @@ if [ $subdir = "pvcorr" ]; then
     OutputMasked perfusion_wm $subdir wm
     if [ -z $fixbat ]; then
 	OutputMasked arrival $subdir gm
-	OutputMasked deltwm $subdir wm
+	OutputMasked arrival_wm $subdir wm
     fi
 fi
 
@@ -2014,6 +2014,7 @@ if [ ! -z $pvcorr ]; then
     mkdir $tempdir/pvcorr
     cp $tempdir/basil_options.txt $tempdir/pvcorr/basil_options.txt #Dobasil expects the options file to be in the subdirectory
     # Run BASIL
+    basil_pvcorr=$pvcorr
     Dobasil $datafile $tempdir/pvcorr
 
     imcp $tempdir/pvcorr/finalMVN $tempdir/finalMVN #just in case we are about to do a epochwise analysis
