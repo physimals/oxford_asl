@@ -1014,13 +1014,3 @@ fi
 
 echo "Turbo QUSAR ASL analysis done!"
 
-
-# bash turquat_text.sh -i bigdata -o output --calib M0 --tr 4.4 --struct T2_FLAIR_brain --corrcal --infertau --inferart --debug
-
-
-
-# bash turquat_text.sh -i bigdata -o output --calib M0 --tr 4.4 --struct T2_FLAIR_brain --corrcal --inferart 
-
-
-# bash turquat_text.sh -i bigdata -o output --calib M0 --tr 4.4 --struct T2_FLAIR_brain --corrcal --inferart --debug
-
