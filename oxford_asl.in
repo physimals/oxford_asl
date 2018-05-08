@@ -551,14 +551,13 @@ if [ ! -z $calibflag ]; then
     if [ $cmethod = 'single' ]; then
 	malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
     elif [ $cmethod = 'voxel' ]; then
-    #######################################ADDED
+    # Sensitivity map is re-calculated in PVC mode, so 'undo' the old correction and re-do the new one
     if [ ! -z $senscorr ]; then
         if [ $subdir = "pvcorr" ]; then
             fslmaths $outdir/calib/M0 -mul $outdir/native_space/sensitivity_non_pvcorr $outdir/calib/M0
         fi
         fslmaths $outdir/calib/M0 -div $outdir/native_space/sensitivity $outdir/calib/M0
     fi
-    ########################################END OF ADDED
 	fslmaths $outdir/calib/M0 -mul $alpha $tempdir/malpha
 	malpha=$tempdir/malpha
     fi
@@ -1998,15 +1997,26 @@ if [ ! -z $pvcorr ]; then
 	fslcpgeom $regfrom $tempdir/mask
 	imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
     fi
-    ###ADDED re-calculation of sensitivity image using the PVE correction brain mask calculated above
+    # Structrual -> ASL registration may have changed slightly, so need to re-calculate sensitivity map, since it
+    # either depends on the brain mask from the structural image, or the bias field extracted by FASL/FSL_ANAT
+    # Save the original sensitivity map for comparison
     imcp $outdir/native_space/sensitivity $outdir/native_space/sensitivity_non_pvcorr
     if [ ! -z $isen ]; then
-    # User-supplied sensitivity image
-    Warn "User supplied sens image"
-    fslmaths $isen -mas $tempdir/mask $outdir/native_space/sensitivity
+      # User-supplied sensitivity image
+      Warn "User supplied sens image"
+      fslmaths $isen -mas $tempdir/mask $outdir/native_space/sensitivity
     elif [ ! -z $cref ]; then
-    # Calculate sensitivty image using user-supplied cref image
-    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+      # Calculate sensitivty image using user-supplied cref image
+      fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+    elif [ ! -z $fasthasrun ]; then
+      if [ ! -z $tempdir/biasfield_struct ]; then
+        if [ ! -z $senscorr ]; then
+	      # Struct->ASL registration may have changed, so re-transform the bias field and invert to use for sensitivity correction
+          Log "Re-registering bias field and calculating sensitivity map"
+          applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$outdir/native_space/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+	      fslmaths $outdir/native_space/biasfield -recip $outdir/native_space/sensitivity
+        fi
+      fi
     fi
     
     # intructions for BASIL
