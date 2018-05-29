@@ -21,7 +21,7 @@ abspath() {
 
 Usage() {
     # For future development, I have commented some potentially useful options
-    echo "TOAST: TurbO quasar asl bayesian AnalySis Tool"
+    echo "TOAST: TurbO quasar asl bayesian AnalySis Tool (haha)"
     echo "Beta version: it only works for AMC's file format:"
     echo "Shift 1 Repeat 1 Tag, Shift 1 Repeat 1 Control, Shift 2 Repeat 1 Tag, Shift 2 Repeat 1 Control."
     echo ""
