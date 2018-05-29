@@ -537,7 +537,7 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # We only use the first three and last three TIs.
-tislist_calib="--ti1=0.04, --ti2=0.64, --ti3=1.24, --ti4=4.84, --ti5=5.44, --ti6=6.04"
+tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
 # Done Moss Edit
 
 # Prepare for a fabber option file
