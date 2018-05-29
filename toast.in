@@ -498,6 +498,11 @@ imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0
 
 
 # Moss Edit
+# Here we need to estimate T1 and flip angle correction (g) values using the control data
+# We only need the first four TIs of the control data
+# Now estimate T1 and M0 from Shift 1
+$asl_file --data=$shift_1_repeat_1_control --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
+
 # Extract first 3 and last 3 TIs of the first six dynamic
 last_TI_1=0
 last_TI_2=8
