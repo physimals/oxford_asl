@@ -37,6 +37,7 @@ Usage() {
     echo " --transoff : transform the calibration image to the current data resolution"
     echo " --TR_calib : TR of the calibration image. It needs to be corrected if less than 5.0s {default: 5.0s}"
     echo " --struct   : structural image (T1 or T2 weighted)"
+    echo " --t1       : Set the value for T1 of arterial blood {default: 1.3 s}"
     echo " --t1b      : Set the value for T1 of arterial blood {default: 1.6 s}"
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
     echo " --infertau : estimate bolus duration from data"
@@ -563,6 +564,11 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 # Now perform model fitting to estimate these parameters
 $fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
 
+# Moss edit
+fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
+echo "T1 T1 T1"
+# Done Moss edit
+
 # Now estimate T1 and M0 from shift 2
 $asl_file --data=$shift_2_repeat_1_control_effective --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
 
@@ -650,6 +656,11 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 
 # Now perform model fitting to estimate these parameters
 $fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
+
+# Moss edit
+fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
+echo "T1 T1 T1"
+# Done Moss edit
 
 # Done estimating T1 and M0
 
