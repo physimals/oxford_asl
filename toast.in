@@ -269,7 +269,7 @@ fi
 # deal with bolus patterns
 if [ -z $taupat ]; then
     # default QUASAR list of TIs
-    taupat="1,1,1,1,1,1,1"
+    taupat="1,1,1,1,1,1"
 fi
 
 # Create TI list
