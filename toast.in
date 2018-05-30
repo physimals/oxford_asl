@@ -568,7 +568,7 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
 
 # Moss edit
-#fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
+fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
 echo "T1 T1 T1"
 # Done Moss edit
 
@@ -664,7 +664,7 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
 
 # Moss edit
-#fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
+fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
 echo "T1 T1 T1"
 # Done Moss edit
 
