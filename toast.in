@@ -572,12 +572,12 @@ $fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=ou
 # Moss edit
 # Here we need to estimate T1 and flip angle correction (g) values using the control data
 # Create a mask for the whole data. We use shift 1 repeat 1 control data
-if [ -z $infert1 ]; then
-# auto generate mask
+if [ ! -z $infert1 ]; then
+    echo "Estimating T1 of tissue from ASL control data..."
+
+else
     echo "Use user provided T1 of tissue in CBF quantification..."
     fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
-else
-    echo "Estimating T1 of tissue from ASL control data..."
 fi
 # Done Moss edit
 
@@ -675,12 +675,12 @@ $fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile -
 # Moss edit
 # Here we need to estimate T1 and flip angle correction (g) values using the control data
 # Create a mask for the whole data. We use shift 1 repeat 1 control data
-if [ -z $infert1 ]; then
-# auto generate mask
+if [ ! -z $infert1 ]; then
+    echo "Estimating T1 of tissue from ASL control data..."
+
+else
     echo "Use user provided T1 of tissue in CBF quantification..."
     fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
-else
-    echo "Estimating T1 of tissue from ASL control data..."
 fi
 # Done Moss edit
 
