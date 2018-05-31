@@ -38,6 +38,7 @@ Usage() {
     echo " --TR_calib : TR of the calibration image. It needs to be corrected if less than 5.0s {default: 5.0s}"
     echo " --struct   : structural image (T1 or T2 weighted)"
     echo " --t1       : Set the value for T1 of arterial blood {default: 1.3 s}"
+    echo " --infert1  : Infer T1 of tissue from Turbo QUASAR ASL control data"
     echo " --t1b      : Set the value for T1 of arterial blood {default: 1.6 s}"
     echo " --corrcal  : Correct partial volume effects on the edge of calibration image M0a"
     echo " --infertau : estimate bolus duration from data"
@@ -119,6 +120,8 @@ until [ -z $1 ]; do
             shift;;
         --t1) t1=$argument
             shift;;
+        --infert1) infert1=1
+            ;;
         --t1wm) t1wm=$argument
             shift;;
         --slicedt) slicedt=$argument
@@ -499,7 +502,6 @@ imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0
 
 
 # Moss Edit
-# Here we need to estimate T1 and flip angle correction (g) values using the control data
 # We only need the first four TIs of the control data
 # Now estimate T1 and M0 from Shift 1
 $asl_file --data=$shift_1_repeat_1_control --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
@@ -568,8 +570,15 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
 
 # Moss edit
-#fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
-#echo "T1 T1 T1"
+# Here we need to estimate T1 and flip angle correction (g) values using the control data
+# Create a mask for the whole data. We use shift 1 repeat 1 control data
+if [ -z $infert1 ]; then
+# auto generate mask
+    echo "Use user provided T1 of tissue in CBF quantification..."
+    fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
+else
+    echo "Estimating T1 of tissue from ASL control data..."
+fi
 # Done Moss edit
 
 # Now estimate T1 and M0 from shift 2
@@ -594,7 +603,7 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 
-# Moss Edit
+# Check if we need to estimate T1. If not, assign the user provided value
 # Here we need to estimate T1 and flip angle correction (g) values using the control data
 # We only need the first four TIs of the control data
 # Now estimate T1 and M0 from Shift 1
@@ -664,8 +673,15 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
 
 # Moss edit
-#fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
-#echo "T1 T1 T1"
+# Here we need to estimate T1 and flip angle correction (g) values using the control data
+# Create a mask for the whole data. We use shift 1 repeat 1 control data
+if [ -z $infert1 ]; then
+# auto generate mask
+    echo "Use user provided T1 of tissue in CBF quantification..."
+    fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
+else
+    echo "Estimating T1 of tissue from ASL control data..."
+fi
 # Done Moss edit
 
 # Done estimating T1 and M0
