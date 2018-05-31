@@ -507,7 +507,7 @@ $asl_file --data=$shift_1_repeat_1_control --ntis=$n_dynamics --ibf=tis --iaf=di
 # Extract first 3 and last 3 TIs of the first six dynamic
 last_TI_1=0
 last_TI_2=8
-length_1=1
+length_1=3
 length_2=3
 fslroi data_control_000 data_control_0_m_1 $last_TI_1 $length_1
 fslroi data_control_000 data_control_0_m_2 $last_TI_2 $length_2
@@ -539,9 +539,9 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
+tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
 #tislist_calib="--ti1=0.04 --ti2=4.24 --ti3=4.84 --ti4=5.44 --ti5=6.04"
-tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
+#tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
 # Done Moss Edit
 
 # Prepare for a fabber option file
@@ -568,8 +568,8 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
 
 # Moss edit
-fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
-echo "T1 T1 T1"
+#fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
+#echo "T1 T1 T1"
 # Done Moss edit
 
 # Now estimate T1 and M0 from shift 2
@@ -603,7 +603,7 @@ $asl_file --data=$shift_2_repeat_1_control_effective --ntis=$n_dynamics --ibf=ti
 # Extract first 3 and last 3 TIs of the first six dynamic
 last_TI_1=0
 last_TI_2=8
-length_1=1
+length_1=3
 length_2=3
 fslroi data_control_000 data_control_0_m_1 $last_TI_1 $length_1
 fslroi data_control_000 data_control_0_m_2 $last_TI_2 $length_2
@@ -635,9 +635,9 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
+tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
 #tislist_calib="--ti1=0.04 --ti2=4.24 --ti3=4.84 --ti4=5.44 --ti5=6.04"
-tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
+#tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
 # Done Moss Edit
 
 # Prepare for a fabber option file
@@ -664,8 +664,8 @@ echo "--param-spatial-priors=MN+" >> $current_options_file
 $fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
 
 # Moss edit
-fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
-echo "T1 T1 T1"
+#fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
+#echo "T1 T1 T1"
 # Done Moss edit
 
 # Done estimating T1 and M0
