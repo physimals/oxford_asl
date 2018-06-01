@@ -63,7 +63,7 @@ Usage() {
     echo " --fa       : Flip angle for LL readout {default: 35 degrees}"
     echo " --lfa      : Lower flip angle for final phase of data {default: 11.7 degrees}"
     echo " --tis      : comma separated list of TI values"
-    echo "            {default: 0.04,0.64,1.24,1.84,2.44,3.04,3.64,4.24,4.84,5.44,6.04}"
+    echo "            {default: 0.03,0.63,1.23,1.83,2.43,3.03,3.63,4.23,4.83,5.43,6.03}"
     echo " --shift    : slice shifting factor {default: 2}"
     echo " --break_1  : slice number of first acquisition point (start from 0) {default: 0}"
     echo " --break_2  : slice number of middle acquisition point (start from 0) {default: 7}"
@@ -267,7 +267,7 @@ mkdir $tempdir
 # deal with the TIs
 if [ -z $tis ]; then
     # default QUASAR list of TIs
-    tis="0.04,0.64,1.24,1.84,2.44,3.04,3.64,4.24,4.84,5.44,6.04"
+    tis="0.03,0.63,1.23,1.83,2.43,3.03,3.63,4.23,4.83,5.43,6.03"
 fi
 
 # deal with bolus patterns
@@ -541,9 +541,9 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
-#tislist_calib="--ti1=0.04 --ti2=4.24 --ti3=4.84 --ti4=5.44 --ti5=6.04"
-tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
+#tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=4.83 --ti5=5.43 --ti6=6.03"
+#tislist_calib="--ti1=0.03 --ti2=4.23 --ti3=4.83 --ti4=5.43 --ti5=6.03"
+tislist_calib="--ti1=0.03 --ti2=4.83 --ti3=5.43 --ti4=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
@@ -644,9 +644,9 @@ imrm data_control_000 data_control_001 data_control_002 data_control_003 data_co
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.04 --ti2=0.64 --ti3=1.24 --ti4=4.84 --ti5=5.44 --ti6=6.04"
-#tislist_calib="--ti1=0.04 --ti2=4.24 --ti3=4.84 --ti4=5.44 --ti5=6.04"
-tislist_calib="--ti1=0.04 --ti2=4.84 --ti3=5.44 --ti4=6.04"
+#tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=4.83 --ti5=5.43 --ti6=6.03"
+#tislist_calib="--ti1=0.03 --ti2=4.23 --ti3=4.83 --ti4=5.43 --ti5=6.03"
+tislist_calib="--ti1=0.03 --ti2=4.83 --ti3=5.43 --ti4=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
