@@ -529,8 +529,8 @@ fslmerge -t data_control_4_m_0 data_control_4_m_1 data_control_4_m_2
 fslroi data_control_005 data_control_5_m_1 $last_TI_1 $length_1
 fslroi data_control_005 data_control_5_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_5_m_0 data_control_5_m_1 data_control_5_m_2
-fslroi data_control_006 data_control_6_m_1 $last_TI_1 $length_1
-fslroi data_control_006 data_control_6_m_2 $last_TI_2 $length_2
+fslroi data_control_006 data_control_shift_1_MT_low_fa $last_TI_1 $length_1
+fslroi data_control_006 data_control_shift_1_non_MT_low_fa $last_TI_2 $length_2
 fslmerge -t data_control_6_m_0 data_control_6_m_1 data_control_6_m_2
 
 echo "Split data into MT and non MT parts..."
@@ -539,8 +539,8 @@ echo "Split data into MT and non MT parts..."
 fslmaths data_control_0_m_1 -add data_control_1_m_1 -add data_control_2_m_1 -add data_control_3_m_1 -add data_control_4_m_1 -add data_control_5_m_1 -div 6 data_control_shift_1_MT_high_fa
 fslmaths data_control_0_m_2 -add data_control_1_m_2 -add data_control_2_m_2 -add data_control_3_m_2 -add data_control_4_m_2 -add data_control_5_m_2 -div 6 data_control_shift_1_non_MT_high_fa
 # Now merge with the low flip angle data
-fslmerge -t data_control_shift_1_MT data_control_shift_1_MT_high_fa data_control_6_m_1
-fslmerge -t data_control_shift_1_non_MT data_control_shift_1_non_MT_high_fa data_control_6_m_2
+fslmerge -t data_control_shift_1_MT data_control_shift_1_MT_high_fa data_control_shift_1_MT_low_fa
+fslmerge -t data_control_shift_1_non_MT data_control_shift_1_non_MT_high_fa data_control_shift_1_non_MT_low_fa
 
 # You also need two initial points for the two part of the data, ie. where the saturation signal recovers from
 # For the data with MT effects, the initial signal is zero
