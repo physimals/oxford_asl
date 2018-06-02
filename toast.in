@@ -533,6 +533,7 @@ fslroi data_control_006 data_control_6_m_1 $last_TI_1 $length_1
 fslroi data_control_006 data_control_6_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_6_m_0 data_control_6_m_1 data_control_6_m_2
 
+echo "Split data into MT and non MT parts..."
 # Now take the mean of MT and non-MT part
 # You have to use two dynamics (repeats) of the high flip angle data to minimize the MT effects (See Turbo QUASAR paper)
 fslmaths data_control_0_m_1 -add data_control_1_m_1 -add data_control_2_m_1 -add data_control_3_m_1 -add data_control_4_m_1 -add data_control_5_m_1 -div 6 data_control_shift_1_MT_high_fa
@@ -540,6 +541,26 @@ fslmaths data_control_0_m_2 -add data_control_1_m_2 -add data_control_2_m_2 -add
 # Now merge with the low flip angle data
 fslmerge -t data_control_shift_1_MT data_control_shift_1_MT_high_fa data_control_6_m_1
 fslmerge -t data_control_shift_1_non_MT data_control_shift_1_non_MT_high_fa data_control_6_m_2
+
+# You also need two initial points for the two part of the data, ie. where the saturation signal recovers from
+# For the data with MT effects, the initial signal is zero
+# For the data without MT effects, the initial signal is TI = 6
+initial_point=5 # TI = 6, starts from zero
+initial_length=1 # We only need one point
+fslroi data_control_000 data_initial_000 $initial_point $initial_length
+fslroi data_control_001 data_initial_001 $initial_point $initial_length
+fslroi data_control_002 data_initial_002 $initial_point $initial_length
+fslroi data_control_003 data_initial_003 $initial_point $initial_length
+fslroi data_control_004 data_initial_004 $initial_point $initial_length
+fslroi data_control_005 data_initial_005 $initial_point $initial_length
+fslroi data_control_006 data_initial_shift_1_non_MT_low_fa $initial_point $initial_length # The initial signal of the low FA curve without MT effects
+# Now compute the mean of the first six dynamics (high FA)
+fslmaths data_initial_000 -add data_initial_001 -add data_initial_002 -add data_initial_003 -add data_initial_004 -add data_initial_005 -div 6 data_initial_shift_1_non_MT_high_fa
+# Now do the initial signal with MT effects. It should starts from zero but we make it a very low value for easier fitting
+fslmaths data_initial_shift_1_non_MT_high_fa -mul 0 -add 0.0000001 -mas mask data_initial_shift_1_MT_high_fa
+fslmaths data_initial_shift_1_non_MT_low_fa -mul 0 -add 0.0000001 -mas mask data_initial_shift_1_MT_low_fa
+
+echo "Finished spliting data into MT and non MT parts"
 
 # Merge the first seven TIs
 fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
