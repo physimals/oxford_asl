@@ -569,46 +569,98 @@ fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 
 imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
-# We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=4.83 --ti5=5.43 --ti6=6.03"
-#tislist_calib="--ti1=0.03 --ti2=4.23 --ti3=4.83 --ti4=5.43 --ti5=6.03"
-tislist_calib="--ti1=0.03 --ti2=4.83 --ti3=5.43 --ti4=6.03"
+# TIs for MT and non MT effects
+tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
+tislist_calib_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
 # We estimate these paramters:
 # T1, M0t, g(FA correction factor), A(saturation efficiency)
 current_options_file="options_calib_shift_1.txt"
-echo "Begin T1 and M0 estimation for Shift 1 of the data"
+echo "Begin T1 and M0 estimation for Shift 1 of the data (non MT part, last 5 TIs)"
 echo "# Turbo QUASAR analysis calibration options" >> $current_options_file
 echo "--mask=mask" >> $current_options_file
 echo "--method=spatialvb" >> $current_options_file
 echo "--noise=white" >> $current_options_file
-echo "--model=satrecov" >> $current_options_file
+echo "--model=satrecovdualfa" >> $current_options_file
 echo "--repeats=1" >> $current_options_file
-echo "--phases=6" >> $current_options_file
+echo "--phases=1" >> $current_options_file
 echo $tislist_calib >> $current_options_file
 echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
 echo "--slicedt=$slicedt" >> $current_options_file
+echo "--t_initial_high_FA=3.03" >> $current_options_file # hard coded value
+echo "--t_initial_low_FA=3.03" >> $current_options_file # hard coded value
 echo "--print-free-energy" >> $current_options_file
 echo "--save-residuals" >> $current_options_file
 echo "--save-model-fit" >> $current_options_file
-echo "--param-spatial-priors=MN+" >> $current_options_file
+echo "--PSP_byname1=M0t" >> $current_options_file
+echo "--PSP_byname1_type=M" >> $current_options_file
+echo "--PSP_byname2=T1t" >> $current_options_file
+echo "--PSP_byname2_type=N" >> $current_options_file
+echo "--PSP_byname3=A" >> $current_options_file
+echo "--PSP_byname3_type=N" >> $current_options_file
+echo "--PSP_byname4=g" >> $current_options_file
+echo "--PSP_byname4_type=N" >> $current_options_file
+echo "--PSP_byname5=M0_initial_high_fa" >> $current_options_file
+echo "--PSP_byname5_type=I" >> $current_options_file
+echo "--PSP_byname5_image=data_initial_shift_1_non_MT_high_fa" >> $current_options_file
+echo "--PSP_byname6=M0_initial_low_fa" >> $current_options_file
+echo "--PSP_byname6_type=I" >> $current_options_file
+echo "--PSP_byname6_image=data_initial_shift_1_non_MT_low_fa" >> $current_options_file
 
 # Now perform model fitting to estimate these parameters
-$fabber --data=shift_1_repeat_1_control_TI_4 --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
+$fabber --data=data_control_shift_1_non_MT --data-order=singlefile --output=output_calib_shift_1 -@ $current_options_file
 
-# Moss edit
 # Here we need to estimate T1 and flip angle correction (g) values using the control data
 # Create a mask for the whole data. We use shift 1 repeat 1 control data
 if [ ! -z $infert1 ]; then
     echo "Estimating T1 of tissue from ASL control data..."
+    # Now do the non MT part
+
+    # T1, M0t, g(FA correction factor), A(saturation efficiency)
+    current_options_file="options_calib_shift_1_MT.txt"
+    echo "Begin T1 and M0 estimation for Shift 1 of the data (MT part, first 5 TIs)"
+    echo "# Turbo QUASAR analysis calibration options" >> $current_options_file
+    echo "--mask=mask" >> $current_options_file
+    echo "--method=spatialvb" >> $current_options_file
+    echo "--noise=white" >> $current_options_file
+    echo "--model=satrecovdualfa" >> $current_options_file
+    echo "--repeats=1" >> $current_options_file
+    echo "--phases=1" >> $current_options_file
+    echo $tislist_calib >> $current_options_file
+    echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
+    echo "--slicedt=$slicedt" >> $current_options_file
+    echo "--t_initial_high_FA=0" >> $current_options_file # hard coded value
+    echo "--t_initial_low_FA=0" >> $current_options_file # hard coded value
+    echo "--print-free-energy" >> $current_options_file
+    echo "--save-residuals" >> $current_options_file
+    echo "--save-model-fit" >> $current_options_file
+    echo "--PSP_byname1=M0t" >> $current_options_file
+    echo "--PSP_byname1_type=M" >> $current_options_file
+    echo "--PSP_byname2=T1t" >> $current_options_file
+    echo "--PSP_byname2_type=N" >> $current_options_file
+    echo "--PSP_byname3=A" >> $current_options_file
+    echo "--PSP_byname3_type=N" >> $current_options_file
+    echo "--PSP_byname4=g" >> $current_options_file
+    echo "--PSP_byname4_type=N" >> $current_options_file
+    echo "--PSP_byname5=M0_initial_high_fa" >> $current_options_file
+    echo "--PSP_byname5_type=I" >> $current_options_file
+    echo "--PSP_byname5_image=data_initial_shift_1_MT_high_fa" >> $current_options_file
+    echo "--PSP_byname6=M0_initial_low_fa" >> $current_options_file
+    echo "--PSP_byname6_type=I" >> $current_options_file
+    echo "--PSP_byname6_image=data_initial_shift_1_MT_low_fa" >> $current_options_file
+
+    # Now perform model fitting to estimate these parameters
+    $fabber --data=data_control_shift_1_MT --data-order=singlefile --output=output_calib_shift_1_MT -@ $current_options_file
 
 else
     echo "Use user provided T1 of tissue in CBF quantification..."
     fslmaths output_calib_shift_1/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_1/mean_T1t
 fi
-# Done Moss edit
+
+
+
 
 # Now estimate T1 and M0 from shift 2
 $asl_file --data=$shift_2_repeat_1_control_effective --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
@@ -638,11 +690,16 @@ imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0
 # Now estimate T1 and M0 from Shift 1
 $asl_file --data=$shift_2_repeat_1_control_effective --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
 
-# Extract first 3 and last 3 TIs of the first six dynamic
+# Moss Edit
+# We only need the first four TIs of the control data
+# Now estimate T1 and M0 from Shift 1
+$asl_file --data=$shift_2_repeat_1_control_effective --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
+
+# Split the TIs into MT and non-MT parts. First six TIs have MT, last five TIs no MT
 last_TI_1=0
-last_TI_2=8
-length_1=1
-length_2=3
+last_TI_2=6
+length_1=6
+length_2=5
 fslroi data_control_000 data_control_0_m_1 $last_TI_1 $length_1
 fslroi data_control_000 data_control_0_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_0_m_0 data_control_0_m_1 data_control_0_m_2
@@ -661,55 +718,134 @@ fslmerge -t data_control_4_m_0 data_control_4_m_1 data_control_4_m_2
 fslroi data_control_005 data_control_5_m_1 $last_TI_1 $length_1
 fslroi data_control_005 data_control_5_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_5_m_0 data_control_5_m_1 data_control_5_m_2
-fslroi data_control_006 data_control_6_m_1 $last_TI_1 $length_1
-fslroi data_control_006 data_control_6_m_2 $last_TI_2 $length_2
+fslroi data_control_006 data_control_shift_2_MT_low_fa $last_TI_1 $length_1
+fslroi data_control_006 data_control_shift_2_non_MT_low_fa $last_TI_2 $length_2
 fslmerge -t data_control_6_m_0 data_control_6_m_1 data_control_6_m_2
 
+echo "Split data into MT and non MT parts..."
+# Now take the mean of MT and non-MT part
+# You have to use two dynamics (repeats) of the high flip angle data to minimize the MT effects (See Turbo QUASAR paper)
+fslmaths data_control_0_m_1 -add data_control_1_m_1 -add data_control_2_m_1 -add data_control_3_m_1 -add data_control_4_m_1 -add data_control_5_m_1 -div 6 data_control_shift_2_MT_high_fa
+fslmaths data_control_0_m_2 -add data_control_1_m_2 -add data_control_2_m_2 -add data_control_3_m_2 -add data_control_4_m_2 -add data_control_5_m_2 -div 6 data_control_shift_2_non_MT_high_fa
+# Now merge with the low flip angle data
+fslmerge -t data_control_shift_2_MT data_control_shift_2_MT_high_fa data_control_shift_2_MT_low_fa
+fslmerge -t data_control_shift_2_non_MT data_control_shift_2_non_MT_high_fa data_control_shift_2_non_MT_low_fa
+
+# You also need two initial points for the two part of the data, ie. where the saturation signal recovers from
+# For the data with MT effects, the initial signal is zero
+# For the data without MT effects, the initial signal is TI = 6
+initial_point=5 # TI = 6, starts from zero
+initial_length=1 # We only need one point
+fslroi data_control_000 data_initial_000 $initial_point $initial_length
+fslroi data_control_001 data_initial_001 $initial_point $initial_length
+fslroi data_control_002 data_initial_002 $initial_point $initial_length
+fslroi data_control_003 data_initial_003 $initial_point $initial_length
+fslroi data_control_004 data_initial_004 $initial_point $initial_length
+fslroi data_control_005 data_initial_005 $initial_point $initial_length
+fslroi data_control_006 data_initial_shift_2_non_MT_low_fa $initial_point $initial_length # The initial signal of the low FA curve without MT effects
+# Now compute the mean of the first six dynamics (high FA)
+fslmaths data_initial_000 -add data_initial_001 -add data_initial_002 -add data_initial_003 -add data_initial_004 -add data_initial_005 -div 6 data_initial_shift_2_non_MT_high_fa
+# Now do the initial signal with MT effects. It should starts from zero but we make it a very low value for easier fitting
+fslmaths data_initial_shift_2_non_MT_high_fa -mul 0 -add 0.0000001 -mas mask_shift_2_effective data_initial_shift_2_MT_high_fa
+fslmaths data_initial_shift_2_non_MT_low_fa -mul 0 -add 0.0000001 -mas mask_shift_2_effective data_initial_shift_2_MT_low_fa
+
+echo "Finished spliting data into MT and non MT parts"
+
 # Merge the first seven TIs
-fslmerge -t shift_2_repeat_1_control_TI_4_effective data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
+fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # Remove the intermediate files
 imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
 imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
-# We only use the first three and last three TIs.
-#tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=4.83 --ti5=5.43 --ti6=6.03"
-#tislist_calib="--ti1=0.03 --ti2=4.23 --ti3=4.83 --ti4=5.43 --ti5=6.03"
-tislist_calib="--ti1=0.03 --ti2=4.83 --ti3=5.43 --ti4=6.03"
+# TIs for MT and non MT effects
+tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
+tislist_calib_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
 # We estimate these paramters:
 # T1, M0t, g(FA correction factor), A(saturation efficiency)
 current_options_file="options_calib_shift_2.txt"
-echo "Begin T1 and M0 estimation for Shift 2 of the data"
+echo "Begin T1 and M0 estimation for Shift 2 of the data (non MT part, last 5 TIs)"
 echo "# Turbo QUASAR analysis calibration options" >> $current_options_file
 echo "--mask=mask_shift_2_effective" >> $current_options_file
 echo "--method=spatialvb" >> $current_options_file
 echo "--noise=white" >> $current_options_file
-echo "--model=satrecov" >> $current_options_file
+echo "--model=satrecovdualfa" >> $current_options_file
 echo "--repeats=1" >> $current_options_file
-echo "--phases=6" >> $current_options_file
+echo "--phases=1" >> $current_options_file
 echo $tislist_calib >> $current_options_file
 echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
 echo "--slicedt=$slicedt" >> $current_options_file
+echo "--t_initial_high_FA=3.03" >> $current_options_file # hard coded value
+echo "--t_initial_low_FA=3.03" >> $current_options_file # hard coded value
 echo "--print-free-energy" >> $current_options_file
 echo "--save-residuals" >> $current_options_file
 echo "--save-model-fit" >> $current_options_file
-echo "--param-spatial-priors=MN+" >> $current_options_file
+echo "--PSP_byname1=M0t" >> $current_options_file
+echo "--PSP_byname1_type=M" >> $current_options_file
+echo "--PSP_byname2=T1t" >> $current_options_file
+echo "--PSP_byname2_type=N" >> $current_options_file
+echo "--PSP_byname3=A" >> $current_options_file
+echo "--PSP_byname3_type=N" >> $current_options_file
+echo "--PSP_byname4=g" >> $current_options_file
+echo "--PSP_byname4_type=N" >> $current_options_file
+echo "--PSP_byname5=M0_initial_high_fa" >> $current_options_file
+echo "--PSP_byname5_type=I" >> $current_options_file
+echo "--PSP_byname5_image=data_initial_shift_2_non_MT_high_fa" >> $current_options_file
+echo "--PSP_byname6=M0_initial_low_fa" >> $current_options_file
+echo "--PSP_byname6_type=I" >> $current_options_file
+echo "--PSP_byname6_image=data_initial_shift_2_non_MT_low_fa" >> $current_options_file
 
 # Now perform model fitting to estimate these parameters
-$fabber --data=shift_2_repeat_1_control_TI_4_effective --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
+$fabber --data=data_control_shift_2_non_MT --data-order=singlefile --output=output_calib_shift_2 -@ $current_options_file
 
-# Moss edit
 # Here we need to estimate T1 and flip angle correction (g) values using the control data
 # Create a mask for the whole data. We use shift 1 repeat 1 control data
 if [ ! -z $infert1 ]; then
     echo "Estimating T1 of tissue from ASL control data..."
+    # Now do the non MT part
+
+    # T1, M0t, g(FA correction factor), A(saturation efficiency)
+    current_options_file="options_calib_shift_2_MT.txt"
+    echo "Begin T1 and M0 estimation for Shift 2 of the data (MT part, first 5 TIs)"
+    echo "# Turbo QUASAR analysis calibration options" >> $current_options_file
+    echo "--mask=mask_shift_2_effective" >> $current_options_file
+    echo "--method=spatialvb" >> $current_options_file
+    echo "--noise=white" >> $current_options_file
+    echo "--model=satrecovdualfa" >> $current_options_file
+    echo "--repeats=1" >> $current_options_file
+    echo "--phases=1" >> $current_options_file
+    echo $tislist_calib >> $current_options_file
+    echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
+    echo "--slicedt=$slicedt" >> $current_options_file
+    echo "--t_initial_high_FA=0" >> $current_options_file # hard coded value
+    echo "--t_initial_low_FA=0" >> $current_options_file # hard coded value
+    echo "--print-free-energy" >> $current_options_file
+    echo "--save-residuals" >> $current_options_file
+    echo "--save-model-fit" >> $current_options_file
+    echo "--PSP_byname1=M0t" >> $current_options_file
+    echo "--PSP_byname1_type=M" >> $current_options_file
+    echo "--PSP_byname2=T1t" >> $current_options_file
+    echo "--PSP_byname2_type=N" >> $current_options_file
+    echo "--PSP_byname3=A" >> $current_options_file
+    echo "--PSP_byname3_type=N" >> $current_options_file
+    echo "--PSP_byname4=g" >> $current_options_file
+    echo "--PSP_byname4_type=N" >> $current_options_file
+    echo "--PSP_byname5=M0_initial_high_fa" >> $current_options_file
+    echo "--PSP_byname5_type=I" >> $current_options_file
+    echo "--PSP_byname5_image=data_initial_shift_2_MT_high_fa" >> $current_options_file
+    echo "--PSP_byname6=M0_initial_low_fa" >> $current_options_file
+    echo "--PSP_byname6_type=I" >> $current_options_file
+    echo "--PSP_byname6_image=data_initial_shift_2_MT_low_fa" >> $current_options_file
+
+    # Now perform model fitting to estimate these parameters
+    $fabber --data=data_control_shift_2_MT --data-order=singlefile --output=output_calib_shift_2_MT -@ $current_options_file
 
 else
     echo "Use user provided T1 of tissue in CBF quantification..."
-    fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask_shift_2_effective output_calib_shift_2/mean_T1t
+    fslmaths output_calib_shift_2/mean_T1t -mul 0 -add $t1 -mas mask output_calib_shift_2/mean_T1t
 fi
 # Done Moss edit
 
