@@ -506,11 +506,11 @@ imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0
 # Now estimate T1 and M0 from Shift 1
 $asl_file --data=$shift_1_repeat_1_control --ntis=$n_dynamics --ibf=tis --iaf=diff --split=data_control_
 
-# Extract first 3 and last 3 TIs of the first six dynamic
+# Split the TIs into MT and non-MT parts. First six TIs have MT, last five TIs no MT
 last_TI_1=0
-last_TI_2=8
-length_1=1
-length_2=3
+last_TI_2=6
+length_1=6
+length_2=5
 fslroi data_control_000 data_control_0_m_1 $last_TI_1 $length_1
 fslroi data_control_000 data_control_0_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_0_m_0 data_control_0_m_1 data_control_0_m_2
@@ -532,6 +532,14 @@ fslmerge -t data_control_5_m_0 data_control_5_m_1 data_control_5_m_2
 fslroi data_control_006 data_control_6_m_1 $last_TI_1 $length_1
 fslroi data_control_006 data_control_6_m_2 $last_TI_2 $length_2
 fslmerge -t data_control_6_m_0 data_control_6_m_1 data_control_6_m_2
+
+# Now take the mean of MT and non-MT part
+# You have to use two dynamics (repeats) of the high flip angle data to minimize the MT effects (See Turbo QUASAR paper)
+fslmaths data_control_0_m_1 -add data_control_1_m_1 -add data_control_2_m_1 -add data_control_3_m_1 -add data_control_4_m_1 -add data_control_5_m_1 -div 6 data_control_shift_1_MT_high_fa
+fslmaths data_control_0_m_2 -add data_control_1_m_2 -add data_control_2_m_2 -add data_control_3_m_2 -add data_control_4_m_2 -add data_control_5_m_2 -div 6 data_control_shift_1_non_MT_high_fa
+# Now merge with the low flip angle data
+fslmerge -t data_control_shift_1_MT data_control_shift_1_MT_high_fa data_control_6_m_1
+fslmerge -t data_control_shift_1_non_MT data_control_shift_1_non_MT_high_fa data_control_6_m_2
 
 # Merge the first seven TIs
 fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
