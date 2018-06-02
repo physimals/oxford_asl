@@ -563,15 +563,15 @@ fslmaths data_initial_shift_1_non_MT_low_fa -mul 0 -add 0.0000001 -mas mask data
 echo "Finished spliting data into MT and non MT parts"
 
 # Merge the first seven TIs
-fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
+#fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # Remove the intermediate files
-imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
-imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
+#imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
+#imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # TIs for MT and non MT effects
-tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
-tislist_calib_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
+tislist_calib_MT="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
+tislist_calib_non_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
@@ -586,7 +586,7 @@ echo "--noise=white" >> $current_options_file
 echo "--model=satrecovdualfa" >> $current_options_file
 echo "--repeats=1" >> $current_options_file
 echo "--phases=1" >> $current_options_file
-echo $tislist_calib >> $current_options_file
+echo $tislist_calib_non_MT >> $current_options_file
 echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
 echo "--slicedt=$slicedt" >> $current_options_file
 echo "--t_initial_high_FA=3.03" >> $current_options_file # hard coded value
@@ -628,7 +628,7 @@ if [ ! -z $infert1 ]; then
     echo "--model=satrecovdualfa" >> $current_options_file
     echo "--repeats=1" >> $current_options_file
     echo "--phases=1" >> $current_options_file
-    echo $tislist_calib >> $current_options_file
+    echo $tislist_calib_MT >> $current_options_file
     echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
     echo "--slicedt=$slicedt" >> $current_options_file
     echo "--t_initial_high_FA=0" >> $current_options_file # hard coded value
@@ -752,15 +752,15 @@ fslmaths data_initial_shift_2_non_MT_low_fa -mul 0 -add 0.0000001 -mas mask_shif
 echo "Finished spliting data into MT and non MT parts"
 
 # Merge the first seven TIs
-fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
+#fslmerge -t shift_1_repeat_1_control_TI_4 data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # Remove the intermediate files
-imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
-imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
+#imrm data_control_000 data_control_001 data_control_002 data_control_003 data_control_004 data_control_005 data_control_006
+#imrm data_control_0_m_0 data_control_1_m_0 data_control_2_m_0 data_control_3_m_0 data_control_4_m_0 data_control_5_m_0 data_control_6_m_0
 
 # TIs for MT and non MT effects
-tislist_calib="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
-tislist_calib_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
+tislist_calib_MT="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
+tislist_calib_non_MT="--ti1=3.63 --ti2=4.23 --ti3=4.83 --ti4=5.34 --ti5=6.03"
 # Done Moss Edit
 
 # Prepare for a fabber option file
@@ -775,7 +775,7 @@ echo "--noise=white" >> $current_options_file
 echo "--model=satrecovdualfa" >> $current_options_file
 echo "--repeats=1" >> $current_options_file
 echo "--phases=1" >> $current_options_file
-echo $tislist_calib >> $current_options_file
+echo $tislist_calib_non_MT >> $current_options_file
 echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
 echo "--slicedt=$slicedt" >> $current_options_file
 echo "--t_initial_high_FA=3.03" >> $current_options_file # hard coded value
@@ -817,7 +817,7 @@ if [ ! -z $infert1 ]; then
     echo "--model=satrecovdualfa" >> $current_options_file
     echo "--repeats=1" >> $current_options_file
     echo "--phases=1" >> $current_options_file
-    echo $tislist_calib >> $current_options_file
+    echo $tislist_calib_MT >> $current_options_file
     echo "--t1=$t1 --FA=$fa --LFA=$lfa " >> $current_options_file
     echo "--slicedt=$slicedt" >> $current_options_file
     echo "--t_initial_high_FA=0" >> $current_options_file # hard coded value
