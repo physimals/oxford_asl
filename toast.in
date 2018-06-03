@@ -1084,6 +1084,17 @@ if [ ! -z $infertau ]; then
     fslroi output_tissue_shift_2/mean_tautiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
     fslmerge -z output_tissue_shift_2/mean_tautiss_result data_segment_2 data_segment_1 # Segment 2 was scanned first
 fi
+# T1 and M0t of MT effects
+if [ ! -z $infert1 ]; then
+    # T1
+    fslroi output_calib_shift_2_MT/mean_T1t data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
+    fslroi output_calib_shift_2_MT/mean_T1t data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
+    fslmerge -z output_calib_shift_2_MT/mean_T1t_result data_segment_2 data_segment_1 # Segment 2 was scanned first
+    # M0t
+    fslroi output_calib_shift_2_MT/mean_M0t data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
+    fslroi output_calib_shift_2_MT/mean_M0t data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
+    fslmerge -z output_calib_shift_2_MT/mean_M0t_result data_segment_2 data_segment_1 # Segment 2 was scanned first
+fi
 # Arterial blood colume and arrival time to macrovasculature
 if [ ! -z $infer_arterial ]; then
     # ABV
@@ -1127,12 +1138,19 @@ if [ ! -z $infertau ]; then
     fslmaths output_tissue_shift_1/mean_tautiss -add output_tissue_shift_2/mean_tautiss_result -div 2 -thr 0 $output_dir_temp/Bolus_duration
     #imrm Bolus_duration_raw numerator denominator tanh
 fi
+# T1 and M0t of MT effects
+if [ ! -z $infert1 ]; then
+    # T1
+    fslmaths output_blood_shift_1/mean_fblood -add output_blood_shift_2/mean_fblood_result -div 2 -thr 0 $output_dir_temp/ABV_relative
+    # M0t
+    fslmaths output_blood_shift_1/mean_deltblood -add output_blood_shift_2/mean_deltblood_result -div 2 -thr 0 $output_dir_temp/Arrival_time_blood
+fi
 # Arterial blood colume and arrival time to macrovasculature
 if [ ! -z $infer_arterial ]; then
     # ABV
-    fslmaths output_blood_shift_1/mean_fblood -add output_blood_shift_2/mean_fblood_result -div 2 -thr 0 $output_dir_temp/ABV_relative
+    fslmaths output_calib_shift_1_MT/mean_T1t -add output_calib_shift_2_MT/mean_T1t_result -div 2 -thr 0 $output_dir_temp/T1_tissue_MT
     # arrival time to macrovasculature
-    fslmaths output_blood_shift_1/mean_deltblood -add output_blood_shift_2/mean_deltblood_result -div 2 -thr 0 $output_dir_temp/Arrival_time_blood
+    fslmaths output_calib_shift_1_MT/mean_M0t -add output_calib_shift_2_MT/mean_M0t_result -div 2 -thr 0 $output_dir_temp/M0t_MT
 fi
 
 
