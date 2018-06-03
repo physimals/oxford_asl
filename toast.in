@@ -830,8 +830,10 @@ echo "Begin model-based analysis"
     echo $bolus_pattern_list >> $current_options_file
     echo "--slice_shift=$shift_factor" >> $current_options_file
     echo "--onephase" >> $current_options_file
-    echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
-    echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    if [ ! -z $infert1 ]; then
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+        echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    fi
     #echo "--artdir" >> $current_options_file
     # Save model fitting results and residue
     echo "--save-model-fit" >> $current_options_file
@@ -849,15 +851,16 @@ echo "Begin model-based analysis"
     echo "--PSP_byname3_type=N" >> $current_options_file
     echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
     echo "--PSP_byname4_type=N" >> $current_options_file
-    echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
-    echo "--PSP_byname5_type=I" >> $current_options_file
-    echo "--PSP_byname5_image=$calib_shift_1_dir/mean_g" >> $current_options_file
-    echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
-    echo "--PSP_byname6_type=I" >> $current_options_file
-    echo "--PSP_byname6_image=$calib_shift_1_dir/mean_T1t" >> $current_options_file
-    echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
-    echo "--PSP_byname7_type=N" >> $current_options_file
-
+    if [ ! -z $infert1 ]; then
+        echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
+        echo "--PSP_byname5_type=I" >> $current_options_file
+        echo "--PSP_byname5_image=$calib_shift_1_dir/mean_g" >> $current_options_file
+        echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
+        echo "--PSP_byname6_type=I" >> $current_options_file
+        echo "--PSP_byname6_image=$calib_shift_1_dir/mean_T1t" >> $current_options_file
+        echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
+        echo "--PSP_byname7_type=N" >> $current_options_file
+    fi
 
     # Now perform model fitting to estimate CBF, ATT, etc
     $fabber --data=$shift_1_repeat_1_tissue --data-order=singlefile --output=output_tissue_shift_1 -@ $current_options_file
@@ -882,8 +885,10 @@ echo "Begin model-based analysis"
     echo $bolus_pattern_list >> $current_options_file
     echo "--slice_shift=$shift_factor" >> $current_options_file
     echo "--onephase" >> $current_options_file
-    echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
-    echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    if [ ! -z $infert1 ]; then
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+        echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    fi
     #echo "--artdir" >> $current_options_file
     # Save model fitting results and residue
     echo "--save-model-fit" >> $current_options_file
@@ -901,14 +906,16 @@ echo "Begin model-based analysis"
     echo "--PSP_byname3_type=N" >> $current_options_file
     echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
     echo "--PSP_byname4_type=N" >> $current_options_file
-    echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
-    echo "--PSP_byname5_type=I" >> $current_options_file
-    echo "--PSP_byname5_image=$calib_shift_2_dir/mean_g" >> $current_options_file
-    echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
-    echo "--PSP_byname6_type=I" >> $current_options_file
-    echo "--PSP_byname6_image=$calib_shift_2_dir/mean_T1t" >> $current_options_file
-    echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
-    echo "--PSP_byname7_type=N" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
+        echo "--PSP_byname5_type=I" >> $current_options_file
+        echo "--PSP_byname5_image=$calib_shift_2_dir/mean_g" >> $current_options_file
+        echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
+        echo "--PSP_byname6_type=I" >> $current_options_file
+        echo "--PSP_byname6_image=$calib_shift_2_dir/mean_T1t" >> $current_options_file
+        echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
+        echo "--PSP_byname7_type=N" >> $current_options_file
+    fi
 
 
     # Now perform model fitting to estimate CBF, ATT, etc
@@ -936,8 +943,14 @@ echo "Begin model-based analysis"
         current_options_file="options_tissue_shift_1.txt"
         echo "--infertau" >> $current_options_file # Estimate bolus duration
         echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
-        echo "--PSP_byname8=tautiss" >> $current_options_file # Estimate bolus duration
-        echo "--PSP_byname8_type=N" >> $current_options_file
+        if [ ! -z $infert1 ]; then
+            echo "--PSP_byname8=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname8_type=N" >> $current_options_file
+        else
+            echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname5_type=N" >> $current_options_file
+        fi
+
 
         $fabber --data=$shift_1_repeat_1_tissue --data-order=singlefile --output=output_tissue_shift_1 -@ $current_options_file --continue-from-mvn=output_tissue_shift_1_step_1/finalMVN2
     
@@ -952,8 +965,13 @@ echo "Begin model-based analysis"
         current_options_file="options_tissue_shift_2.txt"
         echo "--infertau" >> $current_options_file # Estimate bolus duration
         echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
-        echo "--PSP_byname8=tautiss" >> $current_options_file # Estimate bolus duration
-        echo "--PSP_byname8_type=N" >> $current_options_file
+        if [ ! -z $infert1 ]; then
+            echo "--PSP_byname8=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname8_type=N" >> $current_options_file
+        else
+            echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname5_type=N" >> $current_options_file
+        fi
 
         $fabber --data=$shift_1_repeat_1_tissue --data-order=singlefile --output=output_tissue_shift_2 -@ $current_options_file --continue-from-mvn=output_tissue_shift_2_step_1/finalMVN2
 
@@ -989,7 +1007,9 @@ if [ ! -z $infer_arterial ]; then
     echo $bolus_pattern_list >> $current_options_file
     echo "--slice_shift=$shift_factor" >> $current_options_file
     echo "--onephase" >> $current_options_file
-    echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+    if [ ! -z $infert1 ]; then
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+    fi
     #echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
     # Save model fitting results and residue
     echo "--save-model-fit" >> $current_options_file
@@ -1013,9 +1033,11 @@ if [ ! -z $infer_arterial ]; then
     echo "--PSP_byname6_type=N" >> $current_options_file
     echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
     echo "--PSP_byname7_type=N" >> $current_options_file
-    echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
-    echo "--PSP_byname8_type=I" >> $current_options_file
-    echo "--PSP_byname8_image=$calib_shift_1_dir/mean_g" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
+        echo "--PSP_byname8_type=I" >> $current_options_file
+        echo "--PSP_byname8_image=$calib_shift_1_dir/mean_g" >> $current_options_file
+    fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_1_repeat_1_blood --data-order=singlefile --output=output_blood_shift_1 -@ $current_options_file
@@ -1038,7 +1060,9 @@ if [ ! -z $infer_arterial ]; then
     echo $bolus_pattern_list >> $current_options_file
     echo "--slice_shift=$shift_factor" >> $current_options_file
     echo "--onephase" >> $current_options_file
-    echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+    if [ ! -z $infert1 ]; then    
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+    fi
     #echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
     #echo "--artdir" >> $current_options_file
     # Save model fitting results and residue
@@ -1063,9 +1087,11 @@ if [ ! -z $infer_arterial ]; then
     echo "--PSP_byname6_type=N" >> $current_options_file
     echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
     echo "--PSP_byname7_type=N" >> $current_options_file
-    echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
-    echo "--PSP_byname8_type=I" >> $current_options_file
-    echo "--PSP_byname8_image=$calib_shift_2_dir/mean_g" >> $current_options_file
+    if [ ! -z $infert1 ]; then 
+        echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
+        echo "--PSP_byname8_type=I" >> $current_options_file
+        echo "--PSP_byname8_image=$calib_shift_2_dir/mean_g" >> $current_options_file
+    fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_2_repeat_1_blood --data-order=singlefile --output=output_blood_shift_2 -@ $current_options_file
