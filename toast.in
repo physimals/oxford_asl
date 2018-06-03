@@ -792,6 +792,12 @@ fi
 
 # Model based analysis
 # Prepare for a fabber option file
+fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_1 $length_1
+fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
+fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
+fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
+tislist_calib_MT="--ti1=0.03 --ti2=0.63 --ti3=1.23 --ti4=1.83 --ti5=2.43 --ti6=3.03"
+tislist=$tislist_calib_MT
 echo "Begin model-based analysis"
 
     # Fixed bolus duration
@@ -833,10 +839,10 @@ echo "Begin model-based analysis"
     echo "--PSP_byname4_type=N" >> $current_options_file
     echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
     echo "--PSP_byname5_type=I" >> $current_options_file
-    echo "--PSP_byname5_image=output_calib_shift_1/mean_g" >> $current_options_file
+    echo "--PSP_byname5_image=output_calib_shift_1_MT/mean_g" >> $current_options_file
     echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
     echo "--PSP_byname6_type=I" >> $current_options_file
-    echo "--PSP_byname6_image=output_calib_shift_1/mean_T1t" >> $current_options_file
+    echo "--PSP_byname6_image=output_calib_shift_1_MT/mean_T1t" >> $current_options_file
     echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
     echo "--PSP_byname7_type=N" >> $current_options_file
 
@@ -885,10 +891,10 @@ echo "Begin model-based analysis"
     echo "--PSP_byname4_type=N" >> $current_options_file
     echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
     echo "--PSP_byname5_type=I" >> $current_options_file
-    echo "--PSP_byname5_image=output_calib_shift_2/mean_g" >> $current_options_file
+    echo "--PSP_byname5_image=output_calib_shift_2_MT/mean_g" >> $current_options_file
     echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
     echo "--PSP_byname6_type=I" >> $current_options_file
-    echo "--PSP_byname6_image=output_calib_shift_2/mean_T1t" >> $current_options_file
+    echo "--PSP_byname6_image=output_calib_shift_2_MT/mean_T1t" >> $current_options_file
     echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
     echo "--PSP_byname7_type=N" >> $current_options_file
 
@@ -997,7 +1003,7 @@ if [ ! -z $infer_arterial ]; then
     echo "--PSP_byname7_type=N" >> $current_options_file
     echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
     echo "--PSP_byname8_type=I" >> $current_options_file
-    echo "--PSP_byname8_image=output_calib_shift_1/mean_g" >> $current_options_file
+    echo "--PSP_byname8_image=output_calib_shift_1_MT/mean_g" >> $current_options_file
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_1_repeat_1_blood --data-order=singlefile --output=output_blood_shift_1 -@ $current_options_file
@@ -1047,7 +1053,7 @@ if [ ! -z $infer_arterial ]; then
     echo "--PSP_byname7_type=N" >> $current_options_file
     echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
     echo "--PSP_byname8_type=I" >> $current_options_file
-    echo "--PSP_byname8_image=output_calib_shift_2/mean_g" >> $current_options_file
+    echo "--PSP_byname8_image=output_calib_shift_2_MT/mean_g" >> $current_options_file
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_2_repeat_1_blood --data-order=singlefile --output=output_blood_shift_2 -@ $current_options_file
