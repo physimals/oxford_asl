@@ -1042,7 +1042,7 @@ if [ ! -z $infer_arterial ]; then
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_1_repeat_1_blood --data-order=singlefile --output=output_blood_shift_1 -@ $current_options_file
     
-    # Shift 2
+    # Shift 2 data
     current_options_file="options_blood_shift_2.txt"
     echo "# Turbo QUASAR ASL arterial blood component analysis options for Shift 2 of the data" > $current_options_file
     echo "--mask=mask_shift_2_effective" >> $current_options_file
