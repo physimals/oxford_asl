@@ -69,7 +69,7 @@ Usage() {
     echo " --break_2  : slice number of middle acquisition point (start from 0) {default: 7}"
     echo " --break_3  : slice number of last acquisition point (start from 0) {default: 14}"
     echo " --taupat   : comma separated list of bolus pattern. 1: label, 0: skip"
-    echo "            {default: 1, 1, 1, 1, 1, 1}"
+    echo "            {default: 1, 1, 1, 1, 1, 1, 1}"
     echo ""
 }
 
@@ -273,7 +273,7 @@ fi
 # deal with bolus patterns
 if [ -z $taupat ]; then
     # default QUASAR list of TIs
-    taupat="1,1,1,1,1,1"
+    taupat="1,1,1,1,1,1,1"
 fi
 
 # Create TI list
