@@ -803,6 +803,12 @@ if [ ! -z $infert1 ]; then
     # Priors
     calib_shift_1_dir=output_calib_shift_1_MT
     calib_shift_2_dir=output_calib_shift_2_MT
+    # We also need a T1 of blood under MT effects
+    # We assume this relationship T1_tissue/T1_tissue_MT = T1_blood/T1_blood_MT
+    # So T1_blood_MT = T1_tissue_MT * T1_blood / T1_tissue
+    fslmaths output_calib_shift_1_MT/mean_T1t -mul t1b -div output_calib_shift_1/mean_T1t -mas mask $calib_shift_1_dir/mean_T1b
+    fslmaths output_calib_shift_2_MT/mean_T1t -mul t1b -div output_calib_shift_2/mean_T1t -mas mask_shift_2_effective $calib_shift_2_dir/mean_T1b
+
 # Use full data simple quantification
 else
     # Priors
@@ -859,7 +865,8 @@ echo "Begin model-based analysis"
         echo "--PSP_byname6_type=I" >> $current_options_file
         echo "--PSP_byname6_image=$calib_shift_1_dir/mean_T1t" >> $current_options_file
         echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
-        echo "--PSP_byname7_type=N" >> $current_options_file
+        echo "--PSP_byname7_type=I" >> $current_options_file
+        echo "--PSP_byname7_image=$calib_shift_1_dir/mean_T1b" >> $current_options_file
     fi
 
     # Now perform model fitting to estimate CBF, ATT, etc
@@ -914,7 +921,8 @@ echo "Begin model-based analysis"
         echo "--PSP_byname6_type=I" >> $current_options_file
         echo "--PSP_byname6_image=$calib_shift_2_dir/mean_T1t" >> $current_options_file
         echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
-        echo "--PSP_byname7_type=N" >> $current_options_file
+        echo "--PSP_byname7_type=I" >> $current_options_file
+        echo "--PSP_byname7_image=$calib_shift_2_dir/mean_T1b" >> $current_options_file
     fi
 
 
