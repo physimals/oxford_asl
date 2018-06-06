@@ -1158,6 +1158,22 @@ if [ ! -z $moco ]; then
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
 fi
 
+### User supplied distortion correction as (additional) warp
+# convertwarp on the supplied warp image to extract the jacbbian (as parts) (NB meanasl here is just a reference, but I am not sure it has been created yet?)
+#convertwarp -r $tempdir/meanasl -o $tempdir/asldist_userwarp -w [input_warp] --rel -j $tempdir/distcorr/jacobian_parts
+# fslmaths to average the jacobian parts
+#fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+
+# apply the warp with the motion correction to give something that has been corrected in a single step
+#appremat=""
+#    if [ ! -z $moco ]; then
+#	appremat="--premat=$tempdir/asldata.cat"
+#    fi
+#    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $tempdir/asldist_userwarp --rel --interp=spline --paddingsize=1
+#    fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
+
+
+
 ### deal with TIs (as specified on the command line)
 count=0
 tislist=""
@@ -1529,8 +1545,16 @@ if [ -e $tempdir/fmap.* ]; then
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
     
     # generate the correction warp
+
+    # IF
+    # we ALSO have a user supplied warp (which we will have used earlier too) then we need to merge that with the one we have found here
+    # use convert warp to combine the warps
+    #convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --warp2=$tempdir/asldist_userwarp --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+    #fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    #ELSE
     convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
     fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    #FI
     
     # Now apply the correction to the data.
     # note that we use the orignal data here and apply the motion correction as part of the process
