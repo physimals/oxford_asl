@@ -67,7 +67,7 @@ class Prog:
         p = subprocess.Popen(cmd_args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
-            line = p.stdout.readline()
+            line = p.stdout.readline().decode('utf-8')
             out += line
             if retcode is not None: break
         if retcode != 0:

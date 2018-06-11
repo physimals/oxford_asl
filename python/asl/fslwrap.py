@@ -353,7 +353,7 @@ class Workspace(object):
             p = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             while 1:
                 retcode = p.poll() # returns None while subprocess is running
-                stdout_line = p.stdout.readline()
+                stdout_line = p.stdout.readline().decode('utf-8')
                 cmd_stdout += stdout_line
                 self.echo(stdout_line)
                 if retcode is not None: break

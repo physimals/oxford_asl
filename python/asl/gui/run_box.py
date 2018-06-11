@@ -51,7 +51,7 @@ class FslCmd:
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
-            line = p.stdout.readline()
+            line = p.stdout.readline().decode('utf-8')
             self.write_output(line)
             if retcode is not None: break
         self.write_output("\nReturn code: %i\n\n" % retcode)
