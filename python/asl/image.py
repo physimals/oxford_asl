@@ -7,6 +7,7 @@ import os
 import sys
 import shutil
 from optparse import OptionParser, OptionGroup
+from six import string_types
 
 import numpy as np
 import nibabel as nib
@@ -82,7 +83,7 @@ class AslImage(fsl.Image):
         if ntis is None and tis is None:
             raise RuntimeError("Number of TIs not specified")
         elif tis is not None:
-            if isinstance(tis, basestring): tis = [float(ti) for ti in tis.split(",")]
+            if isinstance(tis, string_types): tis = [float(ti) for ti in tis.split(",")]
             ntis = len(tis)
             if ntis is not None and len(tis) != ntis:
                 raise RuntimeError("Number of TIs: %i, but list of %i TIs given" % (ntis, len(tis)))
@@ -95,14 +96,14 @@ class AslImage(fsl.Image):
             # Calculate fixed number of repeats 
             if self.nv % (self.ntc * self.ntis) != 0:
                 raise RuntimeError("Data contains %i volumes, inconsistent with %i TIs and TC pairs" % (self.nv, self.ntis))        
-            rpts = [self.nv / (self.ntc * self.ntis)] * self.ntis
+            rpts = [int(self.nv / (self.ntc * self.ntis))] * self.ntis
         elif nrpts is not None:
             nrpts = int(nrpts)
             if nrpts * self.ntis * self.ntc != self.nv:
                 raise RuntimeError("Data contains %i volumes, inconsistent with %i TIs and %i repeats" % (self.nv, self.ntis, nrpts))
             rpts = [nrpts] * self.ntis
         else:
-            if isinstance(rpts, basestring): rpts = [int(rpt) for rpt in rpts.split(",")]
+            if isinstance(rpts, string_types): rpts = [int(rpt) for rpt in rpts.split(",")]
             if len(rpts) != self.ntis:
                 raise RuntimeError("%i TIs, but only %i variable repeats" % (self.ntis, len(rpts)))        
             elif sum(rpts) * self.ntc != self.nv:
@@ -206,13 +207,13 @@ class AslImage(fsl.Image):
             # Already differenced
             output_data = self.data()
         else:
-            output_data = np.zeros(list(self.shape[:3]) + [self.nv/2])
+            output_data = np.zeros(list(self.shape[:3]) + [int(self.nv/2)])
 
             # Re-order so that TC pairs are together with the tag first
             out_order = self.order.replace("p", "").replace("P", "")
             reordered = self.reorder("p" + out_order).data()
             
-            for t in range(self.nv / 2):
+            for t in range(int(self.nv / 2)):
                 tag = 2*t
                 ctrl = tag+1
                 output_data[:,:,:,t] = reordered[:,:,:,ctrl] - reordered[:,:,:,tag]

@@ -11,6 +11,7 @@ import subprocess
 import errno
 import tempfile
 import collections
+from six import string_types
 
 import nibabel as nib
 import numpy as np
@@ -507,7 +508,7 @@ class Workspace(object):
         """
         if isinstance(img, Image):
             return img, self.IMAGE
-        elif isinstance(img, basestring):
+        elif isinstance(img, string_types):
             return Image(img), self.FILENAME
         elif isinstance(img, np.ndarray):
             tempf = tempfile.NamedTemporaryFile(dir=self.workdir, prefix="fsl", delete=False)
@@ -526,7 +527,7 @@ class Workspace(object):
         Note that care is required with Numpy arrays because they have no
         orientation or grid information which some FSL programs may require.
         """
-        if isinstance(mat, basestring):
+        if isinstance(mat, string_types):
             return mat, self.FILENAME
         elif isinstance(mat, np.ndarray):
             tempf = tempfile.NamedTemporaryFile(dir=self.workdir, prefix="fsl", suffix=".mat", delete=False)
@@ -703,7 +704,7 @@ def _grab_temp_data(data):
 
     We also remove the temporary path from the image file name
     """
-    if isinstance(data, collections.Sequence) and not isinstance(data, basestring):
+    if isinstance(data, collections.Sequence) and not isinstance(data, string_types):
         for d in data:
             _grab_temp_data(d)
     else:
