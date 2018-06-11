@@ -810,7 +810,7 @@ if [ ! -z $infert1 ]; then
     fslmaths output_calib_shift_2_MT/mean_T1t -mul $t1b -div output_calib_shift_2/mean_T1t -mas mask_shift_2_effective output_calib_shift_2_MT/mean_T1b
 
 # Use full data simple quantification
-else
+#else
     # Priors
     #calib_shift_1_dir=output_calib_shift_1
     #calib_shift_2_dir=output_calib_shift_2
