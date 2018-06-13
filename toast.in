@@ -794,12 +794,12 @@ fi
 # Prepare for a fabber option file
 if [ ! -z $infert1 ]; then
     # Get the tissue with MT signals
-    #fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_1 $length_1
-    #fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
-    #fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
-    #fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
+    fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_1 $length_1
+    fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
+    fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
+    fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
     # Use only TIs with MT effects
-    #tislist=$tislist_calib_MT
+    tislist=$tislist_calib_MT
     # Priors
     #calib_shift_1_dir=output_calib_shift_1_MT
     #calib_shift_2_dir=output_calib_shift_2_MT
@@ -1202,7 +1202,13 @@ fi
 fslmaths output_tissue_shift_1/mean_ftiss -add output_tissue_shift_2/mean_ftiss_result -div 2 -thr 0 $output_dir_temp/CBF_relative
 fslmaths output_tissue_shift_1/mean_delttiss -add output_tissue_shift_2/mean_delttiss_result -div 2 -thr 0 $output_dir_temp/ATT
 fslmaths output_calib_shift_1/mean_T1t -add output_calib_shift_2/mean_T1t_result -div 2 -thr 0 $output_dir_temp/T1_tissue
-fslmaths output_calib_shift_1/mean_M0t -add output_calib_shift_2/mean_M0t_result -div 2 -thr 0 $output_dir_temp/M0t_from_control_data
+# Here we need to handle MT effects M0
+if [ ! -z $infert1 ]; then
+    fslmaths output_calib_shift_1_MT/mean_M0t -add output_calib_shift_2_MT/mean_M0t_result -div 2 -thr 0 $output_dir_temp/M0t_from_control_data
+# If we dont correct MT effects, then just use normal M0
+else
+    fslmaths output_calib_shift_1/mean_M0t -add output_calib_shift_2/mean_M0t_result -div 2 -thr 0 $output_dir_temp/M0t_from_control_data
+fi
 if [ ! -z $infertau ]; then
     fslmaths output_tissue_shift_1/mean_tautiss -add output_tissue_shift_2/mean_tautiss_result -div 2 -thr 0 $output_dir_temp/Bolus_duration_raw
     # In the analysis the estimated (observed) bolus duration is actually the results of an operation of the actual bolus duration
