@@ -112,6 +112,8 @@ Usage_extended() {
     echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
+    echo " --gdcwarp=<image>      : Warp image for gradient distortion correction - will be combined with"
+    echo "                          other warp images"
     echo ""
  
     echo "Partial volume correction"
@@ -614,6 +616,52 @@ Warn() {
     echo "WARNING: $1" >> $log
 }
 
+ApplyWarps() {
+    ### Apply correction warps to the data, including a motion correction transformation if
+    ### applicable, and a nonlinear warp field
+
+    warp=$1
+    jacobian=$2
+
+	Log "  Applying combined warps to original data:"
+    Log "   - Warp: $warp"
+    Log "   - Jacobian: $jacobian"
+
+    Log "  Applying warps to ASL data"
+    # Add motion correction if required
+    appremat=""
+    if [ ! -z $moco ]; then
+        moco_xfm=$3
+        Log "   - Moco: $moco_xfm"
+    	appremat="--premat=$moco_xfm"
+    fi
+    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $warp --rel --interp=spline --paddingsize=1
+
+    # Correct for quantitative signal magnitude as volume has been locally scaled by the Jacobian
+    fslmaths $tempdir/asldata -mul $jacobian $tempdir/asldata
+
+    # Apply warp to calibration images
+    if [ ! -z $calib ]; then
+        Log "  Applying warps to calibration data"
+        appremat=""
+        if [ ! -z $moco ]; then
+            calib_xfm=$4
+            Log "   - Calib->ASL: $calib_xfm"
+            appremat="--premat=$calib_xfm"
+        fi
+        applywarp -i $tempdir/calib_orig -r $tempdir/meanasl -o $tempdir/calib $appremat -w $warp --rel --interp=spline --paddingsize=1
+        fslmaths $tempdir/calib -mul $jacobian $tempdir/calib
+        if [ ! -z $cref ]; then
+            applywarp -i $tempdir/cref_orig -r $tempdir/meanasl -o $tempdir/cref $appremat -w $warp --rel --interp=spline --paddingsize=1
+            fslmaths $tempdir/cref -mul $jacobian $tempdir/cref
+        fi
+        if [ ! -z $cblip ]; then
+            applywarp -i $tempdir/cblip_orig -r $tempdir/meanasl -o $tempdir/cblip $appremat -w $warp --rel --interp=spline --paddingsize=1
+            fslmaths $tempdir/cblip -mul $jacobian $tempdir/cblip
+        fi
+    fi
+}
+
 # deal with options
 
 if [ -z $1 ]; then
@@ -819,6 +867,8 @@ takeargs=0;boolarg="";isbool="";
 	--nofmapreg) isbool=1
 		     boolarg=nofmapreg
 		     ;;
+	--gdcwarp) gdcwarp=$argument #User-supplied gradient distortion correction warp
+		 takeargs=1;; 
 	--cblip) cblip=$argument #blip reversed calibration image
 		 takeargs=1;; 
 	# 
@@ -1076,6 +1126,8 @@ if [ ! -z $calib ]; then
     else
 	fslmaths $calib $tempdir/calib
     fi
+    # Save original so we can reapply motion correction/warps to original data
+    imcp $tempdir/calib $tempdir/calib_orig
 fi
 
 # same thing for cref image
@@ -1096,6 +1148,8 @@ if [ ! -z $cref ]; then
     else
 	fslmaths $cref $tempdir/cref
     fi
+    # Save original so we can reapply motion correction/warps to original data
+    imcp $tempdir/cref $tempdir/cref_orig
 fi
 
 # same thing for cblip image
@@ -1117,6 +1171,8 @@ if [ ! -z $cblip ]; then
 	fslmaths $cblip $tempdir/cblip
     fi
     # NOTE cblip is still wholehead, we dont need it masked
+    # Save original so we can reapply motion correction/warps to original data
+    imcp $tempdir/cblip $tempdir/cblip_orig
 fi
 
 # read in ASL data
@@ -1138,7 +1194,7 @@ if [ ! -z $moco ]; then
 	# Extract the middle transformation
 	middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
 	convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
-	# convert all the transofmrations
+	# convert all the transformations
 	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
 	    convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
 	done
@@ -1158,21 +1214,26 @@ if [ ! -z $moco ]; then
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
 fi
 
-### User supplied distortion correction as (additional) warp
-# convertwarp on the supplied warp image to extract the jacbbian (as parts) (NB meanasl here is just a reference, but I am not sure it has been created yet?)
-#convertwarp -r $tempdir/meanasl -o $tempdir/asldist_userwarp -w [input_warp] --rel -j $tempdir/distcorr/jacobian_parts
-# fslmaths to average the jacobian parts
-#fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+# Take mean of the asl data as we might need this in the next step, and subsequent steps
+fslmaths $tempdir/asldata -Tmean $tempdir/meanasl
 
-# apply the warp with the motion correction to give something that has been corrected in a single step
-#appremat=""
-#    if [ ! -z $moco ]; then
-#	appremat="--premat=$tempdir/asldata.cat"
-#    fi
-#    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $tempdir/asldist_userwarp --rel --interp=spline --paddingsize=1
-#    fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
+if [ ! -z $gdcwarp ]; then
+    ### User supplied distortion correction as (additional) warp
+    ### We apply this now, but later if additional distortion correction warps are derived, we will 
+    ### combine them together and re-apply to raw data to avoid multiple interpolations
 
+	Log "Initial application of GDC warp"
+    mkdir $tempdir/distcorr
 
+    # Convert the supplied warp image to extract the jacbbian (as parts) 
+    # (meanasl here is just a reference). Using relative warp convention
+    convertwarp -r $tempdir/meanasl -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts
+    
+    # Average the jacobian parts
+    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+
+    ApplyWarps $tempdir/asldist_userwarp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
+fi
 
 ### deal with TIs (as specified on the command line)
 count=0
@@ -1228,6 +1289,10 @@ else
     #asl_file --data=$infile --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --split --out=$tempdir/asldata --mean=$tempdir/asldata_mean
 
 fi
+
+# Generate a perfusion-weighted image by taking the mean over all TIs of the differenced data
+fslmaths $tempdir/diffdata_mean -Tmean $tempdir/pwi
+
 ### End of : Label-control subtraction
 
 ### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
@@ -1291,11 +1356,6 @@ for ((r=1; r<$repeats; r++)); do
 done
 echo ${alltis[*]}
 Log `echo ${alltis[*]}`
-
-# take mean of the asl data as we might need this later
-fslmaths $tempdir/asldata -Tmean $tempdir/meanasl
-# generate a perfusion-weighted image by taking the mean over all TIs
-fslmaths $tempdir/diffdata_mean -Tmean $tempdir/pwi
 
 ### Registration (1/2)
 # Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
@@ -1544,36 +1604,28 @@ if [ -e $tempdir/fmap.* ]; then
 
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
     
-    # generate the correction warp
-
-    # IF
-    # we ALSO have a user supplied warp (which we will have used earlier too) then we need to merge that with the one we have found here
-    # use convert warp to combine the warps
-    #convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --warp2=$tempdir/asldist_userwarp --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
-    #fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
-    #ELSE
+    # Generate the correction warp in ASL space
     convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
-    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
-    #FI
-    
-    # Now apply the correction to the data.
-    # note that we use the orignal data here and apply the motion correction as part of the process
-    appremat=""
-    if [ ! -z $moco ]; then
-	appremat="--premat=$tempdir/asldata.cat"
+
+    # If we ALSO have a user supplied GDC warp then we need to merge that with the one we have found here
+    # use convert warp to combine the warps. Note that we cannot do this in a single step becase we need
+    # to use --postmat above to transform into ASL space  but this needs to happen before we apply
+    # the user warp 
+    if [ ! -z $gdcwarp ]; then
+	    Log "Adding user-supplied GDC warp to distortion correction warp"
+        convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts
     fi
-    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-    fslmaths $tempdir/asldata -mul $tempdir/distcorr/jacobian $tempdir/asldata
-    repeatsubtract=1;
-        
-    # Now apply the correction to the calibration image
-    applywarp -i $tempdir/calib -r $tempdir/calib -o $tempdir/calib -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-    fslmaths $tempdir/calib -mul $tempdir/distcorr/jacobian $tempdir/calib
- 
-    if [ ! -z $cref ]; then
-	applywarp -i $tempdir/cref -r $tempdir/calib -o $tempdir/cref -w $tempdir/asldist_warp --rel --interp=spline --paddingsize=1
-	fslmaths $tempdir/cref -mul $tempdir/distcorr/jacobian $tempdir/cref
-    fi
+
+    fslmaths $tempdir/distcorr/jacobian_parts -Tmean 
+elif [ ! -z $gdcwarp ]; then
+	Log "Re-applying user-specified GDC warp"
+    imcp $tempdir/asldist_userwarp $tempdir/asldist_warp
+fi
+
+if [ -e $tempdir/asldist_warp.* ]; then  
+    # Re-apply combined warp/moco correction to the data
+    imcp $tempdir/asldata $tempdir/asldata_origwarp
+    ApplyWarps $tempdir/asldist_warp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
 fi
 
 # Repeat the label-control subtraction on the corrected data
