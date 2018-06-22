@@ -112,8 +112,10 @@ Usage_extended() {
     echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
+    echo " Gradient distortion correction:"
     echo " --gdcwarp=<image>      : Warp image for gradient distortion correction - will be combined with"
-    echo "                          other warp images"
+    echo "                          fieldmap distortion correction. NOTE currently this can not be combined"
+    echo "                          with TOPUP correction"
     echo ""
  
     echo "Partial volume correction"
@@ -1580,7 +1582,9 @@ if [ ! -z $topupresult ]; then
 	if [ ! $cmethod="voxel" ]; then
 	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
 	fi
-    
+    if [ ! -z $gdcwarp ]; then
+	    echo "WARNING: TOPUP correction will be overwritten by user-supplied gradient distortion correction warp"
+    fi
 	if [ ! -z $cref ]; then
 	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
 #	fi
