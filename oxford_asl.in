@@ -1561,34 +1561,8 @@ fi
 
 #Fieldmaps
 if [ ! -z $topupresult ]; then
-#    if [ -e $tempdir/struc.* ]; then
-#	# currently DISABLED and applytopup is used with topup results
-#	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
-#	# the fieldmap provided is from topup and will be in ASL space
-#	# convert ot the correct units of rad/s from Hz
-#	fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
-#	# use the existing registration to get the fieldmap into T1 space
-#	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
-#	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
-#	imcp $tempdir/struc $tempdir/fmapmag
-#	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
-#	nofmapreg=1
-#    else
-	echo "Distortion Correction using TOPUP"
-	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
-	applytopup --imain=$tempdir/calib,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
-	repeatsubtract=1;
-	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
-	if [ ! $cmethod="voxel" ]; then
-	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
-	fi
-    if [ ! -z $gdcwarp ]; then
-	    echo "WARNING: TOPUP correction will be overwritten by user-supplied gradient distortion correction warp"
-    fi
-	if [ ! -z $cref ]; then
-	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
-#	fi
-    fi
+    # Moved the application of TOPUP correction below since otherwise it could be overwritten by user GDC warp
+    :
 elif [ ! -z $fmap ]; then
     # a fieldmap has been provided that needs registration - copy images over
     imcp $fmap $tempdir/fmap
@@ -1630,6 +1604,36 @@ if [ -e $tempdir/asldist_warp.* ]; then
     # Re-apply combined warp/moco correction to the data
     imcp $tempdir/asldata $tempdir/asldata_origwarp
     ApplyWarps $tempdir/asldist_warp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
+fi
+
+if [ ! -z $topupresult ]; then
+    # Apply TOPUP correction here because otherwise it could be overwritten by user GDC warp. Note that we would like to combine these
+    # in one transformation to avoid multiple interpolations, however this does not seem to be supported by applytopup
+
+#    if [ -e $tempdir/struc.* ]; then
+#	# currently DISABLED and applytopup is used with topup results
+#	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
+#	# the fieldmap provided is from topup and will be in ASL space
+#	# convert ot the correct units of rad/s from Hz
+#	fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
+#	# use the existing registration to get the fieldmap into T1 space
+#	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
+#	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
+#	imcp $tempdir/struc $tempdir/fmapmag
+#	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
+#	nofmapreg=1
+#    else
+	echo "Distortion Correction using TOPUP"
+	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
+	applytopup --imain=$tempdir/calib,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
+	repeatsubtract=1;
+	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
+	if [ ! $cmethod="voxel" ]; then
+	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
+	fi
+	if [ ! -z $cref ]; then
+	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
+    fi
 fi
 
 # Repeat the label-control subtraction on the corrected data
