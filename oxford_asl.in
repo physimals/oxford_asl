@@ -114,8 +114,7 @@ Usage_extended() {
     echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
     echo " Gradient distortion correction:"
     echo " --gdcwarp=<image>      : Warp image for gradient distortion correction - will be combined with"
-    echo "                          fieldmap distortion correction. NOTE currently this can not be combined"
-    echo "                          with TOPUP correction"
+    echo "                          fieldmap or TOPUP distortion correction"
     echo ""
  
     echo "Partial volume correction"
