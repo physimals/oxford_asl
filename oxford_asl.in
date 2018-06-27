@@ -1593,7 +1593,7 @@ if [ -e $tempdir/fmap.* ]; then
         convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts
     fi
 
-    fslmaths $tempdir/distcorr/jacobian_parts -Tmean 
+    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
 elif [ ! -z $gdcwarp ]; then
 	Log "Re-applying user-specified GDC warp"
     imcp $tempdir/asldist_userwarp $tempdir/asldist_warp
