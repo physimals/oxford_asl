@@ -805,8 +805,9 @@ if [ ! -z $infert1 ]; then
     fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_2 $length_2
 
     # Use only TIs with MT effects
-    tislist=$tislist_calib_non_MT
     tislist_MT=$tislist_calib_MT
+    tislist=$tislist_calib_non_MT
+    #tislist_MT=$tislist_calib_MT
     # Priors
     calib_shift_1_dir_MT=output_calib_shift_1_MT
     calib_shift_2_dir_MT=output_calib_shift_2_MT
@@ -1021,6 +1022,8 @@ echo "Begin model-based analysis"
 
 # Here we correct MT effects for the tissue component
 if [ ! -z $infert1 ]; then
+
+    echo "Correcting for MT effects in tissue data..."
 
     # Fixed bolus duration
     # Condition not to infer bolus duration
