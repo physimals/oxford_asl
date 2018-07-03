@@ -874,12 +874,12 @@ echo "Begin model-based analysis"
         #echo "--PSP_byname7_type=I" >> $current_options_file
         #echo "--PSP_byname7_image=output_calib_shift_1/mean_T1b" >> $current_options_file
 
-        echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
-        echo "--PSP_byname7_type=I" >> $current_options_file
-        echo "--PSP_byname7_image=output_calib_shift_1_MT/mean_T1t" >> $current_options_file
-        echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
-        echo "--PSP_byname8_type=I" >> $current_options_file
-        echo "--PSP_byname8_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
+        #echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_1_MT/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname8_type=I" >> $current_options_file
+        #echo "--PSP_byname8_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
     fi
 
     # Now perform model fitting to estimate CBF, ATT, etc
@@ -940,12 +940,12 @@ echo "Begin model-based analysis"
         #echo "--PSP_byname7_type=I" >> $current_options_file
         #echo "--PSP_byname7_image=output_calib_shift_2/mean_T1b" >> $current_options_file
 
-        echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
-        echo "--PSP_byname7_type=I" >> $current_options_file
-        echo "--PSP_byname7_image=output_calib_shift_2_MT/mean_T1t" >> $current_options_file
-        echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
-        echo "--PSP_byname8_type=I" >> $current_options_file
-        echo "--PSP_byname8_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
+        #echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_2_MT/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname8_type=I" >> $current_options_file
+        #echo "--PSP_byname8_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
     fi
 
 
@@ -975,8 +975,8 @@ echo "Begin model-based analysis"
         echo "--infertau" >> $current_options_file # Estimate bolus duration
         echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
         if [ ! -z $infert1 ]; then
-            echo "--PSP_byname9=tautiss" >> $current_options_file # Estimate bolus duration
-            echo "--PSP_byname9_type=N" >> $current_options_file
+            echo "--PSP_byname7=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname7_type=N" >> $current_options_file
         else
             echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
             echo "--PSP_byname5_type=N" >> $current_options_file
@@ -997,8 +997,8 @@ echo "Begin model-based analysis"
         echo "--infertau" >> $current_options_file # Estimate bolus duration
         echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
         if [ ! -z $infert1 ]; then
-            echo "--PSP_byname9=tautiss" >> $current_options_file # Estimate bolus duration
-            echo "--PSP_byname9_type=N" >> $current_options_file
+            echo "--PSP_byname7=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname7_type=N" >> $current_options_file
         else
             echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
             echo "--PSP_byname5_type=N" >> $current_options_file
@@ -1071,9 +1071,9 @@ if [ ! -z $infer_arterial ]; then
         echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
         echo "--PSP_byname8_type=I" >> $current_options_file
         echo "--PSP_byname8_image=output_calib_shift_1/mean_g" >> $current_options_file
-        echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
-        echo "--PSP_byname9_type=I" >> $current_options_file
-        echo "--PSP_byname9_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
+        #echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
+        #echo "--PSP_byname9_type=I" >> $current_options_file
+        #echo "--PSP_byname9_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
     fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
@@ -1131,9 +1131,9 @@ if [ ! -z $infer_arterial ]; then
         echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
         echo "--PSP_byname8_type=I" >> $current_options_file
         echo "--PSP_byname8_image=output_calib_shift_2/mean_g" >> $current_options_file
-        echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
-        echo "--PSP_byname9_type=I" >> $current_options_file
-        echo "--PSP_byname9_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
+        #echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
+        #echo "--PSP_byname9_type=I" >> $current_options_file
+        #echo "--PSP_byname9_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
     fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
@@ -1182,9 +1182,9 @@ if [ ! -z $infert1 ]; then
     fslroi output_calib_shift_2_MT/mean_M0t data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
     fslmerge -z output_calib_shift_2_MT/mean_M0t_result data_segment_2 data_segment_1 # Segment 2 was scanned first
     # T1b
-    fslroi output_calib_shift_2_MT/mean_T1b data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
-    fslroi output_calib_shift_2_MT/mean_T1b data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
-    fslmerge -z output_calib_shift_2_MT/mean_T1b_result data_segment_2 data_segment_1 # Segment 2 was scanned first   
+    #fslroi output_calib_shift_2_MT/mean_T1b data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
+    #fslroi output_calib_shift_2_MT/mean_T1b data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
+    #fslmerge -z output_calib_shift_2_MT/mean_T1b_result data_segment_2 data_segment_1 # Segment 2 was scanned first   
 fi
 # Arterial blood colume and arrival time to macrovasculature
 if [ ! -z $infer_arterial ]; then
