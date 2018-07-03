@@ -1070,10 +1070,10 @@ if [ ! -z $infert1 ]; then
     if [ ! -z $infert1 ]; then
         echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
         echo "--PSP_byname5_type=I" >> $current_options_file
-        echo "--PSP_byname5_image=output_calib_shift_1/mean_g" >> $current_options_file
+        echo "--PSP_byname5_image=output_calib_shift_1_MT/mean_g" >> $current_options_file
         echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
         echo "--PSP_byname6_type=I" >> $current_options_file
-        echo "--PSP_byname6_image=output_calib_shift_1/mean_T1t" >> $current_options_file
+        echo "--PSP_byname6_image=output_calib_shift_1_MT/mean_T1t" >> $current_options_file
         #echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
         #echo "--PSP_byname7_type=I" >> $current_options_file
         #echo "--PSP_byname7_image=output_calib_shift_1/mean_T1b" >> $current_options_file
@@ -1136,10 +1136,10 @@ if [ ! -z $infert1 ]; then
     if [ ! -z $infert1 ]; then
         echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
         echo "--PSP_byname5_type=I" >> $current_options_file
-        echo "--PSP_byname5_image=output_calib_shift_2/mean_g" >> $current_options_file
+        echo "--PSP_byname5_image=output_calib_shift_2_MT/mean_g" >> $current_options_file
         echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
         echo "--PSP_byname6_type=I" >> $current_options_file
-        echo "--PSP_byname6_image=output_calib_shift_2/mean_T1t" >> $current_options_file
+        echo "--PSP_byname6_image=output_calib_shift_2_MT/mean_T1t" >> $current_options_file
         #echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
         #echo "--PSP_byname7_type=I" >> $current_options_file
         #echo "--PSP_byname7_image=output_calib_shift_2/mean_T1b" >> $current_options_file
