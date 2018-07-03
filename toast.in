@@ -1034,7 +1034,7 @@ if [ ! -z $infert1 ]; then
     echo "--disp=$disp" >> $current_options_file
     #echo "--inferart" >> $current_options_file
     echo "--repeats=1" >> $current_options_file
-    echo $tislist_MT >> $current_options_file
+    echo $tislist_calib_MT >> $current_options_file
     echo "--t1=$t1 --t1b=$t1b --t1wm=$t1wm --tau=$tau --fa=$fa " >> $current_options_file
     #if [ ! -z $infert1 ]; then
     #    #echo "--t1_MT=$t1 --t1b_MT=$t1b " >> $current_options_file
@@ -1100,7 +1100,7 @@ if [ ! -z $infert1 ]; then
     echo "--disp=$disp" >> $current_options_file
     #echo "--inferart" >> $current_options_file
     echo "--repeats=1" >> $current_options_file
-    echo $tislist >> $current_options_file
+    echo $tislist_calib_MT >> $current_options_file
     echo "--t1=$t1 --t1b=$t1b --t1wm=$t1wm --tau=$tau --fa=$fa " >> $current_options_file
     #if [ ! -z $infert1 ]; then
     #    #echo "--t1_MT=$t1 --t1b_MT=$t1b " >> $current_options_file
