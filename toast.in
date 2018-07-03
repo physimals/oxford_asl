@@ -1379,6 +1379,7 @@ fslmerge -z output_calib_shift_2/mean_T1t_result data_segment_2 data_segment_1 #
 fslroi output_tissue_shift_2/mean_ftiss data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
 fslroi output_tissue_shift_2/mean_ftiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
 fslmerge -z output_tissue_shift_2/mean_ftiss_result data_segment_2 data_segment_1 # Segment 2 was scanned first
+
 # ATT
 fslroi output_tissue_shift_2/mean_delttiss data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
 fslroi output_tissue_shift_2/mean_delttiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
@@ -1399,6 +1400,10 @@ if [ ! -z $infert1 ]; then
     fslroi output_calib_shift_2_MT/mean_M0t data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
     fslroi output_calib_shift_2_MT/mean_M0t data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
     fslmerge -z output_calib_shift_2_MT/mean_M0t_result data_segment_2 data_segment_1 # Segment 2 was scanned first
+    # CBF relative MT
+    fslroi output_tissue_shift_2_MT/mean_delttiss data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
+    fslroi output_tissue_shift_2_MT/mean_delttiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
+    fslmerge -z output_tissue_shift_2_MT/mean_delttiss_result data_segment_2 data_segment_1 # Segment 2 was scanned first  
     # T1b
     #fslroi output_calib_shift_2_MT/mean_T1b data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
     #fslroi output_calib_shift_2_MT/mean_T1b data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
@@ -1418,6 +1423,10 @@ fi
 
 # Now compute average CBF, ATT, M0t, T1t, bolus duration
 fslmaths output_tissue_shift_1/mean_ftiss -add output_tissue_shift_2/mean_ftiss_result -div 2 -thr 0 $output_dir_temp/CBF_relative
+# If corrected MT effects, we need to compute a relative CBF under MT effect
+if [ ! -z $infert1 ]; then
+    fslmaths output_tissue_shift_1_MT/mean_ftiss -add output_tissue_shift_2_MT/mean_ftiss_result -div 2 -thr 0 $output_dir_temp/CBF_relative_MT
+fi
 fslmaths output_tissue_shift_1/mean_delttiss -add output_tissue_shift_2/mean_delttiss_result -div 2 -thr 0 $output_dir_temp/ATT
 fslmaths output_calib_shift_1/mean_T1t -add output_calib_shift_2/mean_T1t_result -div 2 -thr 0 $output_dir_temp/T1_tissue
 # Here we need to handle MT effects M0
@@ -1480,7 +1489,6 @@ if [ ! -z $calib_data ]; then
     # Move the calib data into the working directory
     imcp $stdir"/"$calib_data ./
 
-    #echo a
     # We need to perform transformation on the calibration data
     if [ ! -z $trans_status ]; then
         echo "Transforming calibration data to Turbo QUASAR ASL resolution..."
@@ -1507,6 +1515,8 @@ if [ ! -z $calib_data ]; then
         applywarp --ref=$output_dir_temp/CBF_relative --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
         #applywarp --ref=$output_dir_temp/T1_tissue --in=$calib_brain --out=$output_dir_temp/calib_M0t --premat=calib_to_turbo.mat --super --interp=spline --superlevel=4
 
+
+
         # Copy the trasnformation matrices to result dirctory
         cp turbo_to_struct.mat calib_to_struct.mat struct_to_turbo.mat struct_to_calib.mat calib_to_turbo.mat turbo_to_calib.mat $output_dir_temp
 
@@ -1516,10 +1526,25 @@ if [ ! -z $calib_data ]; then
         imcp $stdir"/"$calib_data $output_dir_temp"/"calib_M0t
     fi
 
+    # Correct TR if the TR of the calibration image is less than 5s
+    # We only do this if the calibration image is provided by user
+    TR_calib_in_ms=`echo print $TR_calib*1000 | perl`
+    # If else in bash can only handle integer operations
+    if [ $TR_calib_in_ms -lt 5000 ]; then
+        echo "Correcting TR of calibration image..."
+        #statements
+        # 10.1002/mrm.25197
+        # multiple_factor=(1/(1-exp(-TR/T1_of_tissue)))
+        correction_factor=`echo "(1/(1-e((-1)*$TR_calib/$t1)))" | bc -l`
+        fslmaths $output_dir_temp/calib_M0t -mul $correction_factor $output_dir_temp/calib_M0t
+    fi
+
 # Use the estimated M0t image from the previous step (saturation recovery model)
 else
     echo "Using calibration data estimated from fitting ASL control data to the saturation recovery signal..."
     imcp $output_dir_temp"/"M0t_from_control_data $output_dir_temp/calib_M0t
+
+
 fi
 
 # Correct the calibration image by median filter, erosion, and extrapolation
@@ -1533,25 +1558,29 @@ if [ ! -z $corrcal ]; then
     fslmaths M0t_extra -div $lambda $output_dir_temp/M0a_for_absolute_CBF
     #imrm M0t_median M0t_ero M0t_extra
 
+    # If we corrected MT effects
+    if [ ! -z $infert1 ]; then
+        fslmaths $output_dir_temp/M0t_MT -fmedian M0t_median
+        fslmaths M0t_median -ero M0t_ero
+        asl_file --data=M0t_ero --ntis=1 --mask=mask --extrapolate --neighbour=5 --out=M0t_extra
+        fslmaths M0t_extra -div $lambda $output_dir_temp/M0a_for_absolute_CBF_MT
+    fi
+
 # Otherwise, we dont correct the edge problems
 else
     fslmaths $output_dir_temp/calib_M0t -div $lambda $output_dir_temp/M0a_for_absolute_CBF
 fi
 
-# Correct TR if the TR of the calibration image is less than 5s
-TR_calib_in_ms=`echo print $TR_calib*1000 | perl`
-# If else in bash can only handle integer operations
-if [ $TR_calib_in_ms -lt 5000 ]; then
-    echo "Correcting TR of calibration image..."
-    #statements
-    # 10.1002/mrm.25197
-    # multiple_factor=(1/(1-exp(-TR/T1_of_tissue)))
-    correction_factor=`echo "(1/(1-e((-1)*$TR_calib/$t1)))" | bc -l`
-    fslmaths $output_dir_temp/calib_M0t -mul $correction_factor $output_dir_temp/calib_M0t
-fi
+
 
 # Now compuate CBF in absolute unit
 fslmaths $output_dir_temp/CBF_relative -div $output_dir_temp/M0a_for_absolute_CBF -div $alpha -mul 6000 $output_dir_temp/CBF_absolute
+# If we corrected MT effects
+if [ ! -z $infert1 ]; then
+    fslmaths $output_dir_temp/CBF_relative_MT -div $output_dir_temp/M0a_for_absolute_CBF_MT -div $alpha -mul 6000 $output_dir_temp/CBF_absolute_MT
+    # Now we take the average of the two CBFs
+    fslmaths $output_dir_temp/CBF_absolute -add $output_dir_temp/CBF_absolute_MT -div 2 $output_dir_temp/CBF_absolute
+fi
 # Arterial blood colume in absolute unit
 if [ ! -z $infer_arterial ]; then
     echo "Output ABV is in decimal format"
