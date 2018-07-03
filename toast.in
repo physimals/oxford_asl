@@ -1093,6 +1093,8 @@ if [ ! -z $infert1 ]; then
     fi
 
     # Now perform model fitting to estimate CBF, ATT, etc
+    echo $shift_1_repeat_1_tissue_MT
+    echo $current_options_file
     $fabber --data=$shift_1_repeat_1_tissue_MT --data-order=singlefile --output=output_tissue_shift_1_MT -@ $current_options_file
     
 
