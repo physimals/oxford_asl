@@ -798,11 +798,19 @@ if [ ! -z $infert1 ]; then
     fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
     fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
     fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
+    # Get the tissue with non MT signals
+    fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_2 $length_2
+    fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_2 $length_2
+    fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_2 $length_2
+    fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_2 $length_2
     # Use only TIs with MT effects
-    tislist=$tislist_calib_MT
+    #tislist=$tislist_calib_MT
+    tislist=$tislist_calib_non_MT
     # Priors
-    calib_shift_1_dir=output_calib_shift_1_MT
-    calib_shift_2_dir=output_calib_shift_2_MT
+    #calib_shift_1_dir=output_calib_shift_1_MT
+    #calib_shift_2_dir=output_calib_shift_2_MT
+    calib_shift_1_dir=output_calib_shift_1
+    calib_shift_2_dir=output_calib_shift_2
     # We also need a T1 of blood under MT effects
     # We assume this relationship T1_tissue/T1_tissue_MT = T1_blood/T1_blood_MT
     # So T1_blood_MT = T1_tissue_MT * T1_blood / T1_tissue
@@ -813,10 +821,10 @@ if [ ! -z $infert1 ]; then
     #fslmaths output_calib_shift_2_MT/mean_T1t -mul $t1b -div output_calib_shift_2/mean_T1t -mas mask_shift_2_effective output_calib_shift_2_MT/mean_T1b
 
 # Use full data simple quantification
-#else
+else
     # Priors
-    #calib_shift_1_dir=output_calib_shift_1
-    #calib_shift_2_dir=output_calib_shift_2
+    calib_shift_1_dir=output_calib_shift_1
+    calib_shift_2_dir=output_calib_shift_2
 fi
 
 echo "Begin model-based analysis"
