@@ -794,10 +794,10 @@ fi
 # Prepare for a fabber option file
 if [ ! -z $infert1 ]; then
     # Get the tissue with MT signals
-    fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_1 $length_1
-    fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
-    fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
-    fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
+    #fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_1 $length_1
+    #fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_1 $length_1
+    #fslroi $shift_1_repeat_1_blood $shift_1_repeat_1_blood $last_TI_1 $length_1
+    #fslroi $shift_2_repeat_1_blood $shift_2_repeat_1_blood $last_TI_1 $length_1
     # Get the tissue with non MT signals
     fslroi $shift_1_repeat_1_tissue $shift_1_repeat_1_tissue $last_TI_2 $length_2
     fslroi $shift_2_repeat_1_tissue $shift_2_repeat_1_tissue $last_TI_2 $length_2
