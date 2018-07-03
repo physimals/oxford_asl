@@ -1401,9 +1401,9 @@ if [ ! -z $infert1 ]; then
     fslroi output_calib_shift_2_MT/mean_M0t data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
     fslmerge -z output_calib_shift_2_MT/mean_M0t_result data_segment_2 data_segment_1 # Segment 2 was scanned first
     # CBF relative MT
-    fslroi output_tissue_shift_2_MT/mean_delttiss data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
-    fslroi output_tissue_shift_2_MT/mean_delttiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
-    fslmerge -z output_tissue_shift_2_MT/mean_delttiss_result data_segment_2 data_segment_1 # Segment 2 was scanned first  
+    fslroi output_tissue_shift_2_MT/mean_ftiss data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
+    fslroi output_tissue_shift_2_MT/mean_ftiss data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
+    fslmerge -z output_tissue_shift_2_MT/mean_ftiss_result data_segment_2 data_segment_1 # Segment 2 was scanned first  
     # T1b
     #fslroi output_calib_shift_2_MT/mean_T1b data_segment_1 0 64 0 64 $break_1_result $segment_1_length_result
     #fslroi output_calib_shift_2_MT/mean_T1b data_segment_2 0 64 0 64 $break_2_result $segment_2_length_result
