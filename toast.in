@@ -1012,10 +1012,204 @@ echo "Begin model-based analysis"
             echo "--PSP_byname5_type=N" >> $current_options_file
         fi
 
-        $fabber --data=$shift_1_repeat_1_tissue --data-order=singlefile --output=output_tissue_shift_2 -@ $current_options_file --continue-from-mvn=output_tissue_shift_2_step_1/finalMVN2
+        $fabber --data=$shift_2_repeat_1_tissue --data-order=singlefile --output=output_tissue_shift_2 -@ $current_options_file --continue-from-mvn=output_tissue_shift_2_step_1/finalMVN2
 
 
     fi
+
+
+# Here we correct MT effects for the tissue component
+if [ ! -z $infert1 ]; then
+
+    # Fixed bolus duration
+    # Condition not to infer bolus duration
+    # Shift 1
+    current_options_file="options_tissue_shift_1_MT.txt"
+    echo "# Turbo QUASAR ASL tissue component analysis options for Shift 1 of the data with MT effects" > $current_options_file
+    echo "--mask=mask" >> $current_options_file
+    echo "--method=spatialvb" >> $current_options_file
+    echo "--noise=white" >> $current_options_file
+    echo "--model=turboquasar" >> $current_options_file
+    echo "--disp=$disp" >> $current_options_file
+    #echo "--inferart" >> $current_options_file
+    echo "--repeats=1" >> $current_options_file
+    echo $tislist_MT >> $current_options_file
+    echo "--t1=$t1 --t1b=$t1b --t1wm=$t1wm --tau=$tau --fa=$fa " >> $current_options_file
+    #if [ ! -z $infert1 ]; then
+    #    #echo "--t1_MT=$t1 --t1b_MT=$t1b " >> $current_options_file
+    #fi
+    echo "--slicedt=$slicedt" >> $current_options_file
+    echo $bolus_pattern_list >> $current_options_file
+    echo "--slice_shift=$shift_factor" >> $current_options_file
+    echo "--onephase" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+        echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    fi
+    #echo "--artdir" >> $current_options_file
+    # Save model fitting results and residue
+    echo "--save-model-fit" >> $current_options_file
+    echo "--print-free-energy" >> $current_options_file
+    echo "--save-residuals" >> $current_options_file
+    # Here we create a shortcut to the latest results directory
+    #echo "--link-to-latest" >> $current_options_file
+
+    # Here are the settings
+    echo "--PSP_byname1=ftiss" >> $current_options_file # Estimate CBF
+    echo "--PSP_byname1_type=M" >> $current_options_file
+    echo "--PSP_byname2=delttiss" >> $current_options_file # Estimate ATT
+    echo "--PSP_byname2_type=N" >> $current_options_file
+    echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
+    echo "--PSP_byname3_type=N" >> $current_options_file
+    echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
+    echo "--PSP_byname4_type=N" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
+        echo "--PSP_byname5_type=I" >> $current_options_file
+        echo "--PSP_byname5_image=output_calib_shift_1/mean_g" >> $current_options_file
+        echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
+        echo "--PSP_byname6_type=I" >> $current_options_file
+        echo "--PSP_byname6_image=output_calib_shift_1/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_1/mean_T1b" >> $current_options_file
+
+        #echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_1_MT/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname8_type=I" >> $current_options_file
+        #echo "--PSP_byname8_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
+    fi
+
+    # Now perform model fitting to estimate CBF, ATT, etc
+    $fabber --data=$shift_1_repeat_1_tissue_MT --data-order=singlefile --output=output_tissue_shift_1_MT -@ $current_options_file
+    
+
+
+    # Shift 2
+    # Fixed bolus duration
+    # Condition not to infer bolus duration
+    current_options_file="options_tissue_shift_2_MT.txt"
+    echo "# Turbo QUASAR ASL tissue component analysis options for Shift 2 of the data with MT effects" > $current_options_file
+    echo "--mask=mask_shift_2_effective" >> $current_options_file
+    echo "--method=spatialvb" >> $current_options_file
+    echo "--noise=white" >> $current_options_file
+    echo "--model=turboquasar" >> $current_options_file
+    echo "--disp=$disp" >> $current_options_file
+    #echo "--inferart" >> $current_options_file
+    echo "--repeats=1" >> $current_options_file
+    echo $tislist >> $current_options_file
+    echo "--t1=$t1 --t1b=$t1b --t1wm=$t1wm --tau=$tau --fa=$fa " >> $current_options_file
+    #if [ ! -z $infert1 ]; then
+    #    #echo "--t1_MT=$t1 --t1b_MT=$t1b " >> $current_options_file
+    #fi
+    echo "--slicedt=$slicedt" >> $current_options_file
+    echo $bolus_pattern_list >> $current_options_file
+    echo "--slice_shift=$shift_factor" >> $current_options_file
+    echo "--onephase" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--usecalib " >> $current_options_file # We incorporate previously estimated T1 and g value as priors
+        echo "--infert1" >> $current_options_file # If we infer T1 we must infer T1 of tissue and blood together (must be two of them)
+    fi
+    #echo "--artdir" >> $current_options_file
+    # Save model fitting results and residue
+    echo "--save-model-fit" >> $current_options_file
+    echo "--print-free-energy" >> $current_options_file
+    echo "--save-residuals" >> $current_options_file
+    # Here we create a shortcut to the latest results directory
+    #echo "--link-to-latest" >> $current_options_file
+
+    # Here are the settings
+    echo "--PSP_byname1=ftiss" >> $current_options_file # Estimate CBF
+    echo "--PSP_byname1_type=M" >> $current_options_file
+    echo "--PSP_byname2=delttiss" >> $current_options_file # Estimate ATT
+    echo "--PSP_byname2_type=N" >> $current_options_file
+    echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
+    echo "--PSP_byname3_type=N" >> $current_options_file
+    echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
+    echo "--PSP_byname4_type=N" >> $current_options_file
+    if [ ! -z $infert1 ]; then
+        echo "--PSP_byname5=g" >> $current_options_file # Estimate g (FA correction parameter)
+        echo "--PSP_byname5_type=I" >> $current_options_file
+        echo "--PSP_byname5_image=output_calib_shift_2/mean_g" >> $current_options_file
+        echo "--PSP_byname6=T_1" >> $current_options_file # Estimate T1 of tissue
+        echo "--PSP_byname6_type=I" >> $current_options_file
+        echo "--PSP_byname6_image=output_calib_shift_2/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname7=T_1b" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_2/mean_T1b" >> $current_options_file
+
+        #echo "--PSP_byname7=T_1_MT" >> $current_options_file # Estimate T1 of tissue
+        #echo "--PSP_byname7_type=I" >> $current_options_file
+        #echo "--PSP_byname7_image=output_calib_shift_2_MT/mean_T1t" >> $current_options_file
+        #echo "--PSP_byname8=T_1b_MT" >> $current_options_file # Estimate T1 of blood
+        #echo "--PSP_byname8_type=I" >> $current_options_file
+        #echo "--PSP_byname8_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
+    fi
+
+
+    # Now perform model fitting to estimate CBF, ATT, etc
+    $fabber --data=$shift_2_repeat_1_tissue_MT --data-order=singlefile --output=output_tissue_shift_2_MT -@ $current_options_file
+
+    # Condition to estimate bolus duration
+    if [ ! -z $infertau ]; then
+
+        if [ -z $tau_lowest ]; then
+            tau_lowest=0.2;
+        fi
+        # We need two steps to estimate it
+        # Step 1: Estimate CBF and ATT (as the previous step)
+        # Step 2: Incorporate results from Step 1 to estimate bolus duration and refine CBF and ATT 
+        echo "Inferring bolus duration..."
+
+        # Shift 1
+        echo "Estimating bolus duration from Shift 1 of the data with MT effects..."
+        # Rename the results of the previous step
+        mv output_tissue_shift_1 output_tissue_shift_1_step_1
+        # Now we need to create a new MVN file to include the new bolus duration parameter
+        mvntool --input=output_tissue_shift_1_step_1/finalMVN --output=output_tissue_shift_1_step_1/finalMVN2 --mask=mask --param=3 --new --val=1 --var=1
+
+        # Now create the new option files
+        current_options_file="options_tissue_shift_1_MT.txt"
+        echo "--infertau" >> $current_options_file # Estimate bolus duration
+        echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
+        if [ ! -z $infert1 ]; then
+            echo "--PSP_byname7=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname7_type=N" >> $current_options_file
+        else
+            echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname5_type=N" >> $current_options_file
+        fi
+
+
+        $fabber --data=$shift_1_repeat_1_tissue_MT --data-order=singlefile --output=output_tissue_shift_1_MT -@ $current_options_file --continue-from-mvn=output_tissue_shift_1_step_1/finalMVN2
+    
+        # Shift 2
+        echo "Estimating bolus duration from Shift 2 of the data with MT effects..."
+        # Rename the results of the previous step
+        mv output_tissue_shift_2 output_tissue_shift_2_step_1
+        # Now we need to create a new MVN file to include the new bolus duration parameter
+        mvntool --input=output_tissue_shift_2_step_1/finalMVN --output=output_tissue_shift_2_step_1/finalMVN2 --mask=mask_shift_2_effective --param=3 --new --val=1 --var=1
+
+        # Now create the new option files
+        current_options_file="options_tissue_shift_2_MT.txt"
+        echo "--infertau" >> $current_options_file # Estimate bolus duration
+        echo "--tau_lowest=$tau_lowest" >> $current_options_file # Lowest limit of bolus duration
+        if [ ! -z $infert1 ]; then
+            echo "--PSP_byname7=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname7_type=N" >> $current_options_file
+        else
+            echo "--PSP_byname5=tautiss" >> $current_options_file # Estimate bolus duration
+            echo "--PSP_byname5_type=N" >> $current_options_file
+        fi
+
+        $fabber --data=$shift_2_repeat_1_tissue_MT --data-order=singlefile --output=output_tissue_shift_2_MT -@ $current_options_file --continue-from-mvn=output_tissue_shift_2_step_1/finalMVN2
+
+
+    fi
+
+fi
 # Done model based analysis
 
 
