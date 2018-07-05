@@ -1182,9 +1182,9 @@ if [ ! -z $infert1 ]; then
         # Shift 1
         echo "Estimating bolus duration from Shift 1 of the data with MT effects..."
         # Rename the results of the previous step
-        mv output_tissue_shift_1 output_tissue_shift_1_step_1
+        mv output_tissue_shift_1_MT output_tissue_shift_1_MT_step_1
         # Now we need to create a new MVN file to include the new bolus duration parameter
-        mvntool --input=output_tissue_shift_1_step_1/finalMVN --output=output_tissue_shift_1_step_1/finalMVN2 --mask=mask --param=3 --new --val=1 --var=1
+        mvntool --input=output_tissue_shift_1_MT_step_1/finalMVN --output=output_tissue_shift_1_MT_step_1/finalMVN2 --mask=mask --param=3 --new --val=1 --var=1
 
         # Now create the new option files
         current_options_file="options_tissue_shift_1_MT.txt"
@@ -1204,9 +1204,9 @@ if [ ! -z $infert1 ]; then
         # Shift 2
         echo "Estimating bolus duration from Shift 2 of the data with MT effects..."
         # Rename the results of the previous step
-        mv output_tissue_shift_2 output_tissue_shift_2_step_1
+        mv output_tissue_shift_2_MT output_tissue_shift_2_MT_step_1
         # Now we need to create a new MVN file to include the new bolus duration parameter
-        mvntool --input=output_tissue_shift_2_step_1/finalMVN --output=output_tissue_shift_2_step_1/finalMVN2 --mask=mask_shift_2_effective --param=3 --new --val=1 --var=1
+        mvntool --input=output_tissue_shift_2_MT_step_1/finalMVN --output=output_tissue_shift_2_MT_step_1/finalMVN2 --mask=mask_shift_2_effective --param=3 --new --val=1 --var=1
 
         # Now create the new option files
         current_options_file="options_tissue_shift_2_MT.txt"
