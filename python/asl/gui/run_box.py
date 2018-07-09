@@ -82,16 +82,16 @@ class AslRun(wx.Frame):
     """
 
     # The options we need to pass to oxford_asl for various data orderings
-    order_opts = {"trp" : "--ibf=tis --iaf=diff", 
-                  "trp,tc" : "--ibf=tis --iaf=tcb", 
-                  "trp,ct" : "--ibf=tis --iaf=ctb",
-                  "rtp" : "--ibf=rpt --iaf=diff",
-                  "rtp,tc" : "--rpt --iaf=tcb",
-                  "rtp,ct" : "--ibf=rpt --iaf=ctb",
-                  "ptr,tc" : "--ibf=tis --iaf=tc",
-                  "ptr,ct" : "--ibf=tis --iaf=ct",
-                  "prt,tc" : "--ibf=rpt --iaf=tc",
-                  "prt,ct" : "--ibf=rpt --iaf=ct"}
+    order_opts = {"trp" : "--ibf=rpt --iaf=diff", 
+                  "trp,tc" : "--ibf=rpt --iaf=tcb", 
+                  "trp,ct" : "--ibf=rpt --iaf=ctb",
+                  "rtp" : "--ibf=tis --iaf=diff",
+                  "rtp,tc" : "--ibf=tis --iaf=tcb",
+                  "rtp,ct" : "--ibf=tis --iaf=ctb",
+                  "ptr,tc" : "--ibf=rpt --iaf=tc",
+                  "ptr,ct" : "--ibf=rpt --iaf=ct",
+                  "prt,tc" : "--ibf=tis --iaf=tc",
+                  "prt,ct" : "--ibf=tis --iaf=ct"}
 
     def __init__(self, parent, run_btn, run_label):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
