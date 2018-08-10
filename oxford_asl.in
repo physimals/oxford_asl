@@ -400,11 +400,11 @@ Calibration() {
 	    extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struct"
 	fi
    
-	$asl_calib -c $calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
+	$asl_calib -c $tempdir/calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
 
     else
     # a manual csf mask has been supplied
-	$asl_calib -c $calib -m $csf -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions
+	$asl_calib -c $tempdir/calib -m $csf -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions
     fi
 }
 
@@ -2028,7 +2028,7 @@ if [ ! -z $calib ]; then
 	Log "Calibration is voxelwise"
 	mkdir $outdir/calib
         # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
-	fslmaths $calib -Tmean -mul $cgain $outdir/calib/M0
+	fslmaths $tempdir/calib -Tmean -mul $cgain $outdir/calib/M0
 	Mo=$outdir/calib/M0 
 	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
 	 # correct the M0 image for short TR using the equation from the white paper
