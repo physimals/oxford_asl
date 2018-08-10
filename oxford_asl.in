@@ -640,6 +640,9 @@ ApplyWarps() {
 
     # Correct for quantitative signal magnitude as volume has been locally scaled by the Jacobian
     fslmaths $tempdir/asldata -mul $jacobian $tempdir/asldata
+    
+    # Repeat post correction as may be used as regfrom
+    fslmaths $tempdir/asldata -Tmean $tempdir/meanasl
 
     # Apply warp to calibration images
     if [ ! -z $calib ]; then
