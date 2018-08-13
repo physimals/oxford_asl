@@ -1598,7 +1598,7 @@ if [ -e $tempdir/fmap.* ]; then
 
     fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
 elif [ ! -z $gdcwarp ]; then
-	Log "Re-applying user-specified GDC warp"
+    Log "Re-applying user-specified GDC warp"
     imcp $tempdir/asldist_userwarp $tempdir/asldist_warp
 fi
 
@@ -1606,6 +1606,7 @@ if [ -e $tempdir/asldist_warp.* ]; then
     # Re-apply combined warp/moco correction to the data
     imcp $tempdir/asldata $tempdir/asldata_origwarp
     ApplyWarps $tempdir/asldist_warp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
+    repeatsubtract=1;
 fi
 
 if [ ! -z $topupresult ]; then
