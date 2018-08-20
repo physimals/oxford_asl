@@ -297,10 +297,10 @@ class AslRun(wx.Frame):
         if self.structure.transform():
             if self.structure.transform_type() == self.structure.TRANS_MATRIX:
                 self.check_exists("Transformation matrix", self.structure.transform_file())
-                cmd.add('--asl2struc "%s"' % self.structure.transform_file())
+                cmd.add('-t "%s"' % self.structure.transform_file())
             elif self.structure.transform_type() == self.structure.TRANS_IMAGE:
                 self.check_exists("Warp image", self.structure.transform_file())
-                cmd.add('--regfrom "%s"' % self.structure.transform_file())
+                cmd.add('--warp "%s"' % self.structure.transform_file())
             else:
                 # This implies that FSLANAT output is being used, and hence
                 # --fslanat is already specified
