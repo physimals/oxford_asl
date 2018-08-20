@@ -838,12 +838,6 @@ Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size)
                 int row_begin = y_index_on_matrix - off_set;
                 int row_end = y_index_on_matrix + off_set;
 
-                // If it is out of boundary then continue
-                if (column_begin <= 0 || column_end <= 0 || row_begin <= 0 || row_end <= 0)
-                {
-                    continue;
-                }
-
                 float sum = 0;
                 int non_zero_count = 0;
 
@@ -851,7 +845,7 @@ Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size)
                 {
                     for (int n = row_begin; n <= row_end; n++)
                     {
-                        if (data_in.element(m, n) != 0)
+                        if ((m >= 0) && (n >= 0) && (m < x) && (n < y) && (data_in.element(m, n) != 0))
                         {
                             sum = sum + data_in.element(m, n);
                             non_zero_count++;
