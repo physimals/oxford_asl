@@ -106,7 +106,9 @@ Usage_extended() {
     echo " --fmapmag=<image>      : fieldmap magnitude image - wholehead extracted"
     echo " --fmapmagbrain=<image> : fieldmap magnitude image - brain extracted"
     echo " --echospacing=<val>    : Effective EPI echo spacing (sometimes called dwell time) - in seconds"
-    echo " --pedir=<dir>          : phase encoding direction, dir = x/y/z/-x/-y/-z"
+    echo " --pedir=<dir>          : Phase encoding direction, dir = x/y/z/-x/-y/-z. This is relative to the axes"
+    echo "                          in the image voxel array which usually (but not always) corresponds to RAS."
+    echo "                          If in doubt, compare output with and without distortion correction."
     echo " {--nofmapreg}          : do not perform registration of fmap to T1 (use if fmap already in T1-space) "
     echo " Distortion correction using phase-encode-reversed calibration image (TOPUP):"
     echo " --cblip=<image>        : phase-encode-reversed (blipped) calibration image"
@@ -1526,34 +1528,51 @@ if [ ! -z $cblip ]; then
     else
 	echo "Distortion correction: running topup"
 	
-        #create topup params
+    # Create topup params. Note that TOPUP requires to total readout time which is the echo spacing multiplied
+    # by the output dimension size - 1. We are interpreting the xyz axis as being the axes of the underlying
+    # voxel array - normally these will correspond to RAS space but this is not guaranteed. However this seems
+    # to be what other FSL tools use which take an encoding direction.
 	case $pedir in
 	    x)
-		echo "1 0 0 $echospacing" > $tempdir/topup_params.txt
-		echo "-1 0 0 $echospacing" >> $tempdir/topup_params.txt
+        dimsize=`fslinfo $cblip | grep "^dim1" | sed 's:dim1[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "1 0 0 $totaltime" > $tempdir/topup_params.txt
+		echo "-1 0 0 $totaltime" >> $tempdir/topup_params.txt
 		;;
-    	    -x)
-		echo "-1 0 0 $echospacing" > $tempdir/topup_params.txt
-		echo "1 0 0 $echospacing" >> $tempdir/topup_params.txt
+    	-x)
+        dimsize=`fslinfo $cblip | grep "^dim1" | sed 's:dim1[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "-1 0 0 $totaltime" > $tempdir/topup_params.txt
+		echo "1 0 0 $totaltime" >> $tempdir/topup_params.txt
 		;;
 	    y)
-		echo "0 1 0 $echospacing" > $tempdir/topup_params.txt
-		echo "0 -1 0 $echospacing" >> $tempdir/topup_params.txt
+        dimsize=`fslinfo $cblip | grep "^dim2" | sed 's:dim2[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "0 1 0 $totaltime" > $tempdir/topup_params.txt
+		echo "0 -1 0 $totaltime" >> $tempdir/topup_params.txt
 		;;
 	    -y)
-		echo "0 -1 0 $echospacing" > $tempdir/topup_params.txt
-		echo "0 1 0 $echospacing" >> $tempdir/topup_params.txt
+        dimsize=`fslinfo $cblip | grep "^dim2" | sed 's:dim2[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "0 -1 0 $totaltime" > $tempdir/topup_params.txt
+		echo "0 1 0 $totaltime" >> $tempdir/topup_params.txt
 		;;
 	    z)
-		echo "0 0 1 $echospacing" > $tempdir/topup_params.txt
-		echo "0 0 -1 $echospacing" >> $tempdir/topup_params.txt
+        dimsize=`fslinfo $cblip | grep "^dim3" | sed 's:dim3[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "0 0 1 $totaltime" > $tempdir/topup_params.txt
+		echo "0 0 -1 $totaltime" >> $tempdir/topup_params.txt
 		;;
-    	    -z)
-		echo "0 0 -1 $echospacing" > $tempdir/topup_params.txt
-		echo "0 0 1 $echospacing" >> $tempdir/topup_params.txt
+    	-z)
+        dimsize=`fslinfo $cblip | grep "^dim3" | sed 's:dim3[ ]*::'`
+        totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
+		echo "0 0 -1 $totaltime" > $tempdir/topup_params.txt
+		echo "0 0 1 $totaltime" >> $tempdir/topup_params.txt
 		;;
 	esac
     
+    echo "For TOPUP using total read-out time of ($dimsize - 1) x $echospacing s = $totaltime s"
+
 	# do topup
 	fslmerge -t $tempdir/calib_blipped $tempdir/calib $cblip 
 	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
