@@ -13,6 +13,10 @@
 # to be used, possibly with bundled dependencies
 PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
 
+# Standard options for applying transformations
+APPLYXFM_OPTS="-interp trilinear -paddingsize 1"
+APPLYWARP_OPTS="--interp=trilinear --paddingsize=1 --super --superlevel=a"
+
 Usage() {
     echo "OXFORD_ASL"
     echo "Calculate perfusion maps from ASL data"
@@ -181,14 +185,14 @@ if [ ! -z $nativeout ]; then
 fi
 if [ ! -z $structout ]; then
     if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname
+    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname $APPLYXFM_OPTS
 fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
     if [ ! -z $warp ]; then
-	applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp
+	applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp $APPLYWARP_OPTS
     elif [ ! -z $trans ]; then
-	flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname
+	flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname $APPLYXFM_OPTS
     else
 	echo "ERROR: cannot do standard space out - neither warp or transformation matrix found"
     fi
@@ -638,7 +642,7 @@ ApplyWarps() {
         Log "   - Moco: $moco_xfm"
     	appremat="--premat=$moco_xfm"
     fi
-    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $warp --rel --interp=spline --paddingsize=1
+    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $warp --rel $APPLYWARP_OPTS
 
     # Correct for quantitative signal magnitude as volume has been locally scaled by the Jacobian
     fslmaths $tempdir/asldata -mul $jacobian $tempdir/asldata
@@ -655,14 +659,14 @@ ApplyWarps() {
             Log "   - Calib->ASL: $calib_xfm"
             appremat="--premat=$calib_xfm"
         fi
-        applywarp -i $tempdir/calib_orig -r $tempdir/meanasl -o $tempdir/calib $appremat -w $warp --rel --interp=spline --paddingsize=1
+        applywarp -i $tempdir/calib_orig -r $tempdir/meanasl -o $tempdir/calib $appremat -w $warp --rel $APPLYWARP_OPTS
         fslmaths $tempdir/calib -mul $jacobian $tempdir/calib
         if [ ! -z $cref ]; then
-            applywarp -i $tempdir/cref_orig -r $tempdir/meanasl -o $tempdir/cref $appremat -w $warp --rel --interp=spline --paddingsize=1
+            applywarp -i $tempdir/cref_orig -r $tempdir/meanasl -o $tempdir/cref $appremat -w $warp --rel $APPLYWARP_OPTS
             fslmaths $tempdir/cref -mul $jacobian $tempdir/cref
         fi
         if [ ! -z $cblip ]; then
-            applywarp -i $tempdir/cblip_orig -r $tempdir/meanasl -o $tempdir/cblip $appremat -w $warp --rel --interp=spline --paddingsize=1
+            applywarp -i $tempdir/cblip_orig -r $tempdir/meanasl -o $tempdir/cblip $appremat -w $warp --rel $APPLYWARP_OPTS
             fslmaths $tempdir/cblip -mul $jacobian $tempdir/cblip
         fi
     fi
@@ -1204,20 +1208,23 @@ if [ ! -z $moco ]; then
 	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
 	    convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
 	done
-	applyxfm4D $tempdir/asldata_orig $tempdir/asldata $tempdir/asldata $tempdir/asldata.mat -fourdigit
+    # Concatenate the motion matrices for use with applywarp
+    cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
+    applywarp --ref=$tempdir/asldata --in=$tempdir/asldata_orig --out=$tempdir/asldata --premat=$tempdir/asldata.cat $APPLYWARP_OPTS
 	# Convert all calibration images to align with asldata
-	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     if [ ! -z $cref ]; then
-        flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+        flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
     if [ ! -z $cblip ]; then
-        flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm
+        flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
     else
 	Log "Motion correction to middle volume of ASL data"
 	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
+    # Save concatenated motion matrices for later use with applywarp if required
+    cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
     fi
-    cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat # save the motion matrices for distortion correction if reqd
 fi
 
 # Take mean of the asl data as we might need this in the next step, and subsequent steps
@@ -1461,7 +1468,7 @@ if [ ! -z $fasthasrun ]; then
 
     if [ ! -z $tempdir/biasfield_struct ]; then
 	# transform the bias field and invert to use for sensitivity correction in calibration
-	applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+	applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
     fi
 
     if [ ! -z $senscorr ]; then
@@ -1484,7 +1491,7 @@ Log "Automatic mask generation"
 # preferred option is to use brain extracted structural
 if [ ! -z $strucflag ]; then
     fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-    flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+    flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask  $APPLYXFM_OPTS
     fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
     fslcpgeom $regfrom $tempdir/mask
 # otherwise use the regfrom image (should already be BETed) - note that regfrom may have been set in the Registration (1/2) section.
@@ -1574,7 +1581,7 @@ if [ ! -z $cblip ]; then
     echo "For TOPUP using total read-out time of ($dimsize - 1) x $echospacing s = $totaltime s"
 
 	# do topup
-	fslmerge -t $tempdir/calib_blipped $tempdir/calib $cblip 
+	fslmerge -t $tempdir/calib_blipped $tempdir/calib $tempdir/cblip 
 	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
 	topupresult=$tempdir/topupresult
     fi
@@ -1647,7 +1654,7 @@ if [ ! -z $topupresult ]; then
 #    else
 	echo "Distortion Correction using TOPUP"
 	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
-	applytopup --imain=$tempdir/calib,$cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
+	applytopup --imain=$tempdir/calib,$tempdir/cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
 	repeatsubtract=1;
 	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
 	if [ ! $cmethod="voxel" ]; then
@@ -1963,9 +1970,9 @@ if [ ! -z $fasthasrun ] && [ -z $pvgm ]; then
     convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     
     # Gray matter - assume this will be PVE 1
-    applywarp --ref=$tempdir/asldata --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    applywarp --ref=$tempdir/asldata --in=$tempdir/pvgm_struct --out=$tempdir/pvgm_inasl --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
     # white matter  - assume this will be PVE 2
-    applywarp --ref=$tempdir/asldata --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+    applywarp --ref=$tempdir/asldata --in=$tempdir/pvwm_struct --out=$tempdir/pvwm_inasl --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
     # threshold (upper and lower) the PVE to avoid artefacts of spline interpolation and also ignore very low PVE that could cause numerical issues.
     fslmaths $tempdir/pvgm_inasl -thr 0.1 -min 1 $tempdir/pvgm_inasl
     fslmaths $tempdir/pvwm_inasl -thr 0.1 -min 1 $tempdir/pvwm_inasl
@@ -2098,7 +2105,7 @@ if [ ! -z $pvcorr ]; then
 	# redo the mask now that we have a better registration - as this might matter for PV correction
 	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-	flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask -interp trilinear
+	flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
 	fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
 	fslcpgeom $regfrom $tempdir/mask
 	imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
@@ -2119,7 +2126,7 @@ if [ ! -z $pvcorr ]; then
         if [ ! -z $senscorr ]; then
 	      # Struct->ASL registration may have changed, so re-transform the bias field and invert to use for sensitivity correction
           Log "Re-registering bias field and calculating sensitivity map"
-          applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$outdir/native_space/biasfield --premat=$tempdir/struct2asl.mat --super --interp=spline --superlevel=4
+          applywarp --ref=$tempdir/asldata --in=$tempdir/biasfield_struct --out=$outdir/native_space/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
 	      fslmaths $outdir/native_space/biasfield -recip $outdir/native_space/sensitivity
         fi
       fi
