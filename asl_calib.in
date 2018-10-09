@@ -587,6 +587,9 @@ if [ $mode = longtr ]; then
 
     # calculate M0_ref value
     Moval=`fslstats $temp_calib/calib -M` # this is Mz of CSF
+    echo "Signal in reference tissue: $Moval" >> $log
+    corr=`echo "(1 - e(- ( $tr - $taq ) / $T1r) )" | bc -l`
+    echo "Correction factor: $corr (tr=$tr, tsq=$taq, t1=$T1r)" >> $log
     Moval=`echo "$Moval / (1 - e(- ( $tr - $taq ) / $T1r) )" | bc -l` #this is now M0 of the reference
     echo "Mz of reference tissue: $Moval" >> $log
 
