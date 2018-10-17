@@ -402,9 +402,13 @@ Calibration() {
 	usetrans=$tempdir/asl2struct.mat
 
 	if [ ! -z $fasthasrun ]; then
-        # we have already run FAST so we can pass the PVE to asl_calib (to save running FAST again)
-        extraoptions=$extraoptions" --refpve $tempdir/pv${tissref}_struct"
-	fi
+            # we have already run FAST so we can pass the PVE to asl_calib (to save running FAST again)
+            if [ -z $tissref ]; then
+              extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struct"
+            else
+              extraoptions=$extraoptions" --refpve $tempdir/pv${tissref}_struct"
+	    fi
+        fi
 
 	$asl_calib -c $tempdir/calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
 
