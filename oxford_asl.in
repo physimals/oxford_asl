@@ -1246,8 +1246,11 @@ if [ ! -z $gdcwarp ]; then
     # (meanasl here is just a reference). Using relative warp convention
     convertwarp -r $tempdir/meanasl -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts
     
-    # Average the jacobian parts
-    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    # Calculation of the jacobian for the warp - method suggested in:
+    # https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;d3fee1e5.0908
+    fnirtfileutils -i $tempdir/asldist_userwarp -f spline -o $tempdir/asldist_userwarp_coef
+    fnirtfileutils -i $tempdir/asldist_userwarp_coef -j $tempdir/distcorr/jacobian
+    fslcpgeom $tempdir/asldist_userwarp $tempdir/distcorr/jacobian -d
 
     ApplyWarps $tempdir/asldist_userwarp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
 fi
@@ -1626,7 +1629,12 @@ if [ -e $tempdir/fmap.* ]; then
         convertwarp -r $tempdir/meanasl -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts
     fi
 
-    fslmaths $tempdir/distcorr/jacobian_parts -Tmean $tempdir/distcorr/jacobian
+    # Calculation of the jacobian for the warp - method suggested in:
+    # https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;d3fee1e5.0908
+    fnirtfileutils -i $tempdir/asldist_warp -f spline -o $tempdir/asldist_warp_coef
+    fnirtfileutils -i $tempdir/asldist_warp_coef -j $tempdir/distcorr/jacobian
+    fslcpgeom $tempdir/asldist_warp $tempdir/distcorr/jacobian -d
+
 elif [ ! -z $gdcwarp ]; then
     Log "Re-applying user-specified GDC warp"
     imcp $tempdir/asldist_userwarp $tempdir/asldist_warp
