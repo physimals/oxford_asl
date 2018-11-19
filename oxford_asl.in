@@ -631,11 +631,11 @@ ApplyWarps() {
     ### Apply correction warps to the data, including a motion correction transformation if
     ### applicable, and a nonlinear warp field
 
-    warp=$1
+    corrwarp=$1
     jacobian=$2
 
 	Log "  Applying combined warps to original data:"
-    Log "   - Warp: $warp"
+    Log "   - Warp: $corrwarp"
     Log "   - Jacobian: $jacobian"
 
     Log "  Applying warps to ASL data"
@@ -646,7 +646,7 @@ ApplyWarps() {
         Log "   - Moco: $moco_xfm"
     	appremat="--premat=$moco_xfm"
     fi
-    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $warp --rel $APPLYWARP_OPTS
+    applywarp -i $tempdir/asldata_orig -r $tempdir/meanasl -o $tempdir/asldata $appremat -w $corrwarp --rel $APPLYWARP_OPTS
 
     # Correct for quantitative signal magnitude as volume has been locally scaled by the Jacobian
     fslmaths $tempdir/asldata -mul $jacobian $tempdir/asldata
@@ -663,14 +663,14 @@ ApplyWarps() {
             Log "   - Calib->ASL: $calib_xfm"
             appremat="--premat=$calib_xfm"
         fi
-        applywarp -i $tempdir/calib_orig -r $tempdir/meanasl -o $tempdir/calib $appremat -w $warp --rel $APPLYWARP_OPTS
+        applywarp -i $tempdir/calib_orig -r $tempdir/meanasl -o $tempdir/calib $appremat -w $corrwarp --rel $APPLYWARP_OPTS
         fslmaths $tempdir/calib -mul $jacobian $tempdir/calib
         if [ ! -z $cref ]; then
-            applywarp -i $tempdir/cref_orig -r $tempdir/meanasl -o $tempdir/cref $appremat -w $warp --rel $APPLYWARP_OPTS
+            applywarp -i $tempdir/cref_orig -r $tempdir/meanasl -o $tempdir/cref $appremat -w $corrwarp --rel $APPLYWARP_OPTS
             fslmaths $tempdir/cref -mul $jacobian $tempdir/cref
         fi
         if [ ! -z $cblip ]; then
-            applywarp -i $tempdir/cblip_orig -r $tempdir/meanasl -o $tempdir/cblip $appremat -w $warp --rel $APPLYWARP_OPTS
+            applywarp -i $tempdir/cblip_orig -r $tempdir/meanasl -o $tempdir/cblip $appremat -w $corrwarp --rel $APPLYWARP_OPTS
             fslmaths $tempdir/cblip -mul $jacobian $tempdir/cblip
         fi
     fi
