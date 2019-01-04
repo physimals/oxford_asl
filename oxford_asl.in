@@ -1225,12 +1225,12 @@ if [ ! -z $moco ]; then
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
     applywarp --ref=$tempdir/nativeref --in=$tempdir/asldata_orig --out=$tempdir/asldata --premat=$tempdir/asldata.cat $APPLYWARP_OPTS
 	# Convert all calibration images to align with asldata
-	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
+	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     if [ ! -z $cref ]; then
-        flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
+        flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
     if [ ! -z $cblip ]; then
-        flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/asldata -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
+        flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
     else
 	Log "Motion correction to middle volume of ASL data"
@@ -1524,7 +1524,7 @@ elif [ ! -z $calib ]; then
  # use the low resolution strucutral image to create mask (ahould already be BETed)
 elif [ ! -z $lowstrucflag ]; then
  # resample
-    flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $tempdir/asldata
+    flirt -in $tempdir/lowstruc -applyxfm -init $FSLDIR/etc/flirtsch/ident.mat -out $tempdir/mask -paddingsize 0.0 -interp trilinear -ref $tempdir/nativeref
  # make binary
     fslmaths $tempdir/mask -bin $tempdir/mask
     Log "Mask generated from low res. structural"
@@ -2126,7 +2126,7 @@ if [ ! -z $pvcorr ]; then
 	# redo the mask now that we have a better registration - as this might matter for PV correction
 	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-	flirt -in $tempdir/struc_bet_mask -ref $regfrom -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
+	flirt -in $tempdir/struc_bet_mask -ref $nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
 	fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
 	fslcpgeom $regfrom $tempdir/mask
 	imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
