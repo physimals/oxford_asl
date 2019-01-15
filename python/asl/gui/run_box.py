@@ -356,8 +356,8 @@ class AslRun(wx.Frame):
                 self.check_exists("Phase encode reversed calibration image", calib)
                 cmd.add('--cblip="%s"' % calib)
 
-            # Generic options
-            cmd.add("--echospacing=%.5f" % self.distcorr.echosp())
+            # Generic options - note that echospacing is ms in the GUI but oxford_asl requires it in seconds
+            cmd.add("--echospacing=%.5f" % (self.distcorr.echosp() / 1000))
             cmd.add("--pedir=%s" % self.distcorr.pedir())
   
         # Analysis options
