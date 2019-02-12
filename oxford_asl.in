@@ -2126,7 +2126,7 @@ if [ ! -z $pvcorr ]; then
 	# redo the mask now that we have a better registration - as this might matter for PV correction
 	# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 	fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-	flirt -in $tempdir/struc_bet_mask -ref $nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
+	flirt -in $tempdir/struc_bet_mask -ref $tempdir/nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
 	fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
 	fslcpgeom $regfrom $tempdir/mask
 	imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
