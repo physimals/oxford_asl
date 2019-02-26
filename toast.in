@@ -1472,9 +1472,9 @@ if [ ! -z $infert1 ]; then
     # M0t
     fslmaths output_calib_shift_1_MT/mean_M0t -add output_calib_shift_2_MT/mean_M0t_result -div 2 -thr 0 $output_dir_temp/M0t_MT
     # T1b under MT effects
-    fslmaths output_calib_shift_1_MT/mean_T1b -add output_calib_shift_2_MT/mean_T1b_result -div 2 -thr 0 $output_dir_temp/T1_blood_MT
+    #fslmaths output_calib_shift_1_MT/mean_T1b -add output_calib_shift_2_MT/mean_T1b_result -div 2 -thr 0 $output_dir_temp/T1_blood_MT
     # T1b normal
-    fslmaths $output_dir_temp/T1_blood_MT -mul 0 -add $t1b -mas $output_dir_temp/T1_blood_MT $output_dir_temp/T1_blood
+    #fslmaths $output_dir_temp/T1_blood_MT -mul 0 -add $t1b -mas $output_dir_temp/T1_blood_MT $output_dir_temp/T1_blood
 fi
 # Arterial blood colume and arrival time to macrovasculature infert1
 if [ ! -z $infer_arterial ]; then
