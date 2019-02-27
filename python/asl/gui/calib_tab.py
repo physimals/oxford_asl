@@ -28,7 +28,7 @@ class AslCalibration(TabPage):
         self.seq_te_num = self.number("Sequence TE (ms)", min=0,max=30,initial=0)
         self.ref_t2_num = self.number("Reference T2 (ms)", min=0,max=1000,initial=750, step=10)
         self.blood_t2_num = self.number("Blood T2 (ms)", min=0,max=1000,initial=150, step=10)
-        self.coil_image_picker = self.file_picker("Coil Sensitivity Image", optional=True)
+        self.coil_image_picker = self.file_picker("Reference Image for sensitivity correction", optional=True)
 
         self.sizer.AddGrowableCol(2, 1)
         self.SetSizer(self.sizer)

@@ -5,12 +5,19 @@ PROJNAME = oxford_asl
 USRINCFLAGS = -I${INC_NEWMAT} -I${INC_ZLIB}
 USRLDFLAGS = -L${LIB_NEWMAT} -L${LIB_ZLIB}
 
-LIBS = -lutils -lnewimage -lmiscmaths -lm -lnewmat -lfslio -lniftiio -lznz -lz
+FSLVERSION= $(shell cat ${FSLDIR}/etc/fslversion | head -c 1)
+ifeq ($(FSLVERSION), 5)
+  NIFTILIB = -lfslio -lniftiio
+else
+  NIFTILIB = -lNewNifti
+endif
+
+LIBS = -lutils -lnewimage -lmiscmaths -lprob -lnewmat ${NIFTILIB} -lznz -lz
 
 XFILES = asl_file
-SCRIPTS = oxford_asl asl_calib asl_reg quasil asl_gui toast
+SCRIPTS = oxford_asl asl_calib asl_reg quasil toast
 PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py python/asl/fslwrap.py python/asl/image.py
-PYGUI = python/asl/gui/*.py
+PYGUI = python/asl/gui/*.py python/asl/gui/banner.png
 RUNTCLS = Asl
 VERSIONED = oxford_asl asl_calib quasil asl_reg toast python/asl/__init__.py
 
@@ -34,9 +41,10 @@ $(VERSIONED): %: %.in FORCE
 	chmod a+x $@
 
 postinstallscript: $(PYMODULES) $(PYGUI)
-	mkdir -p $(FSLDEVDIR)/python/asl/gui ; \
-	cp $(PYMODULES) $(FSLDEVDIR)/python/asl/ ; \
-	cp $(PYGUI) $(FSLDEVDIR)/python/asl/gui ; \
+	mkdir -p $(DESTDIR)/python/asl/gui ; \
+	cp $(PYMODULES) $(DESTDIR)/python/asl/ ; \
+	cp $(PYGUI) $(DESTDIR)/python/asl/gui ; \
+        cp asl_gui_fsl $(DESTDIR)/bin/asl_gui ; \
 	cd ..
 
 clean:

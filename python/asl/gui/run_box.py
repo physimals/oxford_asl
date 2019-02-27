@@ -1,25 +1,30 @@
-import sys, os
+import sys
+import os
 import traceback
 import tempfile
 import shutil
 import shlex
 import subprocess
+from threading import Thread
 
 import nibabel as nib
 
 import wx
+from wx.lib.pubsub import pub
 
 class OptionError(RuntimeError):
     pass
 
-class FslCmd():
-    """
-    An FSL command
-    
-    This will look for the executable in the same directory as the 
-    GUI script first, then look in $FSLDEVDIR/bin, then $FSLDIR/bin. This is to enable 
-    distribution of updated code as a bundle which can be run in-situ without installation
-    """
+class Mkdir:
+    def __init__(self, dirname):
+        self.dirname = dirname
+
+    def run(self):
+        if not os.path.exists(self.dirname):
+            os.makedirs(self.dirname)
+        return 0
+
+class FslCmd:
     def __init__(self, cmd):
         script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
         fsldevdir = os.path.join(os.environ.get("FSLDEVDIR", ""), "bin")
@@ -30,34 +35,46 @@ class FslCmd():
             if os.path.exists(os.path.join(d, cmd)):
                 self.cmd = os.path.join(d, cmd)
                 break
-    
+            
     def add(self, opt, val=None):
         if val is not None:
             self.cmd += " %s=%s" % (opt, str(val))
         else:
             self.cmd += " %s" % opt
 
-    def write_output(self, line, out_widget=None, out_stream=None):
-        if out_widget is not None: 
-            out_widget.AppendText(line)
-            wx.Yield()
-        if out_stream is not None:
-            out_stream.write(line)
+    def write_output(self, line):
+        wx.CallAfter(pub.sendMessage, "run_stdout", line=line)
 
-    def run(self, out_widget=None, out_stream=None):
-        self.write_output(self.cmd, out_widget, out_stream)
+    def run(self):
+        self.write_output(self.cmd + "\n")
         args = shlex.split(self.cmd)
         p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         while 1:
             retcode = p.poll() #returns None while subprocess is running
-            line = p.stdout.readline()
-            self.write_output(line, out_widget, out_stream)
+            line = p.stdout.readline().decode('utf-8')
+            self.write_output(line)
             if retcode is not None: break
-        self.write_output("Return code: %i\n" % retcode, out_widget, out_stream)
-        
+        self.write_output("\nReturn code: %i\n\n" % retcode)
         return retcode
 
     def __str__(self): return self.cmd
+
+class CmdRunner(Thread):
+    def __init__(self, cmds, done_cb):
+        Thread.__init__(self)
+        self.cmds = cmds
+        self.done_cb = done_cb
+
+    def run(self):
+        ret = -1
+        try:
+            for cmd in self.cmds:
+                ret = -1
+                ret = cmd.run()
+                if ret != 0:
+                    break
+        finally:
+            wx.CallAfter(pub.sendMessage, "run_finished", retcode=ret)
 
 class AslRun(wx.Frame):
     """
@@ -65,23 +82,25 @@ class AslRun(wx.Frame):
     """
 
     # The options we need to pass to oxford_asl for various data orderings
-    order_opts = {"trp" : "--ibf=tis --iaf=diff", 
-                  "trp,tc" : "--ibf=tis --iaf=tcb", 
-                  "trp,ct" : "--ibf=tis --iaf=ctb",
-                  "rtp" : "--ibf=rpt --iaf=diff",
-                  "rtp,tc" : "--rpt --iaf=tcb",
-                  "rtp,ct" : "--ibf=rpt --iaf=ctb",
-                  "ptr,tc" : "--ibf=tis --iaf=tc",
-                  "ptr,ct" : "--ibf=tis --iaf=ct",
-                  "prt,tc" : "--ibf=rpt --iaf=tc",
-                  "prt,ct" : "--ibf=rpt --iaf=ct"}
+    order_opts = {"trp" : "--ibf=rpt --iaf=diff", 
+                  "trp,tc" : "--ibf=rpt --iaf=tcb", 
+                  "trp,ct" : "--ibf=rpt --iaf=ctb",
+                  "rtp" : "--ibf=tis --iaf=diff",
+                  "rtp,tc" : "--ibf=tis --iaf=tcb",
+                  "rtp,ct" : "--ibf=tis --iaf=ctb",
+                  "ptr,tc" : "--ibf=rpt --iaf=tc",
+                  "ptr,ct" : "--ibf=rpt --iaf=ct",
+                  "prt,tc" : "--ibf=tis --iaf=tc",
+                  "prt,ct" : "--ibf=tis --iaf=ct"}
 
     def __init__(self, parent, run_btn, run_label):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
 
+        self.run_seq = None
         self.run_btn = run_btn
         self.run_btn.Bind(wx.EVT_BUTTON, self.dorun)
         self.run_label = run_label
+        self.preview_data = None
     
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.output_text = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE)
@@ -91,20 +110,32 @@ class AslRun(wx.Frame):
             
         self.SetSizer(self.sizer)
         self.Bind(wx.EVT_CLOSE, self.close)
+        pub.subscribe(self.write_output, "run_stdout")
+        pub.subscribe(self.finished, "run_finished")
 
-    def close(self, evt):
+    def write_output(self, line):
+        self.output_text.AppendText(line)
+
+    def close(self, _):
         self.Hide()
 
-    def dorun(self, evt):
+    def finished(self, retcode):
+        if retcode != 0:
+            self.write_output("\nWARNING: command failed\n")
+        self.update()
+
+    def dorun(self, _):
         if self.run_seq: 
             self.Show()
             self.Raise()
             self.output_text.Clear()
-            for cmd in self.run_seq:
-                cmd.run(out_widget=self.output_text)  
-                self.output_text.AppendText("\n")
+            self.run_btn.Enable(False)
+            self.run_label.SetForegroundColour(wx.Colour(0, 0, 128))
+            self.run_label.SetLabel("Running - Please Wait")
+            runner = CmdRunner(self.run_seq, self.finished)
+            runner.start()
 
-    def update(self, evt=None):
+    def update(self):
         """
         Get the sequence of commands and enable the run button if options are valid. Otherwise
         display the first error in the status label
@@ -126,8 +157,8 @@ class AslRun(wx.Frame):
             self.run_label.SetLabel("Unexpected error - see console and report as a bug")
             traceback.print_exc(sys.exc_info()[1])
 
-    def check_exists(self, label, file):
-        if not os.path.exists(file):
+    def check_exists(self, label, fname):
+        if not os.path.exists(fname):
             raise OptionError("%s - no such file or directory" % label)
 
     def get_preview_data(self):
@@ -203,6 +234,9 @@ class AslRun(wx.Frame):
 
         # Build OXFORD_ASL command 
         outdir = self.analysis.outdir()
+        if os.path.exists(outdir) and not os.path.isdir(outdir):
+            raise OptionError("Output directory already exists and is a file")
+        run.append(Mkdir(outdir))
 
         # Input data
         cmd = FslCmd("oxford_asl")
@@ -263,10 +297,10 @@ class AslRun(wx.Frame):
         if self.structure.transform():
             if self.structure.transform_type() == self.structure.TRANS_MATRIX:
                 self.check_exists("Transformation matrix", self.structure.transform_file())
-                cmd.add('--asl2struc "%s"' % self.structure.transform_file())
+                cmd.add('-t "%s"' % self.structure.transform_file())
             elif self.structure.transform_type() == self.structure.TRANS_IMAGE:
                 self.check_exists("Warp image", self.structure.transform_file())
-                cmd.add('--regfrom "%s"' % self.structure.transform_file())
+                cmd.add('--warp "%s"' % self.structure.transform_file())
             else:
                 # This implies that FSLANAT output is being used, and hence
                 # --fslanat is already specified
@@ -322,8 +356,8 @@ class AslRun(wx.Frame):
                 self.check_exists("Phase encode reversed calibration image", calib)
                 cmd.add('--cblip="%s"' % calib)
 
-            # Generic options
-            cmd.add("--echospacing=%.5f" % self.distcorr.echosp())
+            # Generic options - note that echospacing is ms in the GUI but oxford_asl requires it in seconds
+            cmd.add("--echospacing=%.5f" % (self.distcorr.echosp() / 1000))
             cmd.add("--pedir=%s" % self.distcorr.pedir())
   
         # Analysis options

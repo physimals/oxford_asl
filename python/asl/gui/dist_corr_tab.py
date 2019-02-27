@@ -38,7 +38,7 @@ class AslDistCorr(TabPage):
         
         # General options
         self.section("General")
-        self.echosp_num = self.number("Effective EPI echo spacing", min=0, max=10)
+        self.echosp_num = self.number("Effective EPI echo spacing (ms)", min=0, max=10, digits=5, initial=1.0)
         self.pedir_ch = self.choice("Phase encoding direction", choices=["x", "y", "z", "-x", "-y", "-z"])
         
         self.sizer.AddGrowableCol(1, 1)

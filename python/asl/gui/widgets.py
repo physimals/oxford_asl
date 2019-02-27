@@ -18,8 +18,7 @@ class TabPage(wx.Panel):
     """
     def __init__(self, parent, title, idx, n, name=None):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
- 
-	self.notebook = parent
+        self.notebook = parent
         self.idx = idx
         self.n = n
         self.sizer = wx.GridBagSizer(vgap=5, hgap=5)
@@ -39,7 +38,7 @@ class TabPage(wx.Panel):
             self.next_btn.Bind(wx.EVT_BUTTON, self.next)
         else:
             self.next_btn = wx.StaticText(self, label="")
-	
+
         if self.idx > 0:
             self.prev_btn = wx.Button(self, label="Previous", id=wx.ID_BACKWARD)
             self.prev_btn.Bind(wx.EVT_BUTTON, self.prev)
@@ -54,10 +53,10 @@ class TabPage(wx.Panel):
         self.sizer.Add(self.next_btn, pos=(self.row, 3), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_RIGHT)
 
     def next(self, evt):
-	self.notebook.SetSelection(self.idx+1)
+        self.notebook.SetSelection(self.idx+1)
 
     def prev(self, evt):
-	self.notebook.SetSelection(self.idx-1)
+        self.notebook.SetSelection(self.idx-1)
 
     def pack(self, label, *widgets, **kwargs):
         """
@@ -292,7 +291,7 @@ class PreviewPanel(wx.Panel):
         self.nslices = 1
         self.view = 0
         self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, axis_bgcolor='black')
+        self.axes = self.figure.add_subplot(111, facecolor='black')
         self.axes.get_xaxis().set_ticklabels([])
         self.axes.get_yaxis().set_ticklabels([])          
         self.canvas = FigureCanvas(self, -1, self.figure)
@@ -342,7 +341,7 @@ class PreviewPanel(wx.Panel):
 
     def init_view(self):
         self.nslices = self.data.shape[2-self.view]
-        self.slice = self.nslices / 2
+        self.slice = int(self.nslices / 2)
         self.redraw()
 
     def redraw(self):
@@ -351,7 +350,6 @@ class PreviewPanel(wx.Panel):
         """
         self.axes.clear() 
         if self.data is None: return
-
         if self.view == 0:
             sl = self.data[:,:,self.slice]
         elif self.view == 1:
@@ -396,7 +394,7 @@ class AslDataPreview(wx.Panel):
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.n_tis = n_tis
-        self.n_repeats = n_repeats
+        self.n_repeats = int(n_repeats)
         self.tc_pairs = tc_pairs
         self.tagfirst = tagfirst
         self.order = order
@@ -416,7 +414,7 @@ class AslDataPreview(wx.Panel):
 
     def on_paint(self, event):
         w, h = self.GetClientSize()
-        N = self.n_tis * self.n_repeats
+        N = self.n_tis * int(self.n_repeats)
         if self.tc_pairs: N *= 2
         dc = wx.AutoBufferedPaintDC(self)
         dc.Clear()
@@ -468,7 +466,7 @@ class AslDataPreview(wx.Panel):
                         seq.append(i)
                 elif t == "r":
                     seq.append(i)
-                    seq += [i+2,] * (self.n_repeats - 1)
+                    seq += [i+2,] * (int(self.n_repeats) - 1)
         
         tistart = -1
         ti_sep = 1

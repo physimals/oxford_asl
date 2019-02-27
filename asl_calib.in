@@ -417,7 +417,7 @@ if [ -z $maskflag ]; then
 	imcp $refpve $temp_calib/refpve
     fi
 
-    if [ $tissref = "csf" ] & [ -z $csfmaskingoff ]; then
+    if [ $tissref = "csf" ] && [ -z $csfmaskingoff ]; then
 	echo "Ventricle selection" >> $log
 	stdmaskfnirt=1  # by deafult now we do FNRIT transformation of ventricle mask
 
@@ -443,7 +443,7 @@ if [ -z $maskflag ]; then
 	fslmaths $temp_calib/LVentricle -add $temp_calib/RVentricle -thr 0.1 -bin -ero $temp_calib/VentricleMask
 	
         # register structural image to std space using FLIRT
-	if [ -z $str2std ] & [ -z $warp ]; then
+	if [ -z $str2std ] && [ -z $warp ]; then
 	    echo "Registering structural image to standard space using FLIRT" >> $log
 	    flirt -in $struc -ref $FSLDIR/data/standard/MNI152_T1_2mm_brain.nii.gz -omat $temp_calib/struc2std.mat
 	else
@@ -455,7 +455,7 @@ if [ -z $maskflag ]; then
 	    fi
 	fi
 	
-	if [ -z $stdmaskfnirt ] & [ -z $warp ]; then
+	if [ -z $stdmaskfnirt ] && [ -z $warp ]; then
         # do std space masking with FLIRT registration
 	    
 	    convert_xfm -omat $temp_calib/std2struc.mat -inverse $temp_calib/struc2std.mat
@@ -587,6 +587,9 @@ if [ $mode = longtr ]; then
 
     # calculate M0_ref value
     Moval=`fslstats $temp_calib/calib -M` # this is Mz of CSF
+    echo "Signal in reference tissue: $Moval" >> $log
+    corr=`echo "(1 - e(- ( $tr - $taq ) / $T1r) )" | bc -l`
+    echo "Correction factor: $corr (tr=$tr, tsq=$taq, t1=$T1r)" >> $log
     Moval=`echo "$Moval / (1 - e(- ( $tr - $taq ) / $T1r) )" | bc -l` #this is now M0 of the reference
     echo "Mz of reference tissue: $Moval" >> $log
 
