@@ -200,7 +200,7 @@ inline ReadOptions::ReadOptions()
         false, requires_argument)
     , pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
           false, requires_argument)
-    , kernel(string("--kernel"), 5, string("Kernel size of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
+    , kernel(string("--kernel"), 5, string("Kernel size (in voxels) of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
           false, requires_argument)
     ,
 
