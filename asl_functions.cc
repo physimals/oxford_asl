@@ -845,9 +845,9 @@ Matrix extrapolate_avg(Matrix data_in, Matrix mask_in, int neighbour_size)
                 {
                     for (int n = row_begin; n <= row_end; n++)
                     {
-                        if ((m >= 0) && (n >= 0) && (m < x) && (n < y) && (data_in.element(m, n) != 0))
+                        if ((m >= 0) && (n >= 0) && (m < x) && (n < y) && (data_extrapolated.element(m, n) != 0))
                         {
-                            sum = sum + data_in.element(m, n);
+                            sum = sum + data_extrapolated.element(m, n);
                             non_zero_count++;
                         }
                     }
