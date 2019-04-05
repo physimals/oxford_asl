@@ -17,6 +17,10 @@ examples where this is relevant). More advanced users wishing to do customised
 kinetic analysis might want to use the basil command line tool - this is the 
 very core of `oxford_asl` and thus the `BASIL` toolbox overall.
 
+For full documentation on the `oxford_asl` suite of tools see:
+
+https://asl-docs.readthedocs.io/
+
 ## Referencing
 
 If you use oxford_asl in your research, please reference the article below, plus
