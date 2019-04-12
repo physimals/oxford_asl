@@ -10,8 +10,11 @@ ifeq ($(FSLVERSION), 5)
   NIFTILIB = -lfslio -lniftiio 
   MATLIB = -lnewmat
 else 
+  UNAME := $(shell uname -s)
+  ifeq ($(UNAME), Linux)
+    MATLIB = -lopenblas
+  endif
   NIFTILIB = -lNewNifti
-  MATLIB = -lopenblas
 endif
 
 LIBS = -lutils -lnewimage -lmiscmaths -lprob ${MATLIB} ${NIFTILIB} -lznz -lz
@@ -20,7 +23,6 @@ XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil 
 PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py python/asl/fslwrap.py python/asl/image.py
 PYGUI = python/asl/gui/*.py python/asl/gui/banner.png
-RUNTCLS = Asl
 VERSIONED = oxford_asl asl_calib quasil asl_reg python/asl/__init__.py
 
 OBJS = readoptions.o asl_functions.o
