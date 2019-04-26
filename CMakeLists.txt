@@ -75,11 +75,14 @@ configure_file(oxford_asl.in oxford_asl @ONLY)
 configure_file(asl_calib.in asl_calib @ONLY)
 configure_file(asl_reg.in asl_reg @ONLY)
 configure_file(quasil.in quasil @ONLY)
+configure_file(toast.in toast @ONLY)
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/oxford_asl 
-  ${CMAKE_CURRENT_BINARY_DIR}/asl_calib
+        ${CMAKE_CURRENT_BINARY_DIR}/asl_calib
 	${CMAKE_CURRENT_BINARY_DIR}/asl_reg
 	${CMAKE_CURRENT_BINARY_DIR}/quasil
+        ${CMAKE_CURRENT_BINARY_DIR}/toast
+	${CMAKE_CURRENT_BINARY_DIR}/asl_file
 	asl_gui
 	DESTINATION bin)
 
