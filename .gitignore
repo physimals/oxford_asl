@@ -9,4 +9,6 @@ asl_preproc
 asl_reg
 quasil
 asl_file
+toast
 *.pyc
+python/gui/__init__.py
