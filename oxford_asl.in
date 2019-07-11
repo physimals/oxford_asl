@@ -1080,6 +1080,7 @@ if [ ! -z $fslanat ]; then
 	imcp $fslanat/T1 $tempdir/struc
 	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     fi
+    chmod u+w $tempdir/struc.* $tempdir/struc_bet.*
     
     # use the registration to standard space - if it is there
     if [ -e $fslanat/T1_to_MNI_nonlin_coeff.nii.gz ]; then
@@ -1192,6 +1193,7 @@ fi
 
 # read in ASL data
 imcp $infile $tempdir/asldata # this is the MAIN data that we will reflect any corrections applied
+chmod u+w $tempdir/asldata.*
 # take a copy that will not be subject to any subsequent corrections
 imcp $tempdir/asldata $tempdir/asldata_orig
 
@@ -1440,10 +1442,12 @@ if [ ! -z $fslanat ]; then
     imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
     imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
     imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
+    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
 
     if [ ! -z $fslanat/T1_fast_bias ]; then # test to check that there is a bias field here
        Log "Bias field extracted from $fslanat sucessfully"
        imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+       chmod u+w $tempdir/biasfield_struct.*
     else
 	Log "No Bias field found in $fslanat"
     fi
@@ -1467,10 +1471,12 @@ elif [ ! -z $struc ]; then
     imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
     imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
     imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
+    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
 
     if [ ! -z ${fastsrc}_bias ]; then # test to see if there is a bias field in the FAST output
 	Log "Bias field extracted from ${fastsrc} sucessfully"
 	imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    chmod u+w $tempdir/biasfield_struct.*
     else
 	Log "No Bias field found with ${fastsrc}"
     fi
@@ -1492,6 +1498,7 @@ if [ ! -z $fasthasrun ]; then
 	    Log "Creating sensitivity map from biasfield"
 	    fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
         imcp $outdir/native_space/sensitivity $tempdir/sensitivity
+        chmod u+w $tempdir/sensitivity.*
 	fi	    
     fi
 
@@ -1612,6 +1619,7 @@ elif [ ! -z $fmap ]; then
     imcp $fmap $tempdir/fmap
     imcp $fmapmag $tempdir/fmapmag
     imcp $fmapmagbrain $tempdir/fmapmagbrain
+    chmod u+w $tempdir/fmap.* $tempdir/fmapmag.* $tempdir/fmapmagbrain.*
 fi
 
 if [ -e $tempdir/fmap.* ]; then
