@@ -11,4 +11,5 @@ quasil
 asl_file
 toast
 *.pyc
-python/gui/__init__.py
+python/asl/__init__.py
+feeds/output
