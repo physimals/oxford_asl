@@ -1,0 +1,17 @@
+#!/bin/bash -e
+#
+# A FEEDS test which runs oxford_asl on some data
+#
+
+outdir=$1
+indir=$2
+
+oxford_asl -i $indir/oxford_asl/mpld_asltc  \
+           --casl --tis=1.65,1.9,2.15,2.4,2.65,2.9 --iaf=tc --ibf=tis --slicedt=0.0452 \
+           --fslanat $indir/oxford_asl/T1.anat --senscorr \
+           -c $indir/oxford_asl/aslcalib --tr=4.8 --cmethod=single  \
+           --csf $indir/oxford_asl/csfmask \
+           --cblip=$indir/oxford_asl/aslcalib_PA --echospacing=0.06 --pedir=y \
+           --mc \
+           -o $outdir  
+
