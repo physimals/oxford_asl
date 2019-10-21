@@ -489,6 +489,18 @@ fi
     if [ -z $fixbat ]; then
 	fslmaths ${finalstep}/var_delttiss -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_delttiss $2/var_delttiss
     fi
+
+    #Partial volume correction - output variances of PVC results
+    if [ ! -z $basil_pvcorr ]; then
+        fslmaths ${finalstep}/var_fwm -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_fwm $2/var_ftisswm
+        if [ ! -z $senscorr ]; then
+            # sensitivity correction
+            fslmaths $2/var_ftisswm -div $outdir/native_space/sensitivity -div $outdir/native_space/sensitivity $2/var_ftisswm
+        fi
+        if [ -z $fixbat ]; then
+	        fslmaths ${finalstep}/var_deltwm -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_deltwm $2/var_deltwm
+        fi
+    fi
 fi
 
 #copy the final MVN to the temp directory for future use
@@ -556,7 +568,15 @@ if [ ! -z $varout ]; then
     if [ -z $fixbat ]; then
     Output var_delttiss arrival_var $subdir
     fi
-    
+        
+    # PVcorr
+    if [ $subdir = "pvcorr" ]; then
+        Output var_ftisswm perfusion_wm_var $subdir
+        Normalise_var perfusion_wm $subdir wm
+        if [ -z $fixbat ]; then
+        Output var_deltwm arrival_wm_var $subdir
+        fi
+    fi
 fi
 
 # calibrated results
@@ -588,14 +608,18 @@ if [ ! -z $calibflag ]; then
     fi
 
     if [ ! -z $varout ]; then
-	if [ $cmethod = 'single' ]; then
-	    Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
-	elif [ $cmethod = 'voxel' ]; then
-	    fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
-        Mosq=$tempdir/mosq
-	fi
-	
-	Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir
+        if [ $cmethod = 'single' ]; then
+            Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
+        elif [ $cmethod = 'voxel' ]; then
+            fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
+            Mosq=$tempdir/mosq
+        fi
+        
+        Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir
+
+        if [ $subdir = "pvcorr" ]; then
+            Calibrate var_ftisswm perfusion_wm_var $Mosq 36000000 $subdir
+        fi
     fi
 
     if [ -z $artoff ];then
