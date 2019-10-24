@@ -2157,7 +2157,7 @@ if [ ! -z $pvcorr ]; then
     # Re-generate the mask from the structural image now that we have a better registration - as this might matter for PV correction
     # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
     # NB Also, only regenerate the mask if there was no user-specified mask given
-    if [ -f $tempdir/struc_bet.* -a -z $mask ]; then
+    if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
         fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
         flirt -in $tempdir/struc_bet_mask -ref $tempdir/nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
         fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
