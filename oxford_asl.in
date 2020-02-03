@@ -1722,7 +1722,7 @@ fi
 if [ ! -z $repeatsubtract ]; then
     if [ $iaf = 'diff' ]; then
 	# make sure the block format is correct for BASIL
-	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     else
 	# create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
 	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
