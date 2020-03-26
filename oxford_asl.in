@@ -1903,8 +1903,8 @@ fi
 if [ -z $snr ]; then
     snr=10; #default SNR
 fi
-if [ $tpoints -eq 1 ]; then
-    # only a single time point in data, will use informative noise prior
+if [ $tpoints -le 5 ]; then
+    # only small number of time points in data, will use informative noise prior
    noiseprior=1
    Log "Single volume: informative noise prior will be used"
 fi
