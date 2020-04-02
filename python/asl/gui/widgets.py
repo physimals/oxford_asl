@@ -12,6 +12,18 @@ from matplotlib.figure import Figure
 
 import numpy as np
 
+import fsleyes
+import fsleyes.overlay as fsloverlay
+import fsleyes.displaycontext as fsldc
+import fsleyes.views.orthopanel as orthopanel
+import fsleyes.profiles as profiles
+import fsleyes.profiles.profilemap as profilemap
+import fsleyes.colourmaps as colourmaps
+
+from fsl.utils.platform import platform as fslplatform
+from fsl.utils import idle
+import fsl.data.image as fslimage
+
 class TabPage(wx.Panel):
     """
     Shared methods used by the various tab pages in the GUI
@@ -277,6 +289,70 @@ class NumberList(wx.grid.Grid):
         event.Skip()
         self.resize_cols()
 
+def fsleyes_embed(parent=None, make_fsleyesframe=True, **kwargs):
+    """Initialise FSLeyes and create a :class:`.FSLeyesFrame`, when
+    running within another application.
+
+    .. note:: If a ``wx.App`` does not exist, one is created.
+
+    :arg parent: ``wx`` parent object
+    :arg make_fsleyesframe: bool, default is True to make a new :class:`.FSLeyesFrame`
+    :returns:    A tuple containing:
+                    - The :class:`.OverlayList`
+                    - The master :class:`.DisplayContext`
+                    - The :class:`.FSLeyesFrame` or None if make_fsleyesframe=False
+
+    All other arguments are passed to :meth:`.FSLeyesFrame.__init__`.
+    """
+
+    import fsleyes_props          as props
+    import fsleyes.gl             as fslgl
+    import fsleyes.frame          as fslframe
+    import fsleyes.overlay        as fsloverlay
+    import fsleyes.displaycontext as fsldc
+
+    app    = wx.GetApp()
+    ownapp = app is None
+    if ownapp:
+        app = FSLeyesApp()
+
+    fsleyes.initialise()
+    colourmaps.init()
+    props.initGUI()
+
+    called = [False]
+    ret    = [None]
+
+    def until():
+        return called[0]
+
+    def ready():
+        frame = None
+        fslgl.bootstrap()
+
+        overlayList = fsloverlay.OverlayList()
+        displayCtx  = fsldc.DisplayContext(overlayList)
+        if make_fsleyesframe:
+            frame       = fslframe.FSLeyesFrame(
+                parent, overlayList, displayCtx, **kwargs)
+
+        if ownapp:
+            app.SetOverlayListAndDisplayContext(overlayList, displayCtx)
+            # Keep a ref to prevent the app from being GC'd
+            if make_fsleyesframe:
+                frame._embed_app = app
+
+        called[0] = True
+        ret[0]    = (overlayList, displayCtx, frame)
+
+    fslgl.getGLContext(parent=parent, ready=ready)
+    idle.block(10, until=until)
+
+    if ret[0] is None:
+        raise RuntimeError('Failed to start FSLeyes')
+    return ret[0]
+
+
 class PreviewPanel(wx.Panel):
     """
     Panel providing a simple image preview for the output of ASL_FILE.
@@ -287,16 +363,6 @@ class PreviewPanel(wx.Panel):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
         self.data = None
         self.run = None
-        self.slice = -1
-        self.nslices = 1
-        self.view = 0
-        self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, facecolor='black')
-        self.axes.get_xaxis().set_ticklabels([])
-        self.axes.get_yaxis().set_ticklabels([])          
-        self.canvas = FigureCanvas(self, -1, self.figure)
-        self.canvas.mpl_connect('scroll_event', self.scroll)
-        self.canvas.mpl_connect('button_press_event', self.view_change)
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         font = self.GetFont()
         font.SetWeight(wx.BOLD)
@@ -304,10 +370,18 @@ class PreviewPanel(wx.Panel):
         text.SetFont(font)
         self.sizer.AddSpacer(10)
         self.sizer.Add(text, 0)   
-        self.sizer.Add(self.canvas, 2, border=5, flag = wx.EXPAND | wx.ALL)
+        self.overlayList, masterDisplayCtx, _ = fsleyes_embed(None, make_fsleyesframe=False)
+        self.displayCtx = fsldc.DisplayContext(self.overlayList, parent=masterDisplayCtx)
+        self.op = orthopanel.OrthoPanel(
+                self,
+                self.overlayList,
+                self.displayCtx,
+                None)
+        self.op.SetMinSize((-1, 300))
+        self.op.Show()
+        self.sizer.Add(self.op, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
-        hbox.Add(wx.StaticText(self, label="Use scroll wheel to change slice, double click to change view"), 0, flag=wx.ALIGN_CENTRE_VERTICAL)      
         self.update_btn = wx.Button(self, label="Update")
         self.update_btn.Bind(wx.EVT_BUTTON, self.update)
         hbox.Add(self.update_btn)
@@ -328,18 +402,15 @@ class PreviewPanel(wx.Panel):
         button as it involves calling ASL_FILE and may be slow
         """
         self.data = None
+        self.overlayList.clear()
         if self.run is not None:
             self.data = self.run.get_preview_data()
-            # If multi-TI data, take mean over volumes
-            if self.data is not None and len(self.data.shape) == 4:
-                self.data = np.mean(self.data, axis=3)
-                
-        if self.data is not None:
-            self.view = 0
-            self.init_view()
-        self.redraw()
+            if self.data is not None:
+                img = fslimage.Image(self.data)
+                self.overlayList.append(img)
 
     def init_view(self):
+        return
         self.nslices = self.data.shape[2-self.view]
         self.slice = int(self.nslices / 2)
         self.redraw()
@@ -348,6 +419,7 @@ class PreviewPanel(wx.Panel):
         """
         Redraw the preview image
         """
+        return
         self.axes.clear() 
         if self.data is None: return
         if self.view == 0:
@@ -366,6 +438,7 @@ class PreviewPanel(wx.Panel):
         """
         Called on mouse click event. Double click changes the view direction and redraws
         """
+        return
         if self.data is None: return
         if event.dblclick:
             self.view = (self.view + 1) % 3
@@ -376,6 +449,7 @@ class PreviewPanel(wx.Panel):
         """
         Called on mouse scroll wheel to move through the slices in the current view
         """
+        return
         if event.button == "up":
             if self.slice != self.nslices-1: self.slice += 1
         else:

@@ -180,13 +180,10 @@ class AslRun(wx.Frame):
             cmd.add('--mean="%s"' % meanfile)
             cmd.add(" ".join(self.get_data_order_options()))
             cmd.run()
-            img = nib.load(meanfile)
-            return img.get_data()
+            return meanfile
         except:
             traceback.print_exc()
             return None
-        finally:
-            shutil.rmtree(tempdir)
 
     def get_data_order_options(self):
         """
