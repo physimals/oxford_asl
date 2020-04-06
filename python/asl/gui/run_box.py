@@ -173,15 +173,18 @@ class AslRun(wx.Frame):
         tempdir = tempfile.mkdtemp()
         self.preview_data = None
         try:
-            meanfile = "%s/mean.nii.gz" % tempdir
+            meanfile = "%s/mean" % tempdir
             cmd = FslCmd("asl_file")
             cmd.add('--data="%s"' % self.input.data())
             cmd.add("--ntis=%i" % self.input.ntis())
             cmd.add('--mean="%s"' % meanfile)
             cmd.add(" ".join(self.get_data_order_options()))
             cmd.run()
-            img = nib.load(meanfile)
-            return img.get_data()
+
+            for ext in (".nii", ".nii.gz"):
+                if os.path.exists(meanfile + ext):
+                    return nib.load(meanfile + ext).get_data()
+            raise RuntimeError("Could not load output from asl_file")
         except:
             traceback.print_exc()
             return None
