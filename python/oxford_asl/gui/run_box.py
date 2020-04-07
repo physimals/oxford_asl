@@ -82,16 +82,18 @@ class AslRun(wx.Frame):
     """
 
     # The options we need to pass to oxford_asl for various data orderings
-    order_opts = {"trp" : "--ibf=rpt --iaf=diff", 
-                  "trp,tc" : "--ibf=rpt --iaf=tcb", 
-                  "trp,ct" : "--ibf=rpt --iaf=ctb",
-                  "rtp" : "--ibf=tis --iaf=diff",
-                  "rtp,tc" : "--ibf=tis --iaf=tcb",
-                  "rtp,ct" : "--ibf=tis --iaf=ctb",
-                  "ptr,tc" : "--ibf=rpt --iaf=tc",
-                  "ptr,ct" : "--ibf=rpt --iaf=ct",
-                  "prt,tc" : "--ibf=tis --iaf=tc",
-                  "prt,ct" : "--ibf=tis --iaf=ct"}
+    order_opts = {
+        "trp"    : ("rpt", "diff"), 
+        "trp,tc" : ("rpt", "tcb"), 
+        "trp,ct" : ("rpt", "ctb"),
+        "rtp"    : ("tis", "diff"),
+        "rtp,tc" : ("tis", "tcb"),
+        "rtp,ct" : ("tis", "ctb"),
+        "ptr,tc" : ("rpt", "tc"),
+        "ptr,ct" : ("rpt", "ct"),
+        "prt,tc" : ("tis", "tc"),
+        "prt,ct" : ("tis", "ct")
+    }
 
     def __init__(self, parent, run_btn, run_label):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
@@ -191,20 +193,29 @@ class AslRun(wx.Frame):
         finally:
             shutil.rmtree(tempdir)
 
-    def get_data_order_options(self):
-        """
-        Check data order is supported and return the relevant options
-        """
+    def get_ibf_iaf(self):
         order, tagfirst = self.input.data_order()
         diff_opt = ""
         if self.input.tc_pairs(): 
             if tagfirst: order += ",tc"
             else: order += ",ct"
-            diff_opt = "--diff"
         if order not in self.order_opts:
             raise OptionError("This data ordering is not supported by ASL_FILE")
-        else: 
-            return self.order_opts[order], diff_opt
+        else:
+            return self.order_opts[order]
+        
+    def get_data_order_options(self):
+        """
+        Check data order is supported and return the relevant 
+        for ASL_FILE to generate differenced data
+        """
+        ibf, iaf = self.get_ibf_iaf()
+        if self.input.tc_pairs(): 
+            diff_opt = "--diff"
+        else:
+            diff_opt = ""
+
+        return "--ibf=%s --iaf=%s" % (ibf, iaf), diff_opt
 
     def get_run_sequence(self):
         """
@@ -221,19 +232,18 @@ class AslRun(wx.Frame):
         if len(img.shape) != 4:
             raise OptionError("Input data is not a 4D image")
         nvols = img.shape[3]
+        expected_nvols = sum(self.input.repeats()) * (2 if self.input.tc_pairs() else 1)
+        if expected_nvols != nvols:
+            if self.input.repeats_type() == 0:
+                raise OptionError("Input data contains %i volumes - inconsistent with %i TIs and label-control-pairs=%s" % (nvols, self.input.ntis(), self.input.tc_pairs()))
+            else:
+                raise OptionError("Input data contains %i volumes - expected %i from total of repeats at each TI" % (nvols, expected_nvols))
 
-        N = self.input.ntis()
-        if self.input.tc_pairs(): N *= 2
-        if nvols % N != 0:
-            self.input.nrepeats_label.SetLabel("<Invalid>")
-            raise OptionError("Input data contains %i volumes - not consistent with %i TIs and TC pairs=%s" % (img.shape[3], self.input.ntis(), self.input.tc_pairs()))
-        else:
-            self.input.nrepeats_label.SetLabel("%i" % (nvols / N))
-            self.preview.order_preview.n_tis = self.input.ntis()
-            self.preview.order_preview.n_repeats = nvols / N
-            self.preview.order_preview.tc_pairs = self.input.tc_pairs()
-            self.preview.order_preview.tagfirst = self.input.tc_ch.GetSelection() == 0
-            self.preview.order_preview.Refresh()
+        self.preview.order_preview.ntis = self.input.ntis()
+        self.preview.order_preview.repeats = self.input.repeats()
+        self.preview.order_preview.tc_pairs = self.input.tc_pairs()
+        self.preview.order_preview.tagfirst = self.input.tc_ch.GetSelection() == 0
+        self.preview.order_preview.Refresh()
 
         # Build OXFORD_ASL command 
         outdir = self.analysis.outdir()
@@ -247,6 +257,10 @@ class AslRun(wx.Frame):
         cmd.add(self.get_data_order_options()[0])
         cmd.add("--tis %s" % ",".join(["%.2f" % v for v in self.input.tis()]))
         cmd.add("--bolus %s" % ",".join(["%.2f" % v for v in self.input.bolus_dur()]))
+        if self.input.repeats_type() == 1:
+            # Variable repeats
+            cmd.add("--rpts %s" % ",".join(["%i" % v for v in self.input.repeats()]))
+            
         if self.input.labelling() == 1: 
             cmd.add("--casl")
         if self.input.readout() == 1:

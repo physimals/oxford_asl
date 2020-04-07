@@ -241,7 +241,7 @@ class NumberList(wx.grid.Grid):
     """
 
     def __init__(self, parent, n, default=1.8):
-        super(NumberList, self).__init__(parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
+        super(NumberList, self).__init__(parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0)
         self.n=0
         self.default = default
         self.CreateGrid(1, 0)
@@ -256,9 +256,10 @@ class NumberList(wx.grid.Grid):
         except ValueError as e:
             raise RuntimeError("Non-numeric values in number list")
             
-    def set_size(self, n):
-        if self.n == 0: default = self.default
-        else: default = self.GetCellValue(0, self.n-1)
+    def set_size(self, n, default=None):
+        if default is None:
+            if self.n == 0: default = self.default
+            else: default = self.GetCellValue(0, self.n-1)
         if n > self.n:
             self.AppendCols(n - self.n)
             for c in range(self.n, n): self.SetCellValue(0, c, str(default))
@@ -268,6 +269,9 @@ class NumberList(wx.grid.Grid):
         self.resize_cols()
 
     def resize_cols(self):
+        if self.n == 0:
+            return
+
         w, h = self.GetClientSize()
         cw = w / self.n
         for i in range(self.n):
@@ -317,7 +321,7 @@ class PreviewPanel(wx.Panel):
         text = wx.StaticText(self, label="Data order preview")
         text.SetFont(font)
         self.sizer.Add(text, 0)
-        self.order_preview = AslDataPreview(self, 1, 1, True, "trp", True)
+        self.order_preview = AslDataPreview2(self, 1, [1], True, "trp", True)
         self.sizer.Add(self.order_preview, 2, wx.EXPAND)
         self.SetSizer(self.sizer)
         self.Layout()
@@ -381,20 +385,151 @@ class PreviewPanel(wx.Panel):
         else:
             if self.slice != 0: self.slice -= 1
         self.redraw()
-            
+
+ORDER_LABELS = {
+    "r" : ("Repeat ", "R"), 
+    "t" : ("TI ", "TI"),
+    "p" : {
+        "tc" : (("Label", "Control"), ("L", "C")),
+        "ct" : (("Control", "Label"), ("C", "L")),
+    }
+}
+
+class AslDataPreview2(wx.Panel):
+    """
+    Visual preview of the structure of an ASL data set
+    """
+    
+    def __init__(self, parent, ntis, repeats, tc_pairs, order, tagfirst):
+        wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
+        self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
+        self.Bind(wx.EVT_SIZE, self.on_size)
+        self.Bind(wx.EVT_PAINT, self.on_paint)
+        self.ntis = ntis
+        self.repeats = repeats
+        self.tc_pairs = tc_pairs
+        self.tagfirst = tagfirst
+        self.order = order
+        self.tis_name = "PLDs"
+
+        self.hfactor = 0.95
+        self.vfactor = 0.95
+        self.cols = {
+            "r" : wx.Colour(128, 128, 255), 
+            "t" : wx.Colour(255, 128, 128), 
+            "p" : wx.Colour(128, 255, 128),
+        }
+        self.num = {"t" : ntis, "r" : repeats[0], "p" : 2 if tc_pairs else 1}
+
+    def on_size(self, event):
+        event.Skip()
+        self.Refresh()
+
+    def on_paint(self, event):
+        self.num = {"t" : self.ntis, "r" : self.repeats[0], "p" : 2 if self.tc_pairs else 1}
+
+        if not self.tc_pairs: order = self.order.replace("p", "")
+        else: order = self.order
+
+        w, h = self.GetClientSize()
+        group_height = 0.8*self.vfactor*h / len(order)
+        group_width = self.hfactor*w
+        ox = w*(1-self.hfactor)/2
+        oy = h*(1-self.vfactor)/2
+        
+        dc = wx.AutoBufferedPaintDC(self)
+        dc.Clear()
+        nvols = int(sum(self.repeats) * (2 if self.tc_pairs else 1))
+        smallest_group_width = self._draw_groups(dc, order[::-1], ox, oy, group_width, group_height)
+        self._centered_text(dc, "Input data volumes", ox+group_width/2, oy+0.9*h)
+        self._centered_text(dc, "1", ox+smallest_group_width/2, oy+0.85*h)
+        self._centered_text(dc, str(nvols), ox+group_width-smallest_group_width/2, oy+0.85*h)
+
+    def _get_label(self, code, num, short):
+        labels = ORDER_LABELS[code]
+        if isinstance(labels, dict):
+            iaf = "tc" if self.tagfirst else "ct"
+            labels = labels[iaf]
+        label = labels[int(short)]
+        if isinstance(label, tuple):
+            return label[num]
+        else:
+            return label + str(int(num+1))
+        
+    def _centered_text(self, dc, text, x, y):
+        text_size = dc.GetTextExtent(text)
+        dc.DrawText(text, x-text_size.x/2, y-text_size.y/2)
+        
+    def _draw_groups(self, dc, groups, ox, oy, width, height, cont=False):
+        smallest_width = width
+        
+        if groups:
+            small = width < 150 # Heuristic
+            group = groups[0]
+            col = self.cols[group]
+            if cont:
+                # This 'group' is a continuation ellipsis
+                rect = wx.Rect(ox, oy, width-1, height-1)
+                dc.SetBrush(wx.Brush(col, wx.SOLID))
+                dc.DrawRectangle(*rect.Get())
+                text_size = dc.GetTextExtent("...")
+                dc.DrawText("...", ox+width/2-text_size.x/2, oy+height/2-text_size.y/2)
+
+                # Continuation ellipsis contains similar box for each group below it                
+                smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, width, height, cont=True)
+            else:
+                num = self.num[group]
+                # Half the width of a normal box (full with of ellipsis box)
+                w = width/min(2*num, 5)
+
+                # Draw first
+                label = self._get_label(group, 0, small)
+                rect = wx.Rect(ox, oy, 2*w-1, height-1)
+                dc.SetBrush(wx.Brush(col, wx.SOLID))
+                dc.DrawRectangle(*rect.Get())
+                text_size = dc.GetTextExtent(label)
+                dc.DrawText(label, ox+w-text_size.x/2, oy+height/2-text_size.y/2)
+                
+                #p.fillRect(ox, oy, 2*w-1, height-1, QtGui.QBrush(QtGui.QColor(*col)))
+                #p.drawText(ox, oy, 2*w-1, height, QtCore.Qt.AlignHCenter, label)
+                # Draw groups inside this group
+                smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*w, height)
+                ox += 2*w
+                
+                # Draw ellipsis if required
+                if num > 2:
+                    smallest_width = self._draw_groups(dc, groups, ox, oy, w, height, cont=True)
+                    ox += w
+
+                # Draw last box if required
+                if num > 1:
+                    label = self._get_label(group, num-1, small)
+                    
+                    rect = wx.Rect(ox, oy, 2*w-1, height-1)
+                    dc.SetBrush(wx.Brush(col, wx.SOLID))
+                    dc.DrawRectangle(*rect.Get())
+                    text_size = dc.GetTextExtent(label)
+                    dc.DrawText(label, ox+w-text_size.x/2, oy+height/2-text_size.y/2)
+
+                    #p.fillRect(ox, oy, 2*w-1, height-1, QtGui.QBrush(QtGui.QColor(*col)))
+                    #p.drawText(ox, oy, 2*w-1, height, QtCore.Qt.AlignHCenter, label)
+                    smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*w, height)
+        
+        return smallest_width
+
 class AslDataPreview(wx.Panel):
     """
     Widget to display a preview of the data ordering selected (i.e. how the volumes in a 4D
     dataset map to TIs, repeats and tag/control pairs)
     """
 
-    def __init__(self, parent, n_tis, n_repeats, tc_pairs, order, tagfirst):
+    def __init__(self, parent, n_tis, repeats, tc_pairs, order, tagfirst):
         wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
         self.Bind(wx.EVT_SIZE, self.on_size)
         self.Bind(wx.EVT_PAINT, self.on_paint)
         self.n_tis = n_tis
-        self.n_repeats = int(n_repeats)
+        self.repeats = repeats
         self.tc_pairs = tc_pairs
         self.tagfirst = tagfirst
         self.order = order
@@ -413,8 +548,11 @@ class AslDataPreview(wx.Panel):
         return wx.Colour(int(r*255), int(g*255), int(b*255))
 
     def on_paint(self, event):
+        """
+        I don't even understand this and I wrote it
+        """
         w, h = self.GetClientSize()
-        N = self.n_tis * int(self.n_repeats)
+        N = sum(self.repeats)
         if self.tc_pairs: N *= 2
         dc = wx.AutoBufferedPaintDC(self)
         dc.Clear()
