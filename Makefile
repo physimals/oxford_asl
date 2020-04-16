@@ -23,7 +23,7 @@ XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil toast
 PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py python/asl/fslwrap.py python/asl/image.py
 PYGUI = python/asl/gui/*.py python/asl/gui/banner.png
-VERSIONED = oxford_asl asl_calib quasil asl_reg toast python/asl/__init__.py
+VERSIONED = oxford_asl asl_calib quasil asl_reg toast 
 
 OBJS = readoptions.o asl_functions.o
 
@@ -45,9 +45,9 @@ $(VERSIONED): %: %.in FORCE
 	chmod a+x $@
 
 postinstallscript: $(PYMODULES) $(PYGUI)
-	mkdir -p $(DESTDIR)/python/asl/gui ; \
-	cp $(PYMODULES) $(DESTDIR)/python/asl/ ; \
-	cp $(PYGUI) $(DESTDIR)/python/asl/gui ; \
+	mkdir -p $(DESTDIR)/python/oxford_asl/gui ; \
+	cp $(PYMODULES) $(DESTDIR)/python/oxford_asl/ ; \
+	cp $(PYGUI) $(DESTDIR)/python/oxford_asl/gui ; \
         cp asl_gui_fsl $(DESTDIR)/bin/asl_gui ; \
 	cd ..
 
@@ -55,4 +55,4 @@ clean:
 	rm -f ${VERSIONED} asl_file *.o
 
 FORCE:
-
+	python python/setup.py

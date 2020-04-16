@@ -9,7 +9,7 @@ for d in [os.environ.get("FSLDIR", None),
     if d:
         sys.path.insert(0, os.path.join(d, "python"))
 
-from asl.gui import main
+from oxford_asl.gui import main
 try:
     main()
 except RuntimeError as e:

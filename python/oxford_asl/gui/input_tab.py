@@ -3,6 +3,8 @@ import sys, os
 import wx
 import wx.grid
 
+import nibabel as nib
+
 from .widgets import TabPage, NumberChooser, NumberList
 
 class AslInputOptions(TabPage):
@@ -15,13 +17,13 @@ class AslInputOptions(TabPage):
  
         self.groups = ["PLDs", "Repeats", "Label/Control pairs"]
         self.abbrevs = ["t", "r", "p"]
+        self.nvols = -1
 
         self.section("Data contents")
 
         self.data_picker = self.file_picker("Input Image", handler=self.set_default_dir)
         self.ntis_int = self.integer("Number of PLDs", min=1,max=100,initial=1)
-        self.nrepeats_label = wx.StaticText(self, label="<Unknown>")
-        self.pack("Number of repeats", self.nrepeats_label)
+        self.repeats_choice = self.choice("Repeats", choices=["Fixed", "Variable"], handler=self.update)
 
         self.section("Data order")
 
@@ -57,6 +59,11 @@ class AslInputOptions(TabPage):
         self.ti_list.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.update)
         self.pack("PLDs (s)", self.ti_list)
         
+        self.nrepeats_list = NumberList(self, self.ntis(), default=1)
+        self.nrepeats_list.span = 3
+        self.nrepeats_list.Bind(wx.grid.EVT_GRID_CELL_CHANGED, self.update)
+        self.pack("Repeats", self.nrepeats_list, enable=False)
+
         self.readout_ch = wx.Choice(self, choices=["3D (eg GRASE)", "2D multi-slice (eg EPI)"])
         self.readout_ch.SetSelection(0)
         self.readout_ch.Bind(wx.EVT_CHOICE, self.update)
@@ -82,9 +89,11 @@ class AslInputOptions(TabPage):
     def tc_pairs(self): return self.tc_ch.checkbox.IsChecked()
     def labelling(self): return self.labelling_ch.GetSelection()
     def bolus_dur_type(self): return self.bolus_dur_ch.GetSelection()
+    def repeats_type(self): return self.repeats_choice.GetSelection()
     def bolus_dur(self): 
         if self.bolus_dur_type() == 0: return [self.bolus_dur_num.GetValue(), ]
         else: return self.bolus_dur_list.GetValues()
+    def repeats(self): return self.nrepeats_list.GetValues()
     def tis(self): 
         tis = self.ti_list.GetValues()
         if self.labelling() == 1:
@@ -103,7 +112,15 @@ class AslInputOptions(TabPage):
         Bit of a hack - set the default dir for other file pickers to the same dir
         as the main data
         """
-        d = os.path.dirname(self.data_picker.GetPath())
+        f = self.data_picker.GetPath()
+        try:
+            self.nvols = nib.load(f).get_data().shape[3]
+        except:
+            # Failed to open file. Various reasons for this
+            # but error will be displayed by the run handler
+            self.nvols = -1
+
+        d = os.path.dirname(f)
         for w in [self.structure.fsl_anat_picker,
                   self.structure.struc_image_picker,
                   self.structure.brain_image_picker,
@@ -134,6 +151,18 @@ class AslInputOptions(TabPage):
         self.bolus_dur_num.Enable(self.bolus_dur_type() == 0)
         self.bolus_dur_list.Enable(self.bolus_dur_type() == 1)
 
+        if self.nvols == -1:
+            # Couldn't find number of volumes in file
+            self.nrepeats_list.set_size(self.ntis(), default=1)
+        else:
+            N = self.ntis() * (2 if self.tc_pairs() else 1)
+            if self.repeats_type() == 0:
+                # Clear out previous list of repeats to make sure number is fixed
+                # Note run handler will detect error if not consistent with number of volumes
+                self.nrepeats_list.set_size(0)
+            self.nrepeats_list.set_size(self.ntis(), default=int(self.nvols / N))
+            self.nrepeats_list.Enable(self.repeats_type() == 1)
+
         self.tc_ch.Enable(self.tc_pairs())
         self.update_groups()
 
@@ -162,7 +191,7 @@ class AslInputOptions(TabPage):
             for c in range(self.bolus_dur_list.n): 
                 self.bolus_dur_list.SetCellValue(0, c, str(self.bolus_dur()[0]))
         event.Skip()
-        
+
     def update_groups(self, group1=True, group2=True):
         """
         This hideous code is to update the choices available in the ordering menus,
