@@ -10,3 +10,4 @@ asl_reg
 quasil
 asl_file
 *.pyc
+python/asl/__init__.py
