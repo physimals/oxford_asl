@@ -33,15 +33,20 @@ Usage() {
     echo " --struct        : T1 structural image (if FSL_ANAT has not been performed)"
     echo " --t1            : Set the value for T1 of tissue {default: 1.3 sec}"
     echo " --t1b           : Set the value for T1 of arterial blood {default: 1.65 sec}"
+    echo " --t2b           : Set the value for T2 of arterial blood {default: 0.122 sec}"
+    echo " --nex           : Set the value for number of excitations (NEX, GE only) {default: 3}"
+    echo " --repeats       : Set the value for number of repeats (non-GE sequences) {default: 1}"
 
     echo " Sequence parameters:"
     echo " --tr            : TR of the calibration image. It needs to be corrected if less than 5.0 sec {default: 5.0 sec}"
+    echo " --te            : Effective TE of the VS ASL sequence {default: 0.0253 s}"
     echo " --tau           : Set bolus duration {default: 1.59 s}"
     echo " --predelay      : Predelay of each readout {default: 1.9 s}"
     echo " --bs_factor     : Efficiency of each backgroun suppression factor {default: 0.95}"
     echo " --bs_n          : Number of background suppression pulses {default: 3}"
     echo " --alpha         : Inversion efficiency {default: 0.8}"
     echo " --lambda        : Blood-water coefficient factor {default: 0.9}"
+    echo " --slicedt  : Set the increase in TI with slice {default: 0 s}"
     echo " --tis           : comma separated list of TI values (currently only support single TI)"
     echo "                   {default: 1.6}"
     echo ""
@@ -86,64 +91,90 @@ until [ -z $1 ]; do
             shift;;
         -m) mask=$argument
             shift;;
-        --calib) calib_data=$argument
-                 trans_status=1 # Need to perform transformation of the calibration image
-            shift;;
-        --transoff) trans_status=0 # No need to perform transformation of the calibration image
-            ;;
-        --tr) TR_calib=$argument # TR of the calibration image (default is 5)
-            shift;;
+        #--calib) calib_data=$argument
+        #         trans_status=1 # Need to perform transformation of the calibration image
+        #    shift;;
+        #--transoff) trans_status=0 # No need to perform transformation of the calibration image
+        #    ;;
+
         --struct) data_struct=$argument
             shift;;
+        --fsl_anat_dir) fsl_anat_dir=$argument
+            shift;;
+
         --t1b) t1b=$argument
             shift;;
         --t1) t1=$argument
             shift;;
-        --infert1) infert1=1
-            ;;
-        --t1wm) t1wm=$argument
+        --t2b) t2b=$argument
+            shift;;
+        --nex) nex=$argument
+            shift;;
+        --repeats) repeats=$argument
+            shift;;
+        --tr) TR_calib=$argument # TR of the calibration image (default is 5)
+            shift;;
+        --te) te=$argument
+            shift;;        
+        --tau) tau=$argument
+            shift;;
+        --predelay) predelay=$argument
+            shift;;
+        --bs_factor) bs_factor=$argument
+            shift;;
+        bs_n) bs_n=$argument
+            shift;;
+        --alpha) alpha=$argument
+            shift;;
+        --lambda) lambda=$argument
             shift;;
         --slicedt) slicedt=$argument
             shift;;
-        --fa) fa=$argument
+        --tis) tis=$argument
             shift;;
-        --lfa) lfa=$argument
-            shift;;
-        --shift) shift_factor=$argument
-            shift;;
-        --break_1) break_1=$argument
-            shift;;
-        --break_2) break_2=$argument
-            shift;;
-        --break_3) break_3=$argument
-            shift;;
-        --disp) disp=$argument
-            shift;;
+
+
+
+        #--infert1) infert1=1
+        #    ;;
+        #--t1wm) t1wm=$argument
+        #    shift;;
+        #--slicedt) slicedt=$argument
+        #    shift;;
+        #--fa) fa=$argument
+        #    shift;;
+        #--lfa) lfa=$argument
+        #    shift;;
+        #--shift) shift_factor=$argument
+        #    shift;;
+        #--break_1) break_1=$argument
+        #    shift;;
+        #--break_2) break_2=$argument
+        #    shift;;
+        #--break_3) break_3=$argument
+        #    shift;;
+        #--disp) disp=$argument
+        #    shift;;
         #--mfree) mfree=1
         #    ;;
         #--edgecorr) isbool=1;
         #   boolarg=edgecorr;
         #   ;;
-        --tis) tis=$argument
-            shift;;
+
         #--iform) iform=$argument # to choose the input form of the data
         #    shift;;
-        --tau) tau=$argument
-            shift;;
-        --corrcal) corrcal=1
-            ;;
-        --alpha) alpha=$argument
-            shift;;
-        --lambda) lambda=$argument
-            shift;;
-        --infertau) infertau=1
-            ;;
-        --taulowest) tau_lowest=$argument
-            shift;;
-        --inferart) infer_arterial=1
-            ;;
-        --pvcorr) pvcorr=1
-            ;;
+
+        #--corrcal) corrcal=1
+        #    ;;
+
+        #--infertau) infertau=1
+        #    ;;
+        #--taulowest) tau_lowest=$argument
+        #    shift;;
+        #--inferart) infer_arterial=1
+        #    ;;
+        #--pvcorr) pvcorr=1
+        #    ;;
         #--pvgm) pvgm_highres=$argument
             #shift;;
         #--pvwm) pvwm_highres=$argument
@@ -153,8 +184,8 @@ until [ -z $1 ]; do
         #--fslanat) fslanat=$argument # Directory containing the output from fsl_anat
         #    shift;;
 
-        --ccmds) calibcmds=$argument
-            shift;;
+        #--ccmds) calibcmds=$argument
+        #    shift;;
         --debug) debug=1 #debugging option
             ;;
         --version) Version
