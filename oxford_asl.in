@@ -316,7 +316,7 @@ Registration() {
 
 	if [ ! -z $trans ]; then
 	    # compute the transformation needed to standard space if we have the relvant structural to standard transform
-	    convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struc.mat
+	    convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struct.mat
 	fi
 	    
     else

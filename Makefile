@@ -21,8 +21,8 @@ LIBS = -lutils -lnewimage -lmiscmaths -lprob ${MATLIB} ${NIFTILIB} -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil toast
-PYMODULES = python/asl/__init__.py python/asl/fslhelpers.py python/asl/reg.py python/asl/fslwrap.py python/asl/image.py
-PYGUI = python/asl/gui/*.py python/asl/gui/banner.png
+PYMODULES = python/oxford_asl/__init__.py python/oxford_asl/_version.py
+PYGUI = python/oxford_asl/gui/*.py python/oxford_asl/gui/banner.png
 VERSIONED = oxford_asl asl_calib quasil asl_reg toast 
 
 OBJS = readoptions.o asl_functions.o
@@ -55,4 +55,4 @@ clean:
 	rm -f ${VERSIONED} asl_file *.o
 
 FORCE:
-	python python/setup.py
+	fslpython python/setup.py build
