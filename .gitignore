@@ -11,5 +11,7 @@ quasil
 asl_file
 toast
 *.pyc
-python/asl/__init__.py
 feeds/output
+dist
+*.egg-info
+.vscode
