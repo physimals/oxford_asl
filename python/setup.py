@@ -91,7 +91,7 @@ kwargs = {
     },
     'entry_points' : {
         'gui_scripts' : [
-            "asl_gui=oxford_asl.gui:main",
+            "asl_gui=oxford_asl.gui.main:main",
         ],
     },
     'classifiers' : [

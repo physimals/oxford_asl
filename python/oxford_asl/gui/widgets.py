@@ -1,26 +1,25 @@
-import sys
+"""
+BASIL GUI for Oxford ASL - Base classes for pages in the tab notebook
+
+Copyright (C) 2020 University of Oxford
+"""
 import os
-import colorsys
 
 import wx
 import wx.grid
 
-import matplotlib
-matplotlib.use('WXAgg')
-from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg as FigureCanvas
-from matplotlib.figure import Figure
+from . import OptionComponent
 
-import numpy as np
-
-class TabPage(wx.Panel):
+class TabPage(wx.Panel, OptionComponent):
     """
     Shared methods used by the various tab pages in the GUI
     """
-    def __init__(self, parent, title, idx, n, name=None):
-        wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
-        self.notebook = parent
-        self.idx = idx
-        self.n = n
+    def __init__(self, app, notebook, title, tab_idx, num_tabs, name=None):
+        OptionComponent.__init__(self, app)
+        wx.Panel.__init__(self, parent=notebook, id=wx.ID_ANY)
+        self.notebook = notebook
+        self.tab_idx = tab_idx
+        self.num_tabs = num_tabs
         self.sizer = wx.GridBagSizer(vgap=5, hgap=5)
         self.row = 0
         self.title = title
@@ -28,35 +27,35 @@ class TabPage(wx.Panel):
             self.name = title.lower()
         else:
             self.name = name
-            
-    def next_prev(self):
+
+    def add_next_prev_btn(self):
         """
         Add next/previous buttons
         """
-        if self.idx < self.n-1: 
-            self.next_btn = wx.Button(self, label="Next", id=wx.ID_FORWARD)
-            self.next_btn.Bind(wx.EVT_BUTTON, self.next)
+        if self.tab_idx < self.num_tabs-1:
+            next_btn = wx.Button(self, label="Next", id=wx.ID_FORWARD)
+            next_btn.Bind(wx.EVT_BUTTON, self._next)
         else:
-            self.next_btn = wx.StaticText(self, label="")
+            next_btn = wx.StaticText(self, label="")
 
-        if self.idx > 0:
-            self.prev_btn = wx.Button(self, label="Previous", id=wx.ID_BACKWARD)
-            self.prev_btn.Bind(wx.EVT_BUTTON, self.prev)
+        if self.tab_idx > 0:
+            prev_btn = wx.Button(self, label="Previous", id=wx.ID_BACKWARD)
+            prev_btn.Bind(wx.EVT_BUTTON, self._prev)
         else:
-            self.prev_btn = wx.StaticText(self, label="")
+            prev_btn = wx.StaticText(self, label="")
 
         self.pack(" ")
         self.sizer.AddGrowableRow(self.row-1, 1)
-        self.sizer.Add(self.prev_btn, pos=(self.row, 0), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_LEFT)
+        self.sizer.Add(prev_btn, pos=(self.row, 0), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_LEFT)
         self.sizer.Add(wx.StaticText(self, label=""), pos=(self.row, 1), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_LEFT)
         self.sizer.Add(wx.StaticText(self, label=""), pos=(self.row, 2), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_LEFT)
-        self.sizer.Add(self.next_btn, pos=(self.row, 3), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_RIGHT)
+        self.sizer.Add(next_btn, pos=(self.row, 3), border=10, flag=wx.ALIGN_CENTRE_VERTICAL | wx.ALIGN_RIGHT)
 
-    def next(self, evt):
-        self.notebook.SetSelection(self.idx+1)
+    def _next(self, _evt):
+        self.notebook.SetSelection(self.tab_idx+1)
 
-    def prev(self, evt):
-        self.notebook.SetSelection(self.idx-1)
+    def _prev(self, _evt):
+        self.notebook.SetSelection(self.tab_idx-1)
 
     def pack(self, label, *widgets, **kwargs):
         """
@@ -71,7 +70,7 @@ class TabPage(wx.Panel):
             font.SetPointSize(kwargs["size"])
         if kwargs.get("bold", False):
             font.SetWeight(wx.BOLD)
-        
+
         if label != "":
             text = wx.StaticText(self, label=label)
             text.SetFont(font)
@@ -80,62 +79,87 @@ class TabPage(wx.Panel):
         else:
             text = None
 
-        for w in widgets:
+        for widget in widgets:
             span = (1, 1)
-            w.label = text
-            if hasattr(w, "span"): span = (1, w.span)
-            w.SetFont(font)
-            w.Enable(col == 0 or kwargs.get("enable", True))
-            self.sizer.Add(w, pos=(self.row, col), border=border, flag=wx.ALIGN_CENTRE_VERTICAL | wx.EXPAND | wx.LEFT, span=span)
+            widget.label = text
+            if hasattr(widget, "span"):
+                span = (1, widget.span)
+            widget.SetFont(font)
+            widget.Enable(col == 0 or kwargs.get("enable", True))
+            self.sizer.Add(widget, pos=(self.row, col), border=border, flag=wx.ALIGN_CENTRE_VERTICAL | wx.EXPAND | wx.LEFT, span=span)
             col += span[1]
         self.row += 1
 
-    def file_picker(self, label, dir=False, handler=None, optional=False, initial_on=False, pack=True, **kwargs):
+    def file_picker(self, label, pick_dir=False, handler=None, optional=False, initial_on=False, pack=True, **kwargs):
         """
         Add a file picker to the tab
         """
-        if not handler: handler = self.update
-        if dir: 
+        if not handler:
+            handler = self.state_changed
+        if pick_dir:
             picker = wx.DirPickerCtrl(self, style=wx.DIRP_USE_TEXTCTRL)
             picker.Bind(wx.EVT_DIRPICKER_CHANGED, handler)
-        else: 
+        else:
             picker = wx.FilePickerCtrl(self)
             picker.Bind(wx.EVT_FILEPICKER_CHANGED, handler)
         picker.span = 2
         if optional:
-            cb = wx.CheckBox(self, label=label)
-            cb.SetValue(initial_on)
-            cb.Bind(wx.EVT_CHECKBOX, handler)
-            picker.checkbox = cb
-            if pack: self.pack("", cb, picker, enable=initial_on, **kwargs)
+            checkbox = wx.CheckBox(self, label=label)
+            checkbox.SetValue(initial_on)
+            checkbox.Bind(wx.EVT_CHECKBOX, self._checkbox_toggle_cb(checkbox, picker))
+            picker.checkbox = checkbox
+            if pack:
+                self.pack("", checkbox, picker, enable=initial_on, **kwargs)
         elif pack:
             self.pack(label, picker, **kwargs)
 
         return picker
 
+    def set_picker_dir(self, filepicker, fpath):
+        """
+        Set the initial directory for a file or dir picker
+
+        :param fpath: Path to file or directory
+        """
+        dirname = os.path.dirname(fpath)
+        try:
+            filepicker.SetInitialDirectory(dirname)
+        except AttributeError:
+            # WX version dependent - so try alternate name
+            filepicker.SetPath(dirname)
+
+    def _checkbox_toggle_cb(self, checkbox, widget):
+        def _toggled(_event):
+            widget.Enable(checkbox.IsChecked())
+            self.state_changed(_event)
+        return _toggled
+
     def choice(self, label, choices, initial=0, optional=False, initial_on=False, handler=None, pack=True, **kwargs):
         """
         Add a widget to choose from a fixed set of options
         """
-        if not handler: handler = self.update
-        ch = wx.Choice(self, choices=choices)
-        ch.SetSelection(initial)
-        ch.Bind(wx.EVT_CHOICE, handler)
+        if not handler:
+            handler = self.state_changed
+        choice = wx.Choice(self, choices=choices)
+        choice.SetSelection(initial)
+        choice.Bind(wx.EVT_CHOICE, handler)
         if optional:
-            cb = wx.CheckBox(self, label=label)
-            cb.SetValue(initial_on)
-            cb.Bind(wx.EVT_CHECKBOX, self.update)
-            ch.checkbox = cb
-            if pack: self.pack("", cb, ch, enable=initial_on, **kwargs)
+            checkbox = wx.CheckBox(self, label=label)
+            checkbox.SetValue(initial_on)
+            checkbox.Bind(wx.EVT_CHECKBOX, self.state_changed)
+            choice.checkbox = checkbox
+            if pack:
+                self.pack("", checkbox, choice, enable=initial_on, **kwargs)
         elif pack:
-            self.pack(label, ch, **kwargs)
-        return ch
+            self.pack(label, choice, **kwargs)
+        return choice
 
     def number(self, label, handler=None, **kwargs):
         """
         Add a widget to choose a floating point number
         """
-        if not handler: handler = self.update
+        if not handler:
+            handler = self.state_changed
         num = NumberChooser(self, changed_handler=handler, **kwargs)
         num.span = 2
         self.pack(label, num, **kwargs)
@@ -145,24 +169,28 @@ class TabPage(wx.Panel):
         """
         Add a widget to choose an integer
         """
-        if not handler: handler = self.update
+        if not handler:
+            handler = self.state_changed
         spin = wx.SpinCtrl(self, **kwargs)
         spin.SetValue(kwargs.get("initial", 0))
         spin.Bind(wx.EVT_SPINCTRL, handler)
-        if pack: self.pack(label, spin)
+        if pack:
+            self.pack(label, spin)
         return spin
 
     def checkbox(self, label, initial=False, handler=None, **kwargs):
         """
         Add a simple on/off option
         """
-        cb = wx.CheckBox(self, label=label)
-        cb.span=2
-        cb.SetValue(initial)
-        if handler: cb.Bind(wx.EVT_CHECKBOX, handler)
-        else: cb.Bind(wx.EVT_CHECKBOX, self.update)
-        self.pack("", cb, **kwargs)
-        return cb
+        checkbox = wx.CheckBox(self, label=label)
+        checkbox.span = 2
+        checkbox.SetValue(initial)
+        if handler:
+            checkbox.Bind(wx.EVT_CHECKBOX, handler)
+        else:
+            checkbox.Bind(wx.EVT_CHECKBOX, self.state_changed)
+        self.pack("", checkbox, **kwargs)
+        return checkbox
 
     def section(self, label):
         """
@@ -170,473 +198,221 @@ class TabPage(wx.Panel):
         """
         self.pack(label, bold=True)
 
-    def update(self, evt=None):
-        """
-        Update the run module, i.e. when options have changed
-        """
-        if hasattr(self, "run"): 
-            self.run.update()
-            if hasattr(self, "preview"): self.preview.run = self.run
+class WhitePaperCompatibility(OptionComponent, wx.Panel):
+    """
+    Widget for displaying White Paper compatibility and resetting defaults
+
+    White Paper compatibility is defined by:
+      - Voxelwise calibration
+      - Fixed T1 of 1.65
+      - Arterial transit time of 0
+
+    In addition, white paper mode was defined for single-PLD data and therefore no inference of ATT
+    """
+
+    def __init__(self, app, parent):
+        OptionComponent.__init__(self, app)
+        wx.Panel.__init__(self, parent)
+        self._wp = False
+        self._issues = []
+        self._img_compatible = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp_tick.png")
+        self._img_incompatible = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp_cross.png")
+        
+        self.hbox = wx.BoxSizer(wx.HORIZONTAL)
+
+        self._img = wx.Panel(self, size=(48, 48))
+        self.hbox.Add(self._img)
+
+        status_panel = wx.Panel(self)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        status_panel.SetSizer(vbox)
+
+        self._label = wx.StaticText(status_panel, label="")
+        vbox.Add(self._label)
+
+        btn_panel = wx.Panel(status_panel)
+        btn_hbox = wx.BoxSizer(wx.HORIZONTAL)
+        self._reset_btn = wx.Button(btn_panel, label="Make compatible")
+        self._reset_btn.Bind(wx.EVT_BUTTON, self._make_compatible)
+        btn_hbox.Add(self._reset_btn)
+        self._view_btn = wx.Button(btn_panel, label="View issues")
+        self._view_btn.Bind(wx.EVT_BUTTON, self._view_issues)
+        btn_hbox.Add(self._view_btn)
+        btn_panel.SetSizer(btn_hbox)
+        vbox.Add(btn_panel)
+        
+        self._warn = wx.StaticText(status_panel, label="")
+        self._warn.SetForegroundColour(wx.Colour(255, 0, 0))
+        vbox.Add(self._warn)
+
+        self.hbox.Add(status_panel, wx.EXPAND)
+        self.SetSizer(self.hbox)
+
+    def options(self):
+        return {"wp" : self._wp}
+
+    def option_changed(self, options, key, value):
+        self._issues = self._get_issues(options)
+
+        if len(self._issues) == 0:
+            wx.StaticBitmap(self._img, -1, wx.Bitmap(self._img_compatible, wx.BITMAP_TYPE_ANY))
+            self._label.SetLabel("Analysis is compatible with white paper (Alsop et al 2004)")
+            self._wp = True
+        else:
+            wx.StaticBitmap(self._img, -1, wx.Bitmap(self._img_incompatible, wx.BITMAP_TYPE_ANY))
+            self._label.SetLabel("Analysis is not compatible with white paper (Alsop et al 2004)")
+            self._wp = False
+
+        if not self._issues and options["_ntis"] > 1:
+            self._warn.SetLabel("Warning: White paper was intended single TI/PLD data")
+        else:
+            self._warn.SetLabel("")
+
+        self._reset_btn.Enable(not self._wp)
+        self._view_btn.Enable(not self._wp)
+
+    def _get_issues(self, options):
+        issues = []
+        if "c" not in options:
+            issues.append(("Calibration image is not provided - results will not be quantitative", "Calibration will be turned on"))
+        elif options["cmethod"] != "voxel":
+            issues.append(("White paper specifies voxelwise calibration - you are using reference region", "Calibration method will be switched to voxelwise"))
+
+        return issues
+            
+    def _make_compatible(self, _event=None):
+        fix_list = "\n".join(["%i. %s" % (idx+1, issue[1]) for idx, issue in enumerate(self._issues)])
+        message = "The following changes will be made:\n\n" + fix_list
+        ret = wx.MessageBox(message, "Make analysis WP compatible", wx.OK | wx.CANCEL | wx.ICON_INFORMATION)  
+        if ret == wx.OK:
+            self._wp = True
+            self.state_changed()
+
+    def _view_issues(self, _event=None):
+        issue_list = "\n".join(["%i. %s" % (idx+1, issue[0]) for idx, issue in enumerate(self._issues)])
+        message = "The current analysis is not WP compatible for the following reasons:\n\n" + issue_list
+        wx.MessageBox(message, "Reasons for WP incompatibility", wx.OK | wx.ICON_INFORMATION)  
 
 class NumberChooser(wx.Panel):
     """
     Widget for choosing a floating point number
     """
 
-    def __init__(self, parent, label=None, min=0, max=1, initial=0.5, step=0.1, digits=2, changed_handler=None):
+    def __init__(self, parent, label=None, minval=0, maxval=1, initial=0.5, step=0.1, digits=2, changed_handler=None):
         super(NumberChooser, self).__init__(parent)
-        self.min, self.orig_min, self.max, self.orig_max = min, min, max, max
+        self.minval, self.orig_minval, self.maxval, self.orig_maxval = minval, minval, maxval, maxval
         self.handler = changed_handler
-        self.hbox=wx.BoxSizer(wx.HORIZONTAL)
+        self.hbox = wx.BoxSizer(wx.HORIZONTAL)
         if label is not None:
             self.label = wx.StaticText(self, label=label)
             self.hbox.Add(self.label, proportion=0, flag=wx.ALIGN_CENTRE_VERTICAL)
         # Set a very large maximum as we want to let the user override the default range
-        #self.spin = wx.SpinCtrl(self, min=0, max=100000, initial=initial)
-        #self.spin.Bind(wx.EVT_SPINCTRL, self.spin_changed)
+        #self.spin = wx.SpinCtrl(self, minval=0, maxval=100000, initial=initial)
+        #self.spin.Bind(wx.EVT_SPINCTRL, self._spin_changed)
         self.spin = wx.SpinCtrlDouble(self, min=0, max=100000, inc=step, initial=initial)
         self.spin.SetDigits(digits)
-        self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self.spin_changed)
+        self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self._spin_changed)
         self.slider = wx.Slider(self, value=initial, minValue=0, maxValue=100)
-        self.slider.SetValue(100*(initial-self.min)/(self.max-self.min))
-        self.slider.Bind(wx.EVT_SLIDER, self.slider_changed)
+        self.slider.SetValue(100*(initial-self.minval)/(self.maxval-self.minval))
+        self.slider.Bind(wx.EVT_SLIDER, self._slider_changed)
         self.hbox.Add(self.slider, proportion=1, flag=wx.EXPAND | wx.ALIGN_CENTRE_VERTICAL)
         self.hbox.Add(self.spin, proportion=0, flag=wx.EXPAND | wx.ALIGN_CENTRE_VERTICAL)
         self.SetSizer(self.hbox)
 
     def GetValue(self):
+        """
+        Get the currently selected number
+        """
         return self.spin.GetValue()
-        
+
     def SetValue(self, val):
+        """
+        Set the selected number
+        """
         self.spin.SetValue(val)
-        self.slider.SetValue(100*(val-self.min)/(self.max-self.min))
-        
-    def slider_changed(self, event):
-        v = event.GetInt()
-        val = self.min + (self.max-self.min)*float(v)/100
+        self.slider.SetValue(100*(val-self.minval)/(self.maxval-self.minval))
+
+    def _slider_changed(self, event):
+        slider_pos = event.GetInt()
+        val = self.minval + (self.maxval-self.minval)*float(slider_pos)/100
         self.spin.SetValue(val)
-        if self.handler: self.handler(event)
+        if self.handler:
+            self.handler(event)
         event.Skip()
 
-    def spin_changed(self, event):
+    def _spin_changed(self, event):
         """ If user sets the spin outside the current range, update the slider range
         to match. However if they go back inside the current range, revert to this for
         the slider"""
         val = event.GetValue()
-        if val < self.min: 
-            self.min = val
-        elif val > self.orig_min:
-            self.min = self.orig_min
-        if val > self.max: 
-            self.max = val
-        elif val < self.orig_max:
-            self.max = self.orig_max
-        self.slider.SetValue(100*(val-self.min)/(self.max-self.min))
-        if self.handler: self.handler(event)
+        if val < self.minval:
+            self.minval = val
+        elif val > self.orig_minval:
+            self.minval = self.orig_minval
+        if val > self.maxval:
+            self.maxval = val
+        elif val < self.orig_maxval:
+            self.maxval = self.maxval
+        self.slider.SetValue(100*(val-self.minval)/(self.maxval-self.minval))
+        if self.handler:
+            self.handler()
         event.Skip()
-        
+
 class NumberList(wx.grid.Grid):
     """
     Widget for specifying a list of numbers
     """
 
-    def __init__(self, parent, n, default=1.8):
+    def __init__(self, parent, size, default=1.8):
         super(NumberList, self).__init__(parent, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0)
-        self.n=0
+        self.size = 0
         self.default = default
         self.CreateGrid(1, 0)
         self.SetRowLabelSize(0)
         self.SetColLabelSize(0)
-        self.set_size(n)
-        self.Bind(wx.EVT_SIZE, self.on_size)
+        self.SetSize(size)
+        self.Bind(wx.EVT_SIZE, self._on_size)
 
     def GetValues(self):
+        """
+        :return: Sequence of values in the list
+        """
         try:
-            return [float(self.GetCellValue(0, c)) for c in range(self.n)]
-        except ValueError as e:
+            return [float(self.GetCellValue(0, c)) for c in range(self.size)]
+        except ValueError:
             raise RuntimeError("Non-numeric values in number list")
-            
-    def set_size(self, n, default=None):
-        if default is None:
-            if self.n == 0: default = self.default
-            else: default = self.GetCellValue(0, self.n-1)
-        if n > self.n:
-            self.AppendCols(n - self.n)
-            for c in range(self.n, n): self.SetCellValue(0, c, str(default))
-        elif n < self.n:
-            self.DeleteCols(n, self.n-n)
-        self.n = n
-        self.resize_cols()
 
-    def resize_cols(self):
-        if self.n == 0:
+    def SetSize(self, size, default=None):
+        """
+        Set the size of the number list
+
+        :param size: Number of items in list
+        :param default: Default value to use for newly created columns. If not specified
+                        uses default defined in constructor
+        """
+        if default is None:
+            if self.size == 0:
+                default = self.default
+            else:
+                default = self.GetCellValue(0, self.size-1)
+        if size > self.size:
+            self.AppendCols(size - self.size)
+            for col in range(self.size, size):
+                self.SetCellValue(0, col, str(default))
+        elif size < self.size:
+            self.DeleteCols(size, self.size-size)
+        self.size = size
+        self._resize_cols()
+
+    def _resize_cols(self):
+        if self.size == 0:
             return
 
-        w, h = self.GetClientSize()
-        cw = w / self.n
-        for i in range(self.n):
-            self.SetColSize(i, cw)
+        width, _height = self.GetClientSize()
+        col_width = width / self.size
+        for i in range(self.size):
+            self.SetColSize(i, col_width)
 
-    def on_size(self, event):
+    def _on_size(self, event):
         event.Skip()
-        self.resize_cols()
-
-class PreviewPanel(wx.Panel):
-    """
-    Panel providing a simple image preview for the output of ASL_FILE.
-
-    Used so user can check their choice of data grouping/ordering looks right
-    """
-    def __init__(self, parent):
-        wx.Panel.__init__(self, parent, size=wx.Size(300, 600))
-        self.data = None
-        self.run = None
-        self.slice = -1
-        self.nslices = 1
-        self.view = 0
-        self.figure = Figure(figsize=(3.5, 3.5), dpi=100, facecolor='black')
-        self.axes = self.figure.add_subplot(111, facecolor='black')
-        self.axes.get_xaxis().set_ticklabels([])
-        self.axes.get_yaxis().set_ticklabels([])          
-        self.canvas = FigureCanvas(self, -1, self.figure)
-        self.canvas.mpl_connect('scroll_event', self.scroll)
-        self.canvas.mpl_connect('button_press_event', self.view_change)
-        self.sizer = wx.BoxSizer(wx.VERTICAL)
-        font = self.GetFont()
-        font.SetWeight(wx.BOLD)
-        text = wx.StaticText(self, label="Data preview - perfusion weighted image")
-        text.SetFont(font)
-        self.sizer.AddSpacer(10)
-        self.sizer.Add(text, 0)   
-        self.sizer.Add(self.canvas, 2, border=5, flag = wx.EXPAND | wx.ALL)
-
-        hbox = wx.BoxSizer(wx.HORIZONTAL)
-        hbox.Add(wx.StaticText(self, label="Use scroll wheel to change slice, double click to change view"), 0, flag=wx.ALIGN_CENTRE_VERTICAL)      
-        self.update_btn = wx.Button(self, label="Update")
-        self.update_btn.Bind(wx.EVT_BUTTON, self.update)
-        hbox.Add(self.update_btn)
-        self.sizer.Add(hbox)
-
-        self.sizer.AddSpacer(10)
-        text = wx.StaticText(self, label="Data order preview")
-        text.SetFont(font)
-        self.sizer.Add(text, 0)
-        self.order_preview = AslDataPreview2(self, 1, [1], True, "trp", True)
-        self.sizer.Add(self.order_preview, 2, wx.EXPAND)
-        self.SetSizer(self.sizer)
-        self.Layout()
-
-    def update(self, evt):
-        """
-        Update the preview. This is called explicitly when the user clicks the update
-        button as it involves calling ASL_FILE and may be slow
-        """
-        self.data = None
-        if self.run is not None:
-            self.data = self.run.get_preview_data()
-            # If multi-TI data, take mean over volumes
-            if self.data is not None and len(self.data.shape) == 4:
-                self.data = np.mean(self.data, axis=3)
-                
-        if self.data is not None:
-            self.view = 0
-            self.init_view()
-        self.redraw()
-
-    def init_view(self):
-        self.nslices = self.data.shape[2-self.view]
-        self.slice = int(self.nslices / 2)
-        self.redraw()
-
-    def redraw(self):
-        """
-        Redraw the preview image
-        """
-        self.axes.clear() 
-        if self.data is None: return
-        if self.view == 0:
-            sl = self.data[:,:,self.slice]
-        elif self.view == 1:
-            sl = self.data[:,self.slice,:]
-        else:
-            sl = self.data[self.slice,:,:]
-
-        i = self.axes.imshow(sl.T, interpolation="nearest", vmin=sl.min(), vmax=sl.max())
-        self.axes.set_ylim(self.axes.get_ylim()[::-1])
-        i.set_cmap("gray")
-        self.Layout()
-
-    def view_change(self, event):
-        """
-        Called on mouse click event. Double click changes the view direction and redraws
-        """
-        if self.data is None: return
-        if event.dblclick:
-            self.view = (self.view + 1) % 3
-            self.init_view()
-            self.redraw()
-
-    def scroll(self, event):
-        """
-        Called on mouse scroll wheel to move through the slices in the current view
-        """
-        if event.button == "up":
-            if self.slice != self.nslices-1: self.slice += 1
-        else:
-            if self.slice != 0: self.slice -= 1
-        self.redraw()
-
-ORDER_LABELS = {
-    "r" : ("Repeat ", "R"), 
-    "t" : ("TI ", "TI"),
-    "p" : {
-        "tc" : (("Label", "Control"), ("L", "C")),
-        "ct" : (("Control", "Label"), ("C", "L")),
-    }
-}
-
-class AslDataPreview2(wx.Panel):
-    """
-    Visual preview of the structure of an ASL data set
-    """
-    
-    def __init__(self, parent, ntis, repeats, tc_pairs, order, tagfirst):
-        wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
-        self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
-        self.Bind(wx.EVT_SIZE, self.on_size)
-        self.Bind(wx.EVT_PAINT, self.on_paint)
-        self.ntis = ntis
-        self.repeats = repeats
-        self.tc_pairs = tc_pairs
-        self.tagfirst = tagfirst
-        self.order = order
-        self.tis_name = "PLDs"
-
-        self.hfactor = 0.95
-        self.vfactor = 0.95
-        self.cols = {
-            "r" : wx.Colour(128, 128, 255), 
-            "t" : wx.Colour(255, 128, 128), 
-            "p" : wx.Colour(128, 255, 128),
-        }
-        self.num = {"t" : ntis, "r" : repeats[0], "p" : 2 if tc_pairs else 1}
-
-    def on_size(self, event):
-        event.Skip()
-        self.Refresh()
-
-    def on_paint(self, event):
-        self.num = {"t" : self.ntis, "r" : self.repeats[0], "p" : 2 if self.tc_pairs else 1}
-
-        if not self.tc_pairs: order = self.order.replace("p", "")
-        else: order = self.order
-
-        w, h = self.GetClientSize()
-        group_height = 0.8*self.vfactor*h / len(order)
-        group_width = self.hfactor*w
-        ox = w*(1-self.hfactor)/2
-        oy = h*(1-self.vfactor)/2
-        
-        dc = wx.AutoBufferedPaintDC(self)
-        dc.Clear()
-        nvols = int(sum(self.repeats) * (2 if self.tc_pairs else 1))
-        smallest_group_width = self._draw_groups(dc, order[::-1], ox, oy, group_width, group_height)
-        self._centered_text(dc, "Input data volumes", ox+group_width/2, oy+0.9*h)
-        self._centered_text(dc, "1", ox+smallest_group_width/2, oy+0.85*h)
-        self._centered_text(dc, str(nvols), ox+group_width-smallest_group_width/2, oy+0.85*h)
-
-    def _get_label(self, code, num, short):
-        labels = ORDER_LABELS[code]
-        if isinstance(labels, dict):
-            iaf = "tc" if self.tagfirst else "ct"
-            labels = labels[iaf]
-        label = labels[int(short)]
-        if isinstance(label, tuple):
-            return label[num]
-        else:
-            return label + str(int(num+1))
-        
-    def _centered_text(self, dc, text, x, y):
-        text_size = dc.GetTextExtent(text)
-        dc.DrawText(text, x-text_size.x/2, y-text_size.y/2)
-        
-    def _draw_groups(self, dc, groups, ox, oy, width, height, cont=False):
-        smallest_width = width
-        
-        if groups:
-            small = width < 150 # Heuristic
-            group = groups[0]
-            col = self.cols[group]
-            if cont:
-                # This 'group' is a continuation ellipsis
-                rect = wx.Rect(ox, oy, width-1, height-1)
-                dc.SetBrush(wx.Brush(col, wx.SOLID))
-                dc.DrawRectangle(*rect.Get())
-                text_size = dc.GetTextExtent("...")
-                dc.DrawText("...", ox+width/2-text_size.x/2, oy+height/2-text_size.y/2)
-
-                # Continuation ellipsis contains similar box for each group below it                
-                smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, width, height, cont=True)
-            else:
-                num = self.num[group]
-                # Half the width of a normal box (full with of ellipsis box)
-                w = width/min(2*num, 5)
-
-                # Draw first
-                label = self._get_label(group, 0, small)
-                rect = wx.Rect(ox, oy, 2*w-1, height-1)
-                dc.SetBrush(wx.Brush(col, wx.SOLID))
-                dc.DrawRectangle(*rect.Get())
-                text_size = dc.GetTextExtent(label)
-                dc.DrawText(label, ox+w-text_size.x/2, oy+height/2-text_size.y/2)
-                
-                #p.fillRect(ox, oy, 2*w-1, height-1, QtGui.QBrush(QtGui.QColor(*col)))
-                #p.drawText(ox, oy, 2*w-1, height, QtCore.Qt.AlignHCenter, label)
-                # Draw groups inside this group
-                smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*w, height)
-                ox += 2*w
-                
-                # Draw ellipsis if required
-                if num > 2:
-                    smallest_width = self._draw_groups(dc, groups, ox, oy, w, height, cont=True)
-                    ox += w
-
-                # Draw last box if required
-                if num > 1:
-                    label = self._get_label(group, num-1, small)
-                    
-                    rect = wx.Rect(ox, oy, 2*w-1, height-1)
-                    dc.SetBrush(wx.Brush(col, wx.SOLID))
-                    dc.DrawRectangle(*rect.Get())
-                    text_size = dc.GetTextExtent(label)
-                    dc.DrawText(label, ox+w-text_size.x/2, oy+height/2-text_size.y/2)
-
-                    #p.fillRect(ox, oy, 2*w-1, height-1, QtGui.QBrush(QtGui.QColor(*col)))
-                    #p.drawText(ox, oy, 2*w-1, height, QtCore.Qt.AlignHCenter, label)
-                    smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*w, height)
-        
-        return smallest_width
-
-class AslDataPreview(wx.Panel):
-    """
-    Widget to display a preview of the data ordering selected (i.e. how the volumes in a 4D
-    dataset map to TIs, repeats and tag/control pairs)
-    """
-
-    def __init__(self, parent, n_tis, repeats, tc_pairs, order, tagfirst):
-        wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
-        self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
-        self.Bind(wx.EVT_SIZE, self.on_size)
-        self.Bind(wx.EVT_PAINT, self.on_paint)
-        self.n_tis = n_tis
-        self.repeats = repeats
-        self.tc_pairs = tc_pairs
-        self.tagfirst = tagfirst
-        self.order = order
-        self.tis_name = "PLDs"
-
-    def on_size(self, event):
-        event.Skip()
-        self.Refresh()
-
-    def get_col(self, pos, ti):
-        if ti: h = 170.0/255
-        else: 
-            h = 90.0/255
-        s, v = 0.5, 0.95 - pos/2
-        r,g,b = colorsys.hsv_to_rgb(h, s, v)
-        return wx.Colour(int(r*255), int(g*255), int(b*255))
-
-    def on_paint(self, event):
-        """
-        I don't even understand this and I wrote it
-        """
-        w, h = self.GetClientSize()
-        N = sum(self.repeats)
-        if self.tc_pairs: N *= 2
-        dc = wx.AutoBufferedPaintDC(self)
-        dc.Clear()
-
-        leg_width = (w-100)/4
-        leg_start = 50
-
-        dc.SetBrush(wx.TRANSPARENT_BRUSH)
-        rect = wx.Rect(leg_start, 20, leg_width/4, 20)
-        dc.GradientFillLinear(rect, self.get_col(0, True), self.get_col(1.0, True), wx.EAST)
-        dc.DrawRectangle(*rect.Get())
-        dc.DrawText(self.tis_name, leg_start+leg_width/3, 20)
-
-        rect = wx.Rect(leg_start+leg_width, 20, leg_width/4, 20)
-        dc.GradientFillLinear(rect, self.get_col(0, False), self.get_col(1.0, False), wx.EAST)
-        dc.DrawRectangle(*rect.Get())
-        dc.DrawText("Repeats", leg_start+4*leg_width/3, 20)
-
-        if self.tc_pairs:
-            dc.SetBrush(wx.TRANSPARENT_BRUSH)
-            dc.DrawRectangle(leg_start+leg_width*2, 20, leg_width/4, 20)
-            dc.DrawText("Label", leg_start+7*leg_width/3, 20)
-
-            b = wx.Brush('black', wx.BDIAGONAL_HATCH)
-            dc.SetBrush(b)
-            dc.DrawRectangle(leg_start+leg_width*3, 20, leg_width/4, 20)
-            dc.DrawText("Control", leg_start+10*leg_width/3, 20)
-
-        dc.DrawRectangle(50, 50, w-100, h-100)
-        dc.DrawRectangle(50, 50, w-100, h-100)
-        dc.DrawText("0", 50, h-50)
-        dc.DrawText(str(N), w-50, h-50)
-
-        seq = [1,]
-        for t in self.order[::-1]:
-            temp = seq
-            seq = []
-            for i in temp:
-                if t == "t":
-                    seq += [i,] * self.n_tis
-                elif t == "p":
-                    if not self.tc_pairs:
-                        seq.append(i)
-                    elif self.tagfirst:
-                        seq.append(i)
-                        seq.append(i+1)
-                    else:
-                        seq.append(i+1)
-                        seq.append(i)
-                elif t == "r":
-                    seq.append(i)
-                    seq += [i+2,] * (int(self.n_repeats) - 1)
-        
-        tistart = -1
-        ti_sep = 1
-        for idx, s in enumerate(seq):
-            if s == 1 and tistart < 0: 
-                tistart = idx
-            elif s == 1:
-                ti_sep = idx - tistart
-                break
-
-        bwidth = float(w - 100) / N
-        x = 50
-        pos = 0.0
-        ti = 0
-        d = 1.0/self.n_tis
-        for idx, s in enumerate(seq):
-            dc.SetPen(wx.TRANSPARENT_PEN)
-            b = wx.Brush(self.get_col(pos, s in (1, 2)), wx.SOLID)
-            dc.SetBrush(b)
-            dc.DrawRectangle(int(x), 50, int(bwidth+1), h-100)
-
-            if s in (2, 4):
-                b = wx.Brush('black', wx.BDIAGONAL_HATCH)
-                dc.SetBrush(b)
-                dc.DrawRectangle(int(x), 50, int(bwidth+1), h-100)
-
-            dc.SetPen(wx.Pen('black'))
-            dc.DrawLine(int(x), 50, int(x), h-50)
-            x += bwidth
-            if (idx+1) % ti_sep == 0: 
-                pos += d
-                ti += 1
-                if ti == self.n_tis: 
-                    pos = 0
-                    ti = 0
+        self._resize_cols()
