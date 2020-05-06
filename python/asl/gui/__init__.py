@@ -83,8 +83,11 @@ class AslGui(wx.Frame):
             for tab2 in tabs:
                 if tab != tab2: setattr(tab, tab2.name, tab2)
             tab.update()
-
         self.Layout()
+        self.Bind(wx.EVT_CLOSE, self.onClose, self)
+
+    def onClose(self, event):
+        wx.GetApp().ExitMainLoop()
 
 def main():
     app = wx.App(redirect=False)
@@ -93,4 +96,4 @@ def main():
     app.MainLoop()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
