@@ -11,6 +11,6 @@ for d in [os.environ.get("FSLDIR", None),
 
 from oxford_asl.gui import main
 try:
-    main()
+    main.main()
 except RuntimeError as e:
     print("Error: %s" % e)
