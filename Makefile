@@ -22,7 +22,7 @@ LIBS = -lutils -lnewimage -lmiscmaths -lprob ${MATLIB} ${NIFTILIB} -lznz -lz
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil toast
 PYMODULES = python/oxford_asl/__init__.py python/oxford_asl/_version.py
-PYGUI = python/oxford_asl/gui/*.py python/oxford_asl/gui/banner.png
+PYGUI = python/oxford_asl/gui/*.py python/oxford_asl/gui/*.png
 VERSIONED = oxford_asl asl_calib quasil asl_reg toast 
 
 OBJS = readoptions.o asl_functions.o
