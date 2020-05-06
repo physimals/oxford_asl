@@ -9,7 +9,7 @@ Currently this does not use any of the FSL python libraries. Possible improvemen
 
 Requirements:
   - wxpython
-  - matplotlib
+  - fsleyes (or matplotlib using --matplotlib option)
   - numpy
   - nibabel
 """
