@@ -87,7 +87,14 @@ kwargs = {
     'install_requires' : get_requirements(module_dir),
     'packages' : find_packages(),
     'package_data' : {
-        'oxford_asl.gui': ['banner.png', 'icon.png']
+        'oxford_asl.gui': [
+            'banner.png',
+            'icon.png',
+            'wp_cross.png',
+            'wp_tick.png',
+            'wp.png',
+            'basil.png',
+        ]
     },
     'entry_points' : {
         'gui_scripts' : [
