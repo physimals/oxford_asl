@@ -13,7 +13,7 @@ Requirements:
   - numpy
   - nibabel
 """
-
+import sys
 import os
 import traceback
 
@@ -29,7 +29,6 @@ from .calib_tab import CalibTab
 from .input_tab import AslInputOptions
 from .dist_corr_tab import DistCorrTab
 
-from .preview import PreviewPanel
 from .runner import OxfordAslRunner
 
 class AslGui(wx.Frame):
@@ -38,7 +37,9 @@ class AslGui(wx.Frame):
     """
 
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Basil", size=(1200, 800), style=wx.DEFAULT_FRAME_STYLE)
+        wx.Frame.__init__(self, None, title="Basil", size=(1200, 750), style=wx.DEFAULT_FRAME_STYLE)
+        icon_fname = os.path.join(os.path.abspath(os.path.dirname(__file__)), "basil.png")
+        self.SetIcon(wx.Icon(icon_fname))
         self._options = {}
         main_panel = wx.Panel(self)
         main_vsizer = wx.BoxSizer(wx.VERTICAL)
@@ -52,9 +53,14 @@ class AslGui(wx.Frame):
         hpanel = wx.Panel(main_panel)
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         notebook = wx.Notebook(hpanel, id=wx.ID_ANY, style=wx.BK_DEFAULT)
-        hsizer.Add(notebook, 1, wx.ALL|wx.EXPAND, 5)
+        hsizer.Add(notebook, 1, wx.ALL, 5)
+
+        if "--matplotlib" in sys.argv:
+            from .preview_mpl import PreviewPanel
+        else:
+            from .preview_fsleyes import PreviewPanel
         preview = PreviewPanel(hpanel)
-        hsizer.Add(preview, 1, wx.EXPAND)
+        hsizer.Add(preview, 2, wx.EXPAND)
         hpanel.SetSizer(hsizer)
         main_vsizer.Add(hpanel, -1, wx.EXPAND)
 
@@ -65,6 +71,7 @@ class AslGui(wx.Frame):
         bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
         
         run_panel = wx.Panel(bottom_panel)
+        run_panel.SetMinSize(wx.Size(1200, 50))
         runsizer = wx.BoxSizer(wx.VERTICAL)
         run_panel.SetSizer(runsizer)
         self.run_label = wx.StaticText(run_panel, label="Unchecked")
@@ -89,8 +96,16 @@ class AslGui(wx.Frame):
             self.widgets.append(tab)
             notebook.AddPage(tab, tab.title)
 
-        self.Layout()
         self.update_options()
+        self.SetMinSize(self.GetSize())
+        #self.SetMaxSize(self.GetSize())
+        self.Bind(wx.EVT_CLOSE, self._close)
+
+    def _close(self, evt=None):
+        # For some reason with the fsleyes preview the app doesn't exit when then window
+        # sis closed. So we will force it to do so...
+        self.Destroy()
+        sys.exit(0)
 
     def update_options(self):
         """

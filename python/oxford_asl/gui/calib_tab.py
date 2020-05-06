@@ -41,16 +41,21 @@ class CalibTab(TabPage):
         self.sizer.AddGrowableCol(2, 1)
         self.SetSizer(self.sizer)
         self.add_next_prev_btn()
+        self._update_ui()
 
     def options(self):
-        if self.calib_cb.IsChecked():
-            opts = {
+        # FIXME saturation recovery
+        opts = {
+            "_calib_enabled" : self.calib_cb.IsChecked(),
+        }
+        if opts["_calib_enabled"]:
+            opts.update({
                 "c"       : self.calib_image_picker.GetPath(),
                 "cmethod" : "single" if self.calib_mode_ch.GetSelection() == 0 else "voxel",
                 "tr"      : self.seq_tr_num.GetValue(),
                 "cgain"   : self.calib_gain_num.GetValue(),
                 "cref"    : self.coil_image_picker.GetPath() if self.coil_image_picker.checkbox.IsChecked() else None,
-            }
+            })
 
             if opts["cmethod"] == "single":
                 opts.update({
@@ -62,9 +67,7 @@ class CalibTab(TabPage):
                     "te"      : self.seq_te_num.GetValue(),
                 })
 
-            return opts
-        else:
-            return {}
+        return opts
 
     def check_options(self, options):
         if "c" in options:
@@ -80,7 +83,7 @@ class CalibTab(TabPage):
         calib_enabled = self.calib_cb.IsChecked()
         refregion = calib_enabled and self.calib_mode_ch.GetSelection() == 0
 
-        #self.m0_type_ch.Enable(calib_enabled)
+        self.m0_type_ch.Enable(calib_enabled)
         self.seq_tr_num.Enable(calib_enabled and self.m0_type_ch.GetSelection() == 0)
         self.calib_image_picker.Enable(calib_enabled)
         self.calib_gain_num.Enable(calib_enabled)

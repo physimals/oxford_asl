@@ -78,7 +78,7 @@ class AslInputOptions(TabPage):
             "ibf"        : "rpt" if self.ibf_choice.GetSelection() == 0 else "tis",
             "casl"       : bool(self.labelling_ch.GetSelection()),
             "bolus"      : self.bolus_dur_list.GetValues() if bool(self.bolus_dur_ch.GetSelection()) else self.bolus_dur_num.GetValue(),
-            "repeats"    : [int(v) for v in self.nrepeats_list.GetValues()],
+            "rpts"       : [int(v) for v in self.nrepeats_list.GetValues()],
             "slicedt"    : self.time_per_slice_num.GetValue() / 1000 if bool(self.readout_ch.GetSelection()) else None,
             "sliceband"  : self.slices_per_band_spin.GetValue() if self.multiband_cb.IsChecked() else None,
             "_ntis"      : self.ntis_int.GetValue(),
@@ -92,8 +92,15 @@ class AslInputOptions(TabPage):
 
     def check_options(self, options):
         self._check_image("Input data", options["i"], can_be_none=False)
-
-        expected_vols = options["_ntc"] * sum(options["repeats"])
+            
+        if min(options["rpts"]) < 0:
+            raise OptionError("Invalid value in repeats list")
+        if not isinstance(options["bolus"], float) and min(options["bolus"]) < 0:
+            raise OptionError("Invalid bolus duration")
+        if min(options["tis"]) < 0:
+            raise OptionError("Invalid value in TIs/PLDs list")
+        
+        expected_vols = options["_ntc"] * sum(options["rpts"])
         if expected_vols != options["_nvols"] and options["_nvols"] > 0:
             if options["_fixrpts"]:
                 raise OptionError("%i volumes in data - inconsistent with number of TIs/PLDs" % options["_nvols"])
@@ -104,9 +111,9 @@ class AslInputOptions(TabPage):
         if key == "i":
             self._nvols = get_nvols(self.data_picker.GetPath())
         if key == "_ntis":
-            self.ti_list.SetSize(value)
-            self.bolus_dur_list.SetSize(value)
-            self.nrepeats_list.SetSize(value)
+            self.ti_list.SetNumValues(value)
+            self.bolus_dur_list.SetNumValues(value)
+            self.nrepeats_list.SetNumValues(value)
             self._update_fixed_repeats(options)
 
         if key in ("_nvols", "_ntc"):
@@ -152,8 +159,8 @@ class AslInputOptions(TabPage):
             # Clear out previous list of repeats and reset to make sure number is fixed
             # Note check_options will detect error if not consistent with number of volumes
             vols_per_repeat = options["_ntis"] * options["_ntc"]
-            self.nrepeats_list.SetSize(0)
-            self.nrepeats_list.SetSize(options["_ntis"], default=int(options["_nvols"] / vols_per_repeat))
+            self.nrepeats_list.SetNumValues(0)
+            self.nrepeats_list.SetNumValues(options["_ntis"], default=int(options["_nvols"] / vols_per_repeat))
 
     def _labelling_changed(self, options):
         if options["casl"]:

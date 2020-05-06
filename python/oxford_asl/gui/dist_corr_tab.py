@@ -55,7 +55,7 @@ class DistCorrTab(TabPage):
                 opts.update({
                     "fmap" : self.fmap_picker.GetPath(),
                     "fmapmag" : self.fmap_mag_picker.GetPath(),
-                    "fmapmagbrain" : self.fmap_be_picker.GetPath(),
+                    "fmapmagbrain" : self.fmap_be_picker.GetPath() if self.fmap_be_picker.checkbox.IsChecked() else None,
                 })
 
             else:
@@ -68,7 +68,7 @@ class DistCorrTab(TabPage):
         if "fmap" in options:
             self._check_image("Fieldmap image", options["fmap"], can_be_none=False)
             self._check_image("Fieldmap magnitude image", options["fmapmag"], can_be_none=False)
-            self._check_image("Brain-extracted fieldmap magnitude image", options["fmapmagbrain"], can_be_none=False)
+            self._check_image("Brain-extracted fieldmap magnitude image", options["fmapmagbrain"])
         elif "cblip" in options:
             self._check_image("Phase encode reversed calibration image", options["cblip"], can_be_none=False)
 
@@ -81,7 +81,7 @@ class DistCorrTab(TabPage):
         fmap = distcorr_enabled and self.distcorr_ch.GetSelection() == self.FIELDMAP
         self.fmap_picker.Enable(fmap)
         self.fmap_mag_picker.Enable(fmap)
-        self.fmap_be_picker.Enable(fmap)
+        self.fmap_be_picker.Enable(fmap and self.fmap_be_picker.checkbox.IsChecked())
         self.cblip_picker.Enable(distcorr_enabled and not fmap)
         TabPage.state_changed(self, event)
 

@@ -221,6 +221,7 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
         self.hbox = wx.BoxSizer(wx.HORIZONTAL)
 
         self._img = wx.Panel(self, size=(48, 48))
+        self._img.SetMinSize(wx.Size(48, 48))
         self.hbox.Add(self._img)
 
         status_panel = wx.Panel(self)
@@ -370,19 +371,22 @@ class NumberList(wx.grid.Grid):
         self.CreateGrid(1, 0)
         self.SetRowLabelSize(0)
         self.SetColLabelSize(0)
-        self.SetSize(size)
+        self.SetNumValues(size)
         self.Bind(wx.EVT_SIZE, self._on_size)
 
     def GetValues(self):
         """
         :return: Sequence of values in the list
         """
-        try:
-            return [float(self.GetCellValue(0, c)) for c in range(self.size)]
-        except ValueError:
-            raise RuntimeError("Non-numeric values in number list")
+        vals = []
+        for c in range(self.size):
+            try:
+                vals.append(float(self.GetCellValue(0, c)))
+            except ValueError:
+                vals.append(-999)
+        return vals
 
-    def SetSize(self, size, default=None):
+    def SetNumValues(self, size, default=None):
         """
         Set the size of the number list
 

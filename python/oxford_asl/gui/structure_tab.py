@@ -54,6 +54,7 @@ class StructureTab(TabPage):
         self.sizer.AddGrowableCol(2, 1)
         self.SetSizer(self.sizer)
         self.add_next_prev_btn()
+        self._update_ui()
 
     def options(self):
         struc_method = self.struc_ch.GetSelection()
@@ -91,7 +92,21 @@ class StructureTab(TabPage):
         if "fslanat" in options and self.struc_ch.GetSelection() == self.EXISTING_FSLANAT:
             self._check_exists("FSL_ANAT output", options["fslanat"], can_be_none=False)
 
+    def option_changed(self, options, key, value):
+        if key == "i":
+            self.set_picker_dir(self.struc_image_picker, value)
+            self.set_picker_dir(self.brain_image_picker, value)
+            self.set_picker_dir(self.fsl_anat_picker, value)
+            self.set_picker_dir(self.transform_picker, value)
+
+        if key == "o":
+            self._outdir = value
+
     def state_changed(self, event=None):
+        self._update_ui()
+        TabPage.state_changed(self, event)
+
+    def _update_ui(self):
         mode = self.struc_ch.GetSelection()
         self.fsl_anat_picker.Enable(mode == self.EXISTING_FSLANAT)
         self.struc_image_picker.Enable(mode in (self.NEW_FSLANAT, self.INDEP_STRUC))
@@ -114,17 +129,6 @@ class StructureTab(TabPage):
         self.transform_ch.Enable(self._have_transform())
 
         self.transform_picker.Enable(self._have_transform() and self._transform_type() != self.TRANS_FSLANAT)
-        TabPage.state_changed(self, event)
-
-    def option_changed(self, options, key, value):
-        if key == "i":
-            self.set_picker_dir(self.struc_image_picker, value)
-            self.set_picker_dir(self.brain_image_picker, value)
-            self.set_picker_dir(self.fsl_anat_picker, value)
-            self.set_picker_dir(self.transform_picker, value)
-
-        if key == "outdir":
-            self._outdir = value
 
     def _have_transform(self):
         return self.transform_cb.IsChecked()
