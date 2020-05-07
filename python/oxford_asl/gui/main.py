@@ -53,39 +53,35 @@ class AslGui(wx.Frame):
         hpanel = wx.Panel(main_panel)
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         notebook = wx.Notebook(hpanel, id=wx.ID_ANY, style=wx.BK_DEFAULT)
-        hsizer.Add(notebook, 1, wx.ALL, 5)
+        hsizer.Add(notebook, 0, wx.ALL, 5)
 
         if "--matplotlib" in sys.argv:
             from .preview_mpl import PreviewPanel
         else:
             from .preview_fsleyes import PreviewPanel
         preview = PreviewPanel(hpanel)
-        hsizer.Add(preview, 2, wx.EXPAND)
+        hsizer.Add(preview, 1, wx.EXPAND)
         hpanel.SetSizer(hsizer)
-        main_vsizer.Add(hpanel, -1, wx.EXPAND)
+        main_vsizer.Add(hpanel, 1, wx.EXPAND)
 
         line = wx.StaticLine(main_panel, style=wx.LI_HORIZONTAL)
         main_vsizer.Add(line, 0, wx.EXPAND)
 
         bottom_panel = wx.Panel(main_panel)
         bottom_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        
-        run_panel = wx.Panel(bottom_panel)
-        run_panel.SetMinSize(wx.Size(1200, 50))
-        runsizer = wx.BoxSizer(wx.VERTICAL)
-        run_panel.SetSizer(runsizer)
-        self.run_label = wx.StaticText(run_panel, label="Unchecked")
-        self.run_label.SetFont(wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.BOLD))
-        runsizer.Add(self.run_label)
-        self.run_btn = wx.Button(run_panel, label="Run")
-        runsizer.Add(self.run_btn)
-        bottom_sizer.Add(run_panel, 1, wx.ALIGN_CENTER_VERTICAL)
-
-        self.wpcompat = WhitePaperCompatibility(self, bottom_panel)
-        bottom_sizer.Add(self.wpcompat, 0, wx.ALIGN_CENTER_VERTICAL)
         bottom_panel.SetSizer(bottom_sizer)
         
-        main_vsizer.Add(bottom_panel, -1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+        self.run_btn = wx.Button(bottom_panel, label="Run")
+        bottom_sizer.Add(self.run_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.run_label = wx.StaticText(bottom_panel, label="Unchecked")
+        self.run_label.SetFont(wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.BOLD))
+        bottom_sizer.Add(self.run_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        bottom_sizer.AddStretchSpacer(1)
+        self.wpcompat = WhitePaperCompatibility(self, bottom_panel)
+        bottom_sizer.Add(self.wpcompat, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        
+        main_vsizer.Add(bottom_panel, 0, wx.EXPAND)
         main_panel.SetSizer(main_vsizer)
         runner = OxfordAslRunner(self, self.run_btn, self.run_label)
 
