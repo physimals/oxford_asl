@@ -15,20 +15,16 @@ class AnalysisTab(TabPage):
     Tab page containing data analysis options
     """
 
+    EXCH_OPTIONS = [None, "2cpt", "spa"]
+    DISP_OPTIONS = [None, "gamma", "gauss", "sgauss"]
+
     def __init__(self, app, parent, idx, n):
         TabPage.__init__(self, app, parent, "Analysis", idx, n)
-
-        self.distcorr_choices = ["Fieldmap", "Calibration image"]
 
         self.section("Basic analysis options")
 
         self.outdir_picker = self.file_picker("Output Directory", pick_dir=True)
         self.mask_picker = self.file_picker("User-specified brain Mask", optional=True)
-
-        self.section("White paper compatibility")
-        #self.wp_reset = wx.Button(self, label="Reset to white paper defaults")
-       
-        #self.wp_cb = self.checkbox("Analysis which conforms to 'White Paper' (Alsop et al 2014)")
 
         self.section("Initial parameter values")
 
@@ -43,9 +39,10 @@ class AnalysisTab(TabPage):
         self.infer_t1_cb = self.checkbox("Incorporate T1 value uncertainty")
         self.macro_cb = self.checkbox("Include macro vascular component")
         self.fixbolus_cb = self.checkbox("Fix label duration", initial=True)
-
         self.pv_cb = self.checkbox("Partial Volume Correction")
         self.mc_cb = self.checkbox("Motion Correction")
+        self.exch_ch = self.choice("Exchange model", choices=["Well-mixed", "2-compartment", "SPA"], span=1)
+        self.disp_ch = self.choice("Dispersion", choices=["None", "Gamma", "Gaussian (temporal)", "Gaussian (spatial)"], span=1)
 
         self.sizer.AddGrowableCol(1, 1)
         self.SetSizer(self.sizer)
@@ -64,7 +61,9 @@ class AnalysisTab(TabPage):
             "mc"          : self.mc_cb.IsChecked(),
             "infert1"     : self.infer_t1_cb.IsChecked(),
             "pvcorr"      : self.pv_cb.IsChecked(),
-            "artoff"      : not self.macro_cb.IsChecked()
+            "artoff"      : not self.macro_cb.IsChecked(),
+            "exch"        : self.EXCH_OPTIONS[self.exch_ch.GetSelection()],
+            "disp"        : self.DISP_OPTIONS[self.disp_ch.GetSelection()],
         }
 
         return opts
