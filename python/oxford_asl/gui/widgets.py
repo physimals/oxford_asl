@@ -5,6 +5,8 @@ Copyright (C) 2020 University of Oxford
 """
 import os
 
+import numpy as np
+
 import wx
 import wx.grid
 
@@ -217,7 +219,10 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
         self._issues = []
         self._img_compatible = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp_tick.png")
         self._img_incompatible = os.path.join(os.path.abspath(os.path.dirname(__file__)), "wp_cross.png")
-        
+        font = self.GetFont()
+        font.SetPointSize(9)
+        self.SetFont(font)
+
         self.hbox = wx.BoxSizer(wx.HORIZONTAL)
 
         self._img = wx.Panel(self, size=(48, 48))
@@ -233,11 +238,16 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
 
         btn_panel = wx.Panel(status_panel)
         btn_hbox = wx.BoxSizer(wx.HORIZONTAL)
-        self._reset_btn = wx.Button(btn_panel, label="Make compatible")
-        self._reset_btn.Bind(wx.EVT_BUTTON, self._make_compatible)
+
+        self._reset_btn = wx.adv.HyperlinkCtrl(btn_panel, label="Make compatible")
+        self._reset_btn.SetFont(font)
+        self._reset_btn.Bind(wx.adv.EVT_HYPERLINK, self._make_compatible)
         btn_hbox.Add(self._reset_btn)
-        self._view_btn = wx.Button(btn_panel, label="View issues")
-        self._view_btn.Bind(wx.EVT_BUTTON, self._view_issues)
+        self._view_btn = wx.adv.HyperlinkCtrl(btn_panel, label="View issues")
+        self._view_btn.Bind(wx.adv.EVT_HYPERLINK, self._view_issues)
+        btn_hbox.Add(self._view_btn)
+        self._view_btn = wx.adv.HyperlinkCtrl(btn_panel, label="More info")
+        self._view_btn.Bind(wx.adv.EVT_HYPERLINK, self._more_info)
         btn_hbox.Add(self._view_btn)
         btn_panel.SetSizer(btn_hbox)
         vbox.Add(btn_panel)
@@ -279,6 +289,13 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
         elif options["cmethod"] != "voxel":
             issues.append(("White paper specifies voxelwise calibration - you are using reference region", "Calibration method will be switched to voxelwise"))
 
+        if not np.isclose(options["t1b"], 1.65, atol=0.0001):
+            issues.append(("Blood T1 should be 1.65s", "Blood T1 will be set to 1.65s"))
+        if not np.isclose(options["t1"], 1.65, atol=0.0001):
+            issues.append(("Tissue T1 must equal blood T1 (1.65s)", "Tissue T1 will be set to 1.65s"))
+        if not np.isclose(options["bat"], 0, atol=0.0001):
+            issues.append(("ATT should be taken as zero (complete bolus arrival)", "ATT will be set to 0"))
+
         return issues
             
     def _make_compatible(self, _event=None):
@@ -293,6 +310,35 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
         issue_list = "\n".join(["%i. %s" % (idx+1, issue[0]) for idx, issue in enumerate(self._issues)])
         message = "The current analysis is not WP compatible for the following reasons:\n\n" + issue_list
         wx.MessageBox(message, "Reasons for WP incompatibility", wx.OK | wx.ICON_INFORMATION)  
+
+    def _more_info(self, _event=None):
+        text = """<h2>White paper mode</h2>
+
+<p>Alsop et al (2014) describes a consensus implementation of single-delay ASL acquisition
+and analysis for clinical applications. The paper deliberately describes a simplified,
+easy to implement method for the estimation of perfusion in physiological units. The 
+main simplifications made for the purposes data analysis are:
+<ul>
+<li>Complete delivery of the bolus, i.e. assumption of zero arterial transit ti</li>
+<li>Single-compartment model based on blood T1 decay only and neglecting tissue T1</li>
+<li>Voxelwise calibration using separately acquired M0 image</li>
+<li>Single-delay acquisition to enable easy model inversion without nonlinear fitting</li>
+</ul>
+<p>Basil is capable of more sophisticated analysis but for convenience we offer the ability
+to automatically align with the 'white paper' (and optionally tweak settings manually
+after setting up white paper mode).
+<p>Note also that while the paper describes single-delay acquisition, we allow 
+a 'white paper' compatible analysis to be performed on multi-delay acquisitions.
+"""
+        #wx.MessageBox(text, "About 'White paper' mode", wx.OK | wx.ICON_INFORMATION)
+        dlg = HtmlDialog(self, "White paper mode", text, size=(600, 600)) 
+        dlg.Show()
+
+class HtmlDialog(wx.Frame):
+    def __init__(self, parent, title, html, **kwargs):
+        wx.Frame.__init__(self, parent, wx.ID_ANY, title=title, **kwargs)
+        html_win = wx.html.HtmlWindow(self)
+        html_win.SetPage(html)
 
 class NumberChooser(wx.Panel):
     """
@@ -413,7 +459,7 @@ class NumberList(wx.grid.Grid):
             return
 
         width, _height = self.GetClientSize()
-        col_width = width / self.size
+        col_width = (width - 5) / self.size
         for i in range(self.size):
             self.SetColSize(i, col_width)
 

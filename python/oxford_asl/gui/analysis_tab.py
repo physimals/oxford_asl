@@ -55,7 +55,6 @@ class AnalysisTab(TabPage):
         opts = {
             "o"           : self.outdir_picker.GetPath(),
             "m"           : self.mask_picker.GetPath() if self.mask_picker.checkbox.IsChecked() else None,
-            #"wp"          : self.wp_cb.IsChecked(),
             "bat"         : self.bat_num.GetValue(),
             "t1"          : self.t1_num.GetValue(),
             "t1b"         : self.t1b_num.GetValue(),
@@ -68,9 +67,6 @@ class AnalysisTab(TabPage):
             "artoff"      : not self.macro_cb.IsChecked()
         }
 
-        #if opts["wp"]:
-        #    opts.pop("t1")
-        #    opts.pop("bat")
         return opts
 
     def check_options(self, options):
@@ -89,11 +85,9 @@ class AnalysisTab(TabPage):
 
         if key == "wp":
             if value:
+                print("setting wp mode")
                 self.t1_num.SetValue(1.65)
                 self.bat_num.SetValue(0)
-            else:
-                self.t1_num.SetValue(1.3)
-                self.bat_num.SetValue(1.3)
 
         if key == "casl":
             if value:
