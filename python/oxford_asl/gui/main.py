@@ -92,10 +92,10 @@ class AslGui(wx.Frame):
             self.widgets.append(tab)
             notebook.AddPage(tab, tab.title)
 
-        self.update_options()
         self.SetMinSize(self.GetSize())
         #self.SetMaxSize(self.GetSize())
         self.Bind(wx.EVT_CLOSE, self._close)
+        self.update_options()
 
     def _close(self, evt=None):
         # For some reason with the fsleyes preview the app doesn't exit when then window
