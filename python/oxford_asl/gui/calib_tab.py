@@ -122,3 +122,4 @@ class CalibTab(TabPage):
             # Set wp defaults
             self.calib_cb.SetValue(True)
             self.calib_mode_ch.SetSelection(1)
+            self._update_ui()
