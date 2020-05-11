@@ -114,7 +114,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
                 None)
         self.op.SetMinSize((-1, 300))
         self.op.Show()
-        self._sizer.Add(self.op, proportion=0, flag=wx.EXPAND | wx.ALL, border=5)
+        self._sizer.Add(self.op, proportion=3, flag=wx.EXPAND | wx.ALL, border=5)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         self.update_btn = wx.Button(self, label="Update")
@@ -127,11 +127,10 @@ class PreviewPanel(wx.Panel, OptionComponent):
         text.SetFont(font)
         self._sizer.Add(text, 0)
         self._data_struc_preview = DataStructurePreview(self, 1, [1], True, "trp", True)
-        self._sizer.Add(self._data_struc_preview, 2, wx.EXPAND)
+        self._sizer.Add(self._data_struc_preview, 1, wx.EXPAND)
         self.SetSizer(self._sizer)
 
     def OnClose(self, evt=None):
-        print("OnClose")
         self._fsleyes_frame._embed_app.Exit()
 
     def option_changed(self, options, key, value):
@@ -143,7 +142,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
         self._data_struc_preview.ntc = options["_ntc"]
         self._data_struc_preview.tagfirst = options["iaf"] == "tc"
         self._data_struc_preview.order = order
-        self._data_struc_preview.tis_name = "PLDs" if options["casl"] else "TIs"
+        self._data_struc_preview.tis_name = "PLD" if options["casl"] else "TI"
         self._data_struc_preview.Refresh()
 
     def _update_clicked(self, _evt):
@@ -167,6 +166,8 @@ class PreviewPanel(wx.Panel, OptionComponent):
             cmd.add_arg('--mean="%s"' % meanfile)
             cmd.add_arg("--iaf=%s" % self._options["iaf"])
             cmd.add_arg("--ibf=%s" % self._options["ibf"])
+            if self._options["iaf"] != "diff":
+                cmd.add_arg("--diff")
             cmd.run()
 
             for ext in (".nii", ".nii.gz"):

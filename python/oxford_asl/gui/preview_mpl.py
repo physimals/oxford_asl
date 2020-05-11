@@ -74,7 +74,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
         self._data_struc_preview.ntc = options["_ntc"]
         self._data_struc_preview.tagfirst = options["iaf"] == "tc"
         self._data_struc_preview.order = order
-        self._data_struc_preview.tis_name = "PLDs" if options["casl"] else "TIs"
+        self._data_struc_preview.tis_name = "PLD" if options["casl"] else "TI"
         self._data_struc_preview.Refresh()
 
     def _update_clicked(self, _evt):
@@ -97,6 +97,8 @@ class PreviewPanel(wx.Panel, OptionComponent):
             cmd.add_arg('--mean="%s"' % meanfile)
             cmd.add_arg("--iaf=%s" % self._options["iaf"])
             cmd.add_arg("--ibf=%s" % self._options["ibf"])
+            if self._options["iaf"] != "diff":
+                cmd.add_arg("--diff")
             cmd.run()
 
             for ext in (".nii", ".nii.gz"):
