@@ -84,7 +84,6 @@ class AnalysisTab(TabPage):
 
         if key == "wp":
             if value:
-                print("setting wp mode")
                 self.t1_num.SetValue(1.65)
                 self.bat_num.SetValue(0)
 
