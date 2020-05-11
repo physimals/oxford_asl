@@ -70,6 +70,7 @@ class AslInputOptions(TabPage):
         self.sizer.AddGrowableCol(2, 1)
         self.SetSizer(self.sizer)
         self.add_next_prev_btn()
+        self.Layout()
 
     def options(self):
         options = {
