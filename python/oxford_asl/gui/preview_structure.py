@@ -5,15 +5,6 @@ Copyright (C) 2020 University of Oxford
 """
 import wx
 
-ORDER_LABELS = {
-    "r" : ("Repeat ", "R"),
-    "t" : ("TI ", "TI"),
-    "p" : {
-        "tc" : (("Label", "Control"), ("L", "C")),
-        "ct" : (("Control", "Label"), ("C", "L")),
-    }
-}
-
 class DataStructurePreview(wx.Panel):
     """
     Visual preview of the structure of an ASL data set
@@ -29,7 +20,15 @@ class DataStructurePreview(wx.Panel):
         self.repeats = repeats
         self.tagfirst = tagfirst
         self.order = order
-        self.tis_name = "PLDs"
+        self.tis_name = "PLD"
+        self.order_labels = {
+            "r" : ("Repeat ", "R"),
+            "t" : (self.tis_name, self.tis_name),
+            "p" : {
+                "tc" : (("Label", "Control"), ("L", "C")),
+                "ct" : (("Control", "Label"), ("C", "L")),
+            }
+        }
 
         self.hfactor = 0.95
         self.vfactor = 0.95
@@ -45,6 +44,7 @@ class DataStructurePreview(wx.Panel):
         self.Refresh()
 
     def _on_paint(self, _event):
+        self.order_labels["t"] = (self.tis_name, self.tis_name)
         self.num = {"t" : self.ntis, "r" : self.repeats[0], "p" : self.ntc}
 
         if self.ntc == 1:
@@ -67,7 +67,7 @@ class DataStructurePreview(wx.Panel):
         self._centered_text(dc, str(nvols), ox+group_width-smallest_group_width/2, oy+0.85*height)
 
     def _get_label(self, code, num, short):
-        labels = ORDER_LABELS[code]
+        labels = self.order_labels[code]
         if isinstance(labels, dict):
             iaf = "tc" if self.tagfirst else "ct"
             labels = labels[iaf]
