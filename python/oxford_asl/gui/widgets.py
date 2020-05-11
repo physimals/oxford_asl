@@ -239,16 +239,15 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
         btn_panel = wx.Panel(status_panel)
         btn_hbox = wx.BoxSizer(wx.HORIZONTAL)
 
-        self._reset_btn = wx.adv.HyperlinkCtrl(btn_panel, label="Make compatible")
-        self._reset_btn.SetFont(font)
-        self._reset_btn.Bind(wx.adv.EVT_HYPERLINK, self._make_compatible)
-        btn_hbox.Add(self._reset_btn)
         self._view_btn = wx.adv.HyperlinkCtrl(btn_panel, label="View issues")
         self._view_btn.Bind(wx.adv.EVT_HYPERLINK, self._view_issues)
         btn_hbox.Add(self._view_btn)
-        self._view_btn = wx.adv.HyperlinkCtrl(btn_panel, label="More info")
-        self._view_btn.Bind(wx.adv.EVT_HYPERLINK, self._more_info)
-        btn_hbox.Add(self._view_btn)
+        self._reset_btn = wx.adv.HyperlinkCtrl(btn_panel, label="Make compatible")
+        self._reset_btn.Bind(wx.adv.EVT_HYPERLINK, self._make_compatible)
+        btn_hbox.Add(self._reset_btn)
+        self._info_btn = wx.adv.HyperlinkCtrl(btn_panel, label="More info")
+        self._info_btn.Bind(wx.adv.EVT_HYPERLINK, self._more_info)
+        btn_hbox.Add(self._info_btn)
         btn_panel.SetSizer(btn_hbox)
         vbox.Add(btn_panel)
         
@@ -285,7 +284,7 @@ class WhitePaperCompatibility(OptionComponent, wx.Panel):
     def _get_issues(self, options):
         issues = []
         if "c" not in options:
-            issues.append(("Calibration image is not provided - results will not be quantitative", "Calibration will be turned on"))
+            issues.append(("Calibration image is not provided - results will not be quantitative", "Voxelwise calibration will be turned on"))
         elif options["cmethod"] != "voxel":
             issues.append(("White paper specifies voxelwise calibration - you are using reference region", "Calibration method will be switched to voxelwise"))
 
@@ -319,7 +318,7 @@ and analysis for clinical applications. The paper deliberately describes a simpl
 easy to implement method for the estimation of perfusion in physiological units. The 
 main simplifications made for the purposes data analysis are:
 <ul>
-<li>Complete delivery of the bolus, i.e. assumption of zero arterial transit ti</li>
+<li>Complete delivery of the bolus, i.e. assumption of zero arterial transit time</li>
 <li>Single-compartment model based on blood T1 decay only and neglecting tissue T1</li>
 <li>Voxelwise calibration using separately acquired M0 image</li>
 <li>Single-delay acquisition to enable easy model inversion without nonlinear fitting</li>
@@ -464,5 +463,5 @@ class NumberList(wx.grid.Grid):
             self.SetColSize(i, col_width)
 
     def _on_size(self, event):
-        event.Skip()
         self._resize_cols()
+        event.Skip()
