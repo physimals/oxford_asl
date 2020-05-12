@@ -19,6 +19,7 @@ import traceback
 
 import wx
 import wx.grid
+from wx.lib.pubsub import pub
 
 from . import OptionError
 
@@ -41,6 +42,7 @@ class AslGui(wx.Frame):
         icon_fname = os.path.join(os.path.abspath(os.path.dirname(__file__)), "basil.png")
         self.SetIcon(wx.Icon(icon_fname))
         self._options = {}
+        self._running = False
         main_panel = wx.Panel(self)
         main_vsizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -76,6 +78,7 @@ class AslGui(wx.Frame):
         self.run_label = wx.StaticText(bottom_panel, label="Unchecked")
         self.run_label.SetFont(wx.Font(12, wx.DEFAULT, wx.NORMAL, wx.BOLD))
         bottom_sizer.Add(self.run_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.run_btn.Bind(wx.EVT_BUTTON, self._do_run)
 
         bottom_sizer.AddStretchSpacer(1)
         self.wpcompat = WhitePaperCompatibility(self, bottom_panel)
@@ -83,9 +86,10 @@ class AslGui(wx.Frame):
         
         main_vsizer.Add(bottom_panel, 0, wx.EXPAND)
         main_panel.SetSizer(main_vsizer)
-        runner = OxfordAslRunner(self, self.run_btn, self.run_label)
+        self.runner = OxfordAslRunner(self)
+        pub.subscribe(self._run_finished, "run_finished")
 
-        self.widgets = [preview, runner, self.wpcompat]
+        self.widgets = [preview, self.runner, self.wpcompat]
         tab_cls = [AslInputOptions, StructureTab, CalibTab, DistCorrTab, AnalysisTab]
         for idx, cls in enumerate(tab_cls):
             tab = cls(self, notebook, idx, len(tab_cls))
@@ -102,6 +106,17 @@ class AslGui(wx.Frame):
         # sis closed. So we will force it to do so...
         self.Destroy()
         sys.exit(0)
+
+    def _run_finished(self, retcode):
+        self._running = False
+        self.check_options()
+
+    def _do_run(self, _evt):
+        self.runner.run()
+        self.run_btn.Enable(False)
+        self.run_label.SetForegroundColour(wx.Colour(0, 0, 128))
+        self.run_label.SetLabel("Running - Please Wait")
+        self._running = True
 
     def update_options(self):
         """
@@ -126,24 +141,27 @@ class AslGui(wx.Frame):
                         widget.option_changed(options, diff_key, options.get(diff_key, None))
 
                 self._options = options
-
-            try:
-                for widget in self.widgets:
-                    widget.check_options(self._options)
-
-                self.run_label.SetForegroundColour(wx.Colour(0, 128, 0))
-                self.run_label.SetLabel("Ready to Go")
-                self.run_btn.Enable(True)
-            except OptionError as exc:
-                self.run_btn.Enable(False)
-                self.run_label.SetForegroundColour(wx.Colour(255, 0, 0))
-                self.run_label.SetLabel(str(exc))
+                if not self._running:
+                    self.check_options()
         except Exception:
             # Any uncaught exception is a program bug - report it to STDERR
             self.run_btn.Enable(False)
             self.run_label.SetForegroundColour(wx.Colour(255, 0, 0))
             self.run_label.SetLabel("Unexpected error - see console and report as a bug")
             traceback.print_exc()
+
+    def check_options(self):
+        try:
+            for widget in self.widgets:
+                widget.check_options(self._options)
+
+            self.run_label.SetForegroundColour(wx.Colour(0, 128, 0))
+            self.run_label.SetLabel("Ready to Go")
+            self.run_btn.Enable(True)
+        except OptionError as exc:
+            self.run_btn.Enable(False)
+            self.run_label.SetForegroundColour(wx.Colour(255, 0, 0))
+            self.run_label.SetLabel(str(exc))
 
 def main():
     """

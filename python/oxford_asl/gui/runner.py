@@ -17,13 +17,9 @@ class OxfordAslRunner(wx.Frame, OptionComponent):
     Runs oxford_asl (and any other required commands) based on configured options
     """
 
-    def __init__(self, parent, run_btn, run_label):
+    def __init__(self, parent):
         wx.Frame.__init__(self, parent, title="Run", size=(600, 400), style=wx.DEFAULT_FRAME_STYLE)
-
         self._run_sequence = []
-        self.run_btn = run_btn
-        self.run_btn.Bind(wx.EVT_BUTTON, self._do_run)
-        self.run_label = run_label
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.output_text = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE)
@@ -43,22 +39,15 @@ class OxfordAslRunner(wx.Frame, OptionComponent):
         self.Hide()
 
     def _finished(self, retcode):
-        self.run_label.SetForegroundColour(wx.Colour(0, 128, 0))
-        self.run_label.SetLabel("Ready to Go")
-        self.run_btn.Enable(True)
         if retcode != 0:
             self._write_output("\nWARNING: command failed\n")
 
-    def _do_run(self, _):
-        if self._run_sequence:
-            self.Show()
-            self.Raise()
-            self.output_text.Clear()
-            self.run_btn.Enable(False)
-            self.run_label.SetForegroundColour(wx.Colour(0, 0, 128))
-            self.run_label.SetLabel("Running - Please Wait")
-            runner = CmdRunner(self._run_sequence)
-            runner.start()
+    def run(self):
+        self.Show()
+        self.Raise()
+        self.output_text.Clear()
+        runner = CmdRunner(self._run_sequence)
+        runner.start()
 
     def option_changed(self, options, key, value):
         """
