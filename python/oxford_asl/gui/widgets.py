@@ -9,6 +9,7 @@ import numpy as np
 
 import wx
 import wx.grid
+import wx.adv
 
 from . import OptionComponent
 
