@@ -103,10 +103,9 @@ class AslGui(wx.Frame):
 
     def _close(self, evt=None):
         # For some reason with the fsleyes preview the app doesn't exit when then window
-        # sis closed. So we will force it to do so...
-        self.Destroy()
-        sys.exit(0)
-
+        # is closed. So we will force it to do so...
+        wx.GetApp().ExitMainLoop()
+        
     def _run_finished(self, retcode):
         self._running = False
         self.check_options()
