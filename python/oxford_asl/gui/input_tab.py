@@ -14,6 +14,8 @@ class AslInputOptions(TabPage):
     Tab page containing input data options
     """
 
+    IAF_CHOICES = ["tc", "ct", "diff"]
+
     def __init__(self, app, parent, idx, n):
         TabPage.__init__(self, app, parent, "Input Data", idx, n, name="input")
         self._nvols = -1 # Cached to improve responsiveness
@@ -24,8 +26,8 @@ class AslInputOptions(TabPage):
         self.repeats_choice = self.choice("Repeats", choices=["Fixed", "Variable"])
 
         self.section("Data order")
-        self.ibf_choice = self.choice("Block format", choices=["Repeats", "TIs/PLDs"])
-        self.iaf_choice = self.choice("Label/Control pairs", choices=["Label then control", "Control then label"], optional=True, initial_on=True)
+        self.ibf_choice = self.choice("Volumes grouped by", choices=["Repeats", "TIs/PLDs"])
+        self.iaf_choice = self.choice("Label/Control pairing", choices=["Label then control", "Control then label", "Pre-subtracted"])
 
         self.section("Acquisition parameters")
         self.labelling_ch = self.choice("Labelling", choices=["pASL", "cASL/pcASL"], initial=1)
@@ -75,7 +77,7 @@ class AslInputOptions(TabPage):
     def options(self):
         options = {
             "i"          : self.data_picker.GetPath(),
-            "iaf"        : "diff" if not self.iaf_choice.checkbox.IsChecked() else "tc" if self.iaf_choice.GetSelection() == 0 else "ct",
+            "iaf"        : self.IAF_CHOICES[self.iaf_choice.GetSelection()],
             "ibf"        : "rpt" if self.ibf_choice.GetSelection() == 0 else "tis",
             "casl"       : bool(self.labelling_ch.GetSelection()),
             "bolus"      : self.bolus_dur_list.GetValues() if bool(self.bolus_dur_ch.GetSelection()) else self.bolus_dur_num.GetValue(),
@@ -84,7 +86,7 @@ class AslInputOptions(TabPage):
             "sliceband"  : self.slices_per_band_spin.GetValue() if self.multiband_cb.IsChecked() else None,
             "_ntis"      : self.ntis_int.GetValue(),
             "_nvols"     : self._nvols,
-            "_ntc"       : 2 if self.iaf_choice.checkbox.IsChecked() else 1,
+            "_ntc"       : 1 if self.iaf_choice.GetSelection() == 2 else 2,
             "_fixbolus"  : not bool(self.bolus_dur_ch.GetSelection()),
             "_fixrpts"   : not bool(self.repeats_choice.GetSelection())
         }
