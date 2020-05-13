@@ -44,6 +44,10 @@ class AnalysisTab(TabPage):
         self.exch_ch = self.choice("Exchange model", choices=["Well-mixed", "2-compartment", "SPA"], span=1)
         self.disp_ch = self.choice("Dispersion", choices=["None", "Gamma", "Gaussian (temporal)", "Gaussian (spatial)"], span=1)
 
+        self.section("White paper mode")
+        self.wpcompat = WhitePaperCompatibility(self.app, self)
+        self.wp_cb = self.checkbox("Check compatibility", self.wpcompat, initial=False, span=1)
+
         self.sizer.AddGrowableCol(1, 1)
         self.SetSizer(self.sizer)
         self.add_next_prev_btn()
@@ -64,8 +68,10 @@ class AnalysisTab(TabPage):
             "artoff"      : not self.macro_cb.IsChecked(),
             "exch"        : self.EXCH_OPTIONS[self.exch_ch.GetSelection()],
             "disp"        : self.DISP_OPTIONS[self.disp_ch.GetSelection()],
+            "_checkwp"    : self.wp_cb.IsChecked(),
         }
 
+        opts.update(self.wpcompat.options())
         return opts
 
     def check_options(self, options):
@@ -94,3 +100,12 @@ class AnalysisTab(TabPage):
             else:
                 self.bat_num.SetValue(0.7)
                 self.ie_num.SetValue(0.98)
+
+        if key == "_checkwp":
+            if value:
+                self.wpcompat.Show()
+            else:
+                self.wpcompat.Hide()
+            self.Layout()
+
+        self.wpcompat.option_changed(options, key, value)

@@ -38,7 +38,7 @@ class AslGui(wx.Frame):
     """
 
     def __init__(self):
-        wx.Frame.__init__(self, None, title="Basil", size=(1200, 750), style=wx.DEFAULT_FRAME_STYLE)
+        wx.Frame.__init__(self, None, title="Basil", size=(1200, 800), style=wx.DEFAULT_FRAME_STYLE)
         icon_fname = os.path.join(os.path.abspath(os.path.dirname(__file__)), "basil.png")
         self.SetIcon(wx.Icon(icon_fname))
         self._options = {}
@@ -80,16 +80,12 @@ class AslGui(wx.Frame):
         bottom_sizer.Add(self.run_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.run_btn.Bind(wx.EVT_BUTTON, self._do_run)
 
-        bottom_sizer.AddStretchSpacer(1)
-        self.wpcompat = WhitePaperCompatibility(self, bottom_panel)
-        bottom_sizer.Add(self.wpcompat, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        
         main_vsizer.Add(bottom_panel, 0, wx.EXPAND)
         main_panel.SetSizer(main_vsizer)
         self.runner = OxfordAslRunner(self)
         pub.subscribe(self._run_finished, "run_finished")
 
-        self.widgets = [preview, self.runner, self.wpcompat]
+        self.widgets = [preview, self.runner]
         tab_cls = [AslInputOptions, StructureTab, CalibTab, DistCorrTab, AnalysisTab]
         for idx, cls in enumerate(tab_cls):
             tab = cls(self, notebook, idx, len(tab_cls))
