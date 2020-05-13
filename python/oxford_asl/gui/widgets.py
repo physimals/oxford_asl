@@ -181,18 +181,18 @@ class TabPage(wx.Panel, OptionComponent):
             self.pack(label, spin)
         return spin
 
-    def checkbox(self, label, initial=False, handler=None, **kwargs):
+    def checkbox(self, label, *extra_widgets, initial=False, handler=None, **kwargs):
         """
         Add a simple on/off option
         """
         checkbox = wx.CheckBox(self, label=label)
-        checkbox.span = 2
+        checkbox.span = kwargs.get("span", 2)
         checkbox.SetValue(initial)
         if handler:
             checkbox.Bind(wx.EVT_CHECKBOX, handler)
         else:
             checkbox.Bind(wx.EVT_CHECKBOX, self.state_changed)
-        self.pack("", checkbox, **kwargs)
+        self.pack("", checkbox, *extra_widgets, **kwargs)
         return checkbox
 
     def section(self, label):
