@@ -122,10 +122,6 @@ class AslInputOptions(TabPage):
         if key in ("_nvols", "_ntc"):
             self._update_fixed_repeats(options)
 
-        if key == "_ntc":
-            #self._update_groups(options)
-            self.iaf_choice.Enable(value == 2)
-
         if key == "_fixbolus":
             self.bolus_dur_num.Enable(value)
             self.bolus_dur_list.Enable(not value)
