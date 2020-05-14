@@ -51,7 +51,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
         self._sizer.Add(self._canvas, 2, border=5, flag=wx.EXPAND | wx.ALL)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
-        hbox.Add(wx.StaticText(self, label="Use scroll wheel to change slice, double click to change view"), 0, flag=wx.ALIGN_CENTRE_VERTICAL)
+        hbox.Add(wx.StaticText(self, label="Scroll wheel to change slice, double click to change view"), 0, flag=wx.ALIGN_CENTRE_VERTICAL)
         self.update_btn = wx.Button(self, label="Update")
         self.update_btn.Bind(wx.EVT_BUTTON, self._update_clicked)
         hbox.Add(self.update_btn)
