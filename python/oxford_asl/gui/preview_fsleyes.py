@@ -114,7 +114,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
                 None)
         self.op.SetMinSize((-1, 300))
         self.op.Show()
-        self._sizer.Add(self.op, proportion=3, flag=wx.EXPAND | wx.ALL, border=5)
+        self._sizer.Add(self.op, proportion=5, flag=wx.EXPAND | wx.ALL, border=5)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         self.update_btn = wx.Button(self, label="Update")

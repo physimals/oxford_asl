@@ -11,7 +11,7 @@ class DataStructurePreview(wx.Panel):
     """
 
     def __init__(self, parent, ntis, repeats, ntc, order, tagfirst):
-        wx.Panel.__init__(self, parent, size=wx.Size(300, 300))
+        wx.Panel.__init__(self, parent, size=wx.Size(300, 150))
         self.SetBackgroundStyle(wx.BG_STYLE_CUSTOM)
         self.Bind(wx.EVT_SIZE, self._on_size)
         self.Bind(wx.EVT_PAINT, self._on_paint)
