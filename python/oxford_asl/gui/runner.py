@@ -23,7 +23,7 @@ class OxfordAslRunner(wx.Frame, OptionComponent):
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.output_text = wx.TextCtrl(self, style=wx.TE_READONLY | wx.TE_MULTILINE)
-        font = wx.Font(8, wx.TELETYPE, wx.NORMAL, wx.NORMAL)
+        font = wx.Font(10, wx.TELETYPE, wx.NORMAL, wx.NORMAL)
         self.output_text.SetFont(font)
         self.sizer.Add(self.output_text, 1, flag=wx.EXPAND)
 
