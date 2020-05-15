@@ -74,9 +74,12 @@ Usage_extended() {
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
     echo "                 {default: on (cASL); off (pASL)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
+    echo " --batim <img>: Voxelwise BAT (ATT) in seconds estimates in native (ASL) space"
     echo " --infert1    : Incorporate uncertainty in T1 values in analysis"
+    echo " --t1im <img> : Voxelwise T1 estimates in native (ASL) space"
     echo " --fulldata   : Never average multiple measurements at each TI"
     echo " --noiseprior : Use an informative prior for the noise estimation"
+    echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
 
     echo " Registration (requires structural image)"
@@ -803,6 +806,8 @@ takeargs=0;boolarg="";isbool="";
 	--t1b) t1bset=$argument
 	       takeargs=1;;
 	--t1im) t1im=$argument # A T1 (of tissue) image
+		takeargs=1;;
+	--batim) batim=$argument # A BAT (seconds) image
 		takeargs=1;;
 	--noiseprior) noiseprior=1
 	    ;;
@@ -1821,6 +1826,11 @@ if [ ! -z $t1im ]; then
     basil_options=$basil_options"--t1im=$t1im "
     #echo "--t1im=$t1im" >> $tempdir/basil_options.txt
     Log "Using supplied T1 (tissue) image in BASIL: $t1im"
+fi
+
+if [ ! -z $batim ]; then
+    basil_options=$basil_options"--batim=$batim "
+    Log "Using supplied BAT (seconds) image in BASIL: $batim"
 fi
 
 # data acquired using CASL?
