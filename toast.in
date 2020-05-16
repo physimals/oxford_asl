@@ -23,6 +23,7 @@ Usage() {
     # For future development, I have commented some potentially useful options
     echo "TOAST: TurbO quasar asl bayesian AnalySis Tool"
     echo "Beta version: it only works for AMC's file format:"
+    echo "Version: v4.0.6-1-g8c97415-dirty Sat May 16 09:36:30 2020"
     echo "The input file should be one single file and the t dimension should be in the following order:"
     echo "Shift 1 Repeat 1 Tag, Shift 1 Repeat 1 Control, Shift 2 Repeat 1 Tag, Shift 2 Repeat 1 Control."
     echo ""
@@ -259,14 +260,20 @@ stdir=`pwd`
 outdir=$(abspath $outdir)
 
 # make a temp directory to work in
-#tmpbase=`tmpnam`
-#tmpbase="haha"
 tmpbase="toast_temp"
 date_stamp=$(date +'%Y%m%d')
 timestamp=$(date +"%H%M%S")
 #tempdir=${tmpbase}_turquat
 tempdir=$tmpbase"_"$date_stamp"_"$timestamp
 mkdir $tempdir
+
+if [ -z $debug ]; then
+    dir=`pwd`
+else
+    echo "Running debug mode..."
+    echo "Intermediate results saved in " $tempdir
+    #mv $tempdir .
+fi
 
 # deal with the TIs
 if [ -z $tis ]; then
@@ -1554,6 +1561,8 @@ fi
 # Correct the calibration image by median filter, erosion, and extrapolation
 # Ref: http://www.sciencedirect.com/science/article/pii/S1053811917307103
 fslmaths $output_dir_temp/calib_M0t -mas mask $output_dir_temp/calib_M0t
+# Here we enforce edge correction
+corrcal=1
 if [ ! -z $corrcal ]; then
     echo "Correcting partial volume effects on the edge of the calibration data..."
     fslmaths $output_dir_temp/calib_M0t -fmedian M0t_median
@@ -1585,6 +1594,13 @@ if [ ! -z $infert1 ]; then
     # Now we take the average of the two CBFs
     fslmaths $output_dir_temp/CBF_absolute -add $output_dir_temp/CBF_absolute_MT -div 2 $output_dir_temp/CBF_absolute
 fi
+# Some additional statistics
+# Get the 1 and 99th percentile of CBF
+fslmaths $output_dir_temp/CBF_absolute -thrP 1 -uthrP 99 $output_dir_temp/CBF_absolute_1_to_99_percentile
+fslstats $output_dir_temp/CBF_absolute -M >> $output_dir_temp/CBF_absolute_mean.txt
+fslstats $output_dir_temp/CBF_absolute_1_to_99_percentile -M >> $output_dir_temp/CBF_absolute_1_to_99_percentile_mean.txt
+
+
 # Arterial blood colume in absolute unit
 if [ ! -z $infer_arterial ]; then
     echo "Output ABV is in decimal format"
@@ -1605,6 +1621,16 @@ else
     echo "Intermediate results saved in " $tempdir
     #mv $tempdir .
 fi
+
+echo "Absolute CBF map saved in "$outdir"/CBF_absolute"
+echo "Mean absolute CBF value saved in "$outdir"/CBF_absolute_mean.txt"
+echo "Absolute CBF map (1 to 99 percentile) saved in "$outdir"/CBF_absolute_1_to_99_percentile"
+echo "Mean absolute CBF (1 to 99 percentile) value saved in "$outdir"/CBF_absolute_1_to_99_percentile_mean.txt"
+# Arterial blood colume in absolute unit
+if [ ! -z $infer_arterial ]; then
+    echo "Arterial blood volume (abv) in decimal saved in "$outdir"/ABV_relative"
+fi
+
 
 echo "Turbo QUSAR ASL analysis done!"
 
