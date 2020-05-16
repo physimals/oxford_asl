@@ -261,10 +261,11 @@ outdir=$(abspath $outdir)
 # make a temp directory to work in
 #tmpbase=`tmpnam`
 #tmpbase="haha"
-tmpbase="turquat_temp_"
+tmpbase="toast_temp"
+date_stamp=$(date +'%Y%m%d')
 timestamp=$(date +"%H%M%S")
 #tempdir=${tmpbase}_turquat
-tempdir=$tmpbase$timestamp
+tempdir=$tmpbase"_"$date_stamp"_"$timestamp
 mkdir $tempdir
 
 # deal with the TIs
