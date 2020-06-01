@@ -1284,7 +1284,7 @@ if [ ! -z $gdcwarp ]; then
 
     # Convert the supplied warp image to extract the jacbbian (as parts) 
     # (meanasl here is just a reference). Using relative warp convention
-    convertwarp -r $tempdir/nativeref -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts
+    convertwarp -r $tempdir/nativeref -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts --constrainj
     
     # Calculation of the jacobian for the warp - method suggested in:
     # https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;d3fee1e5.0908
@@ -1664,7 +1664,7 @@ if [ -e $tempdir/fmap.* ]; then
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
     
     # Generate the correction warp in ASL space
-    convertwarp -r $tempdir/nativeref -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts
+    convertwarp -r $tempdir/nativeref -o $tempdir/asldist_warp -w $tempdir/distcorr/asl2struct_warp.nii.gz --postmat=$tempdir/distcorr/struct2asl.mat --rel -j $tempdir/distcorr/jacobian_parts --constrainj
 
     # If we ALSO have a user supplied GDC warp then we need to merge that with the one we have found here
     # use convert warp to combine the warps. Note that we cannot do this in a single step becase we need
@@ -1672,7 +1672,7 @@ if [ -e $tempdir/fmap.* ]; then
     # the user warp 
     if [ ! -z $gdcwarp ]; then
 	    Log "Adding user-supplied GDC warp to distortion correction warp"
-        convertwarp -r $tempdir/nativeref -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts
+        convertwarp -r $tempdir/nativeref -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts --constrainj
     fi
 
     # Calculation of the jacobian for the warp - method suggested in:
