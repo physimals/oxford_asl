@@ -143,7 +143,9 @@ Usage_extended() {
     echo " Miscellaneous "
     echo " --model-options=<file>  : File containing additional model options to be passed to BASIL/Fabber"
     echo "                           This is an advanced setting for model-specific options ONLY"
-    echo "                           Do NOT include any standard oxford_asl options here" 
+    echo "                           Do NOT include any standard oxford_asl options here"
+    echo " --region-analysis       : Run region analysis using ROIs from Harvard-Oxford standard atlas"
+    echo "                           This requires an FSL_ANAT directory input"
     echo ""
     echo " Notes:"
     echo " Input data - Any combination of label (tag) control images is accepted, see asl_file for more detailed"
@@ -918,6 +920,8 @@ takeargs=0;boolarg="";isbool="";
 	# 
 	--model-options) model_options=$argument
 	    takeargs=1;;
+	--region-analysis) region_analysis=1
+	    ;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -2299,6 +2303,15 @@ if [ ! -z $pvexist ]; then
     imcp $tempdir/wmmask $outdir/native_space/wm_mask
     imcp $tempdir/gmmask_pure $outdir/native_space/gm_roi
     imcp $tempdir/wmmask_pure $outdir/native_space/wm_roi
+fi
+
+# Region analysis if requested
+if [ ! -z $region_analysis ]; then
+    if [ -z $fslanat ]; then
+        echo "WARNING: Region analysis requested but no FSLANAT directory provided"
+    else
+        fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --add-atlas-rois
+    fi
 fi
 
 # clearup
