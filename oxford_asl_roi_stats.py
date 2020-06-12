@@ -16,10 +16,9 @@ import nibabel as nib
 import numpy as np
 import scipy.stats
 
-# For GM/WM results we mask using GM/WM PVEs at the following thresholds
-# (lower when we have separate PV corrected results)
-PVE_THRESHOLD_PVC = 0.1
-PVE_THRESHOLD_NOPVC = 0.8
+# This is the probability threshold below which we do not 
+# consider a voxel relevant to GM/WM averages
+PVE_THRESHOLD_BASE = 0.1
 
 class ArgumentParser(argparse.ArgumentParser):
     """
@@ -36,6 +35,10 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Output directory")
         self.add_argument("--min-nvoxels", default=10, type=int,
                           help="Minimum number of relevant voxels required to report statistics")
+        self.add_argument("--gm-thresh", default=0.8, type=float,
+                          help="Probability threshold for 'pure' grey matter")
+        self.add_argument("--wm-thresh", default=0.9, type=float,
+                          help="Probability threshold for 'pure' white matter")
         self.add_argument("--roi-native", nargs="*", default=[],
                           help="Additional ROI as binarised mask in ASL space. The name of the ROI will be the stripped filename. May be specified multiple times")
         self.add_argument("--roi-struct", nargs="*", default=[],
@@ -107,14 +110,18 @@ def mean_invvarweighted(val, var):
 
 def i2(val, var):
     """ I^2 Measure of heterogenaity """
+    prec = 1 / var
+    prec[~np.isfinite(prec)] = 0
     n = len(val)
-    w = [(1/x) for x in var]
-    mu_bar = sum(a*b for a,b in zip(w,val))/sum(w)
+    mu_bar = mean_invvarweighted(val, var)
 
     #out = []
-    Q = sum(a*b for a,b in zip(w,[(x - mu_bar)**2 for x in val]))
+    Q = np.sum(prec * (val - mu_bar)**2)
     #H = np.sqrt(Q/(n - 1))
     i2 = (Q-(n-1))/Q
+
+    # Negative values map to 0 (see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC192859/)
+    i2 = max(i2, 0)
     #tau2_DL = (Q - n + 1)/(sum(w) - sum([x**2 for x in w])/sum(w))
     #tau2_DL = max(0, tau2_DL)
     #out.extend([mu_bar,Q,H,I2,tau2_DL])
@@ -219,7 +226,7 @@ def add_rois_from_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_nam
     for label in desc.labels:
         add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=50)
  
-def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, log=sys.stdout):
+def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, log=sys.stdout):
     perfusion_data = [
         {
             "suffix" : "", 
@@ -229,35 +236,35 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, log=sys.stdout):
         },
     ]
     if os.path.isdir(os.path.join(outdir, "pvcorr")):
-        log.write(" - Found partial volume corrected results - will mask ROIs using GM/WM PVE (threshold: %.2f)\n" % PVE_THRESHOLD_PVC)
+        log.write(" - Found partial volume corrected results - will mask ROIs using 'base' GM/WM masks (threshold: %.2f)\n" % PVE_THRESHOLD_BASE)
         perfusion_data.extend([
             {
-                "suffix" : " GM", 
+                "suffix" : "_gm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_var_calib")),
-                "mask" : gm_pve_asl.data > PVE_THRESHOLD_PVC,
+                "mask" : gm_pve_asl.data > PVE_THRESHOLD_BASE,
             },
             {
-                "suffix" : " WM", 
+                "suffix" : "_wm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_var_calib")),
-                "mask" : wm_pve_asl.data > PVE_THRESHOLD_PVC,
+                "mask" : wm_pve_asl.data > PVE_THRESHOLD_BASE,
             },
         ])
     else:
-        log.write(" - No partial volume corrected results - will mask ROIs using GM/WM PVE (threshold: %.2f)\n" % PVE_THRESHOLD_NOPVC)
+        log.write(" - No partial volume corrected results - will mask ROIs using 'pure' GM/WM masks (PVE thresholds: %.2f / %.2f)\n" % (gm_thresh, wm_thresh))
         perfusion_data.extend([
             {
-                "suffix" : " %i%%+GM" % (PVE_THRESHOLD_NOPVC*100), 
+                "suffix" : "_gm",
                 "f" : Image(os.path.join(outdir, "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "perfusion_var_calib")),
-                "mask" : gm_pve_asl.data > PVE_THRESHOLD_NOPVC,
+                "mask" : gm_pve_asl.data > gm_thresh,
             },
             {
-                "suffix" : " %i%%+WM" % (PVE_THRESHOLD_NOPVC*100), 
+                "suffix" : "_wm",
                 "f" : Image(os.path.join(outdir, "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "perfusion_var_calib")),
-                "mask" : wm_pve_asl.data > PVE_THRESHOLD_NOPVC,
+                "mask" : wm_pve_asl.data > wm_thresh,
             },
         ])
     return perfusion_data
@@ -291,13 +298,14 @@ def main():
     print("\nLoading perfusion images")
     gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
-    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl)
+    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh)
 
     rois = []
     print("\nLoading generic ROIs")
-    for pv in (0.1, 0.8):
-        add_struct_roi(rois, gm_pve, "%i%%+GM" % (pv*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=pv)
-        add_struct_roi(rois, wm_pve, "%i%%+WM" % (pv*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=pv)
+    add_struct_roi(rois, gm_pve, "10%+GM", ref=asl_ref, struct2asl=struct2asl_mat, threshold=0.1)
+    add_struct_roi(rois, wm_pve, "10%+WM", ref=asl_ref, struct2asl=struct2asl_mat, threshold=0.1)
+    add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
+    add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
 
     # Add ROIs from command line
     print("\nLoading user-specified ROIs")
@@ -315,29 +323,31 @@ def main():
 
     # Get stats in each ROI. Add name to stats dict to make TSV output easier
     print("\nGetting stats - minimum of %i voxels to report in region" % options.min_nvoxels)
-    for roi in rois:
-        roi["stats"] = {"name" : roi["name"]}
-        for item in perfusion_data:
-            get_stats(roi["stats"], item["f"].data, item["var"].data, roi["mask_native"], suffix=item["suffix"], mask=item["mask"], min_nvoxels=options.min_nvoxels)
-    
-    # Save output
-    # Note we give TSV file a CSV extension to make Excel happier
-    os.makedirs(options.output, exist_ok=True)
-    writer = None
-    with open(os.path.join(options.output, "region_analysis.csv"), mode="w", newline='') as tsv_file:
-        for roi in rois:
-            if writer is None:
-                writer = csv.DictWriter(tsv_file, fieldnames=list(roi["stats"].keys()))
-                writer.writeheader()
+    for item in perfusion_data:
+        suffix = item["suffix"]
+        os.makedirs(options.output, exist_ok=True)
+        writer = None
+        # Save TSV stats output. Note we give TSV file a CSV extension to make Excel happier
+        with open(os.path.join(options.output, "region_analysis%s.csv" % suffix), mode="w", newline='') as tsv_file:
+            for roi in rois:
+                roi["stats"] = {"name" : roi["name"]}
+                get_stats(roi["stats"], item["f"].data, item["var"].data, roi["mask_native"], mask=item["mask"], min_nvoxels=options.min_nvoxels)
+            
+                if writer is None:
+                    writer = csv.DictWriter(tsv_file, fieldnames=list(roi["stats"].keys()))
+                    writer.writeheader()
 
-            writer.writerow(roi["stats"])            
-            fname = roi["name"].replace(" ", "_").replace(",", "").lower() + ".nii.gz"
-            if options.save_native_rois and "roi_native" in roi:
-                _write_nii(roi["roi_native"], os.path.join(options.output, "rois_native", fname))
-            if options.save_native_masks and "mask_native" in roi:
-                _write_nii(roi["mask_native"], os.path.join(options.output, "masks_native", fname), header=asl_ref.header)
-            if options.save_mni_rois and "roi_mni" in roi:
-                _write_nii(roi["roi_mni"], os.path.join(options.output, "rois_mni", fname))
+                writer.writerow(roi["stats"])            
+
+    # Save output masks/PVE maps
+    for roi in rois:
+        fname = roi["name"].replace(" ", "_").replace(",", "").lower() + ".nii.gz"
+        if options.save_native_rois and "roi_native" in roi:
+            _write_nii(roi["roi_native"], os.path.join(options.output, "rois_native", fname))
+        if options.save_native_masks and "mask_native" in roi:
+            _write_nii(roi["mask_native"], os.path.join(options.output, "masks_native", fname), header=asl_ref.header)
+        if options.save_mni_rois and "roi_mni" in roi:
+            _write_nii(roi["roi_mni"], os.path.join(options.output, "rois_mni", fname))
 
     print("\nDONE - Output in %s" % options.output)
 
