@@ -118,7 +118,10 @@ def i2(val, var):
     #out = []
     Q = np.sum(prec * (val - mu_bar)**2)
     #H = np.sqrt(Q/(n - 1))
-    i2 = (Q-(n-1))/Q
+    if Q == 0:
+        i2 = 0
+    else:
+        i2 = (Q-(n-1))/Q
 
     # Negative values map to 0 (see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC192859/)
     i2 = max(i2, 0)
@@ -174,6 +177,8 @@ def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=T
 
     sample_data = img[effective_roi]
     sample_var = var_img[effective_roi]
+    # Variance should not be zero but sometimes is - maybe masking?
+    sample_var[sample_var == 0] = 1e-6
     nvoxels = len(sample_data)
     stats["Nvoxels" + suffix] = nvoxels
     for stat, fn in STATS_FNS.items():
@@ -337,7 +342,12 @@ def main():
                     writer = csv.DictWriter(tsv_file, fieldnames=list(roi["stats"].keys()))
                     writer.writeheader()
 
-                writer.writerow(roi["stats"])            
+                # Round floats to 2 d.p. - should be fine for calibrated perfusion values
+                rounded = dict(roi["stats"])
+                for k, v in roi["stats"].items():
+                    if isinstance(v, (float, np.float, np.float32, np.float64)):
+                        rounded[k] = "%.2f" % v
+                writer.writerow(rounded)
 
     # Save output masks/PVE maps
     for roi in rois:
