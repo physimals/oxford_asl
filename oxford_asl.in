@@ -146,6 +146,8 @@ Usage_extended() {
     echo "                           Do NOT include any standard oxford_asl options here"
     echo " --region-analysis       : Run region analysis using ROIs from Harvard-Oxford standard atlas"
     echo "                           This requires an FSL_ANAT directory input"
+    echo " --gm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' GM (default 0.8)"
+    echo " --wm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' WM (default 0.9)"
     echo ""
     echo " Notes:"
     echo " Input data - Any combination of label (tag) control images is accepted, see asl_file for more detailed"
@@ -922,6 +924,10 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--region-analysis) region_analysis=1
 	    ;;
+	--gm-thresh) gm_thresh=$argument
+	    takeargs=1;;
+	--wm-thresh) wm_thresh=$argument
+	    takeargs=1;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -2059,14 +2065,22 @@ if [ ! -z $pvgm ]; then
 	pvexist=1
 fi
 
+# Thresholds for voxels to be considered 'pure' GM / WM
+if [ -z $gm_thresh ]; then
+    gm_thresh=0.8;
+fi
+if [ -z $wm_thresh ]; then
+    wm_thresh=0.9;
+fi
+
 if [ ! -z $pvexist ]; then
     # make some masks 
     # these are currently used for masking after model fitting
     fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
     fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
     # these are for calculating mean perfusion within tissue types
-    fslmaths $tempdir/pvgm_inasl -thr 0.8 -bin $tempdir/gmmask_pure
-    fslmaths $tempdir/pvwm_inasl -thr 0.9 -bin $tempdir/wmmask_pure
+    fslmaths $tempdir/pvgm_inasl -thr $gm_thresh -bin $tempdir/gmmask_pure
+    fslmaths $tempdir/pvwm_inasl -thr $wm_thresh -bin $tempdir/wmmask_pure
 fi
 ### End of: Partial Volume Estimates
 
@@ -2310,7 +2324,7 @@ if [ ! -z $region_analysis ]; then
     if [ -z $fslanat ]; then
         echo "WARNING: Region analysis requested but no FSLANAT directory provided"
     else
-        fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --add-atlas-rois
+        fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
     fi
 fi
 
