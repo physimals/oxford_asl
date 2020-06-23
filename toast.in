@@ -1248,12 +1248,22 @@ fi
 # Estimate ABV and the arterial blood components
 if [ ! -z $infer_arterial ]; then
     echo "Estimateing ABV and arrival time of arterial blood (macrovasculature)"
+
+    echo "Creating macrovasculature mask..."
+    # We might need to adjust the level 50 and 70 here. Wait for Lena's test on her subjects.
+    fslmaths shift_1_repeat_1_blood -Tmean -thr 0 -thrP 50 blood_noisy
+    mean_signal=`fslstats blood_noisy -M `
+    cluster -i blood_noisy -t $mean_signal --osize=output_cluster_size > cluster_info.txt
+    fslmaths output_cluster_size -thrP 70 -bin mask_ABV
+
+    echo "Model fitting in arterial blood component..."
     # Prepare a fabber option file
     # Shift 1
     current_options_file="options_blood_shift_1.txt"
     echo "# Turbo QUASAR ASL arterial blood component analysis options for Shift 1 of the data" > $current_options_file
     echo "--mask=mask" >> $current_options_file
-    echo "--method=spatialvb" >> $current_options_file
+    #echo "--method=spatialvb" >> $current_options_file
+    echo "--method=vb" >> $current_options_file # Because of the small coverage of the vessels, VB method works better than spatial VB
     echo "--noise=white" >> $current_options_file
     echo "--model=turboquasar" >> $current_options_file
     echo "--disp=$disp" >> $current_options_file
@@ -1282,28 +1292,28 @@ if [ ! -z $infer_arterial ]; then
     #echo "--link-to-latest" >> $current_options_file
 
     # Here are the settings
-    echo "--PSP_byname1=fblood" >> $current_options_file # Estimate CBF
-    echo "--PSP_byname1_type=M" >> $current_options_file
-    echo "--PSP_byname2=deltblood" >> $current_options_file # Estimate ATT
-    echo "--PSP_byname2_type=N" >> $current_options_file
-    echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
-    echo "--PSP_byname3_type=N" >> $current_options_file
-    echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
-    echo "--PSP_byname4_type=N" >> $current_options_file
-    echo "--PSP_byname5=thblood" >> $current_options_file # Estimate angle theta of crushing gradient
-    echo "--PSP_byname5_type=N" >> $current_options_file
-    echo "--PSP_byname6=phiblood" >> $current_options_file # Estimate angle phi of crushing gradient
-    echo "--PSP_byname6_type=N" >> $current_options_file
-    echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
-    echo "--PSP_byname7_type=N" >> $current_options_file
-    if [ ! -z $infert1 ]; then
-        echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
-        echo "--PSP_byname8_type=I" >> $current_options_file
-        echo "--PSP_byname8_image=output_calib_shift_1/mean_g" >> $current_options_file
+    #echo "--PSP_byname1=fblood" >> $current_options_file # Estimate CBF
+    #echo "--PSP_byname1_type=M" >> $current_options_file
+    #echo "--PSP_byname2=deltblood" >> $current_options_file # Estimate ATT
+    #echo "--PSP_byname2_type=N" >> $current_options_file
+    #echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
+    #echo "--PSP_byname3_type=N" >> $current_options_file
+    #echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
+    #echo "--PSP_byname4_type=N" >> $current_options_file
+    #echo "--PSP_byname5=thblood" >> $current_options_file # Estimate angle theta of crushing gradient
+    #echo "--PSP_byname5_type=N" >> $current_options_file
+    #echo "--PSP_byname6=phiblood" >> $current_options_file # Estimate angle phi of crushing gradient
+    #echo "--PSP_byname6_type=N" >> $current_options_file
+    #echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
+    #echo "--PSP_byname7_type=N" >> $current_options_file
+    #if [ ! -z $infert1 ]; then
+    #    echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
+    #    echo "--PSP_byname8_type=I" >> $current_options_file
+    #    echo "--PSP_byname8_image=output_calib_shift_1/mean_g" >> $current_options_file
         #echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
         #echo "--PSP_byname9_type=I" >> $current_options_file
         #echo "--PSP_byname9_image=output_calib_shift_1_MT/mean_T1b" >> $current_options_file
-    fi
+    #fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_1_repeat_1_blood --data-order=singlefile --output=output_blood_shift_1 -@ $current_options_file
@@ -1312,7 +1322,8 @@ if [ ! -z $infer_arterial ]; then
     current_options_file="options_blood_shift_2.txt"
     echo "# Turbo QUASAR ASL arterial blood component analysis options for Shift 2 of the data" > $current_options_file
     echo "--mask=mask_shift_2_effective" >> $current_options_file
-    echo "--method=spatialvb" >> $current_options_file
+    #echo "--method=spatialvb" >> $current_options_file
+    echo "--method=vb" >> $current_options_file # Because of the small coverage of the vessels, VB method works better than spatial VB
     echo "--noise=white" >> $current_options_file
     echo "--model=turboquasar" >> $current_options_file
     echo "--disp=$disp" >> $current_options_file
@@ -1342,28 +1353,28 @@ if [ ! -z $infer_arterial ]; then
     #echo "--link-to-latest" >> $current_options_file
 
     # Here are the settings
-    echo "--PSP_byname1=fblood" >> $current_options_file # Estimate CBF
-    echo "--PSP_byname1_type=M" >> $current_options_file
-    echo "--PSP_byname2=deltblood" >> $current_options_file # Estimate ATT
-    echo "--PSP_byname2_type=N" >> $current_options_file
-    echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
-    echo "--PSP_byname3_type=N" >> $current_options_file
-    echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
-    echo "--PSP_byname4_type=N" >> $current_options_file
-    echo "--PSP_byname5=thblood" >> $current_options_file # Estimate angle theta of crushing gradient
-    echo "--PSP_byname5_type=N" >> $current_options_file
-    echo "--PSP_byname6=phiblood" >> $current_options_file # Estimate angle phi of crushing gradient
-    echo "--PSP_byname6_type=N" >> $current_options_file
-    echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
-    echo "--PSP_byname7_type=N" >> $current_options_file
-    if [ ! -z $infert1 ]; then
-        echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
-        echo "--PSP_byname8_type=I" >> $current_options_file
-        echo "--PSP_byname8_image=output_calib_shift_2/mean_g" >> $current_options_file
+    #echo "--PSP_byname1=fblood" >> $current_options_file # Estimate CBF
+    #echo "--PSP_byname1_type=M" >> $current_options_file
+    #echo "--PSP_byname2=deltblood" >> $current_options_file # Estimate ATT
+    #echo "--PSP_byname2_type=N" >> $current_options_file
+    #echo "--PSP_byname3=sp_log" >> $current_options_file # Estimate sp log (dispersion parameter, even if dispersion is none)
+    #echo "--PSP_byname3_type=N" >> $current_options_file
+    #echo "--PSP_byname4=s_log" >> $current_options_file # Estimate s log (dispersion parameter, even if dispersion is none)
+    #echo "--PSP_byname4_type=N" >> $current_options_file
+    #echo "--PSP_byname5=thblood" >> $current_options_file # Estimate angle theta of crushing gradient
+    #echo "--PSP_byname5_type=N" >> $current_options_file
+    #echo "--PSP_byname6=phiblood" >> $current_options_file # Estimate angle phi of crushing gradient
+    #echo "--PSP_byname6_type=N" >> $current_options_file
+    #echo "--PSP_byname7=bvblood" >> $current_options_file # Estimate volume of blood
+    #echo "--PSP_byname7_type=N" >> $current_options_file
+    #if [ ! -z $infert1 ]; then
+    #    echo "--PSP_byname8=g" >> $current_options_file # Incorporate FA correction factor g
+    #    echo "--PSP_byname8_type=I" >> $current_options_file
+    #    echo "--PSP_byname8_image=output_calib_shift_2/mean_g" >> $current_options_file
         #echo "--PSP_byname9=T_1b_MT" >> $current_options_file # T1 blood under MT effects
         #echo "--PSP_byname9_type=I" >> $current_options_file
         #echo "--PSP_byname9_image=output_calib_shift_2_MT/mean_T1b" >> $current_options_file
-    fi
+    #fi
 
     # Now perform model fitting to estimate ABV and arrival time to macrovasculature
     $fabber --data=$shift_2_repeat_1_blood --data-order=singlefile --output=output_blood_shift_2 -@ $current_options_file
@@ -1603,8 +1614,11 @@ fslstats $output_dir_temp/CBF_absolute_1_to_99_percentile -M >> $output_dir_temp
 
 # Arterial blood colume in absolute unit
 if [ ! -z $infer_arterial ]; then
-    echo "Output ABV is in decimal format"
-    fslmaths $output_dir_temp/ABV_relative -div $output_dir_temp/M0a_for_absolute_CBF -div $alpha $output_dir_temp/ABV_absolute
+    # Copy the ABV mask
+    imcp mask_ABV $output_dir_temp/mask_ABV
+    echo "Output ABV is in decimal format and masked by mask_ABV"
+    fslmaths $output_dir_temp/ABV_relative -div $output_dir_temp/M0a_for_absolute_CBF -div $alpha -mas $output_dir_temp/mask_ABV $output_dir_temp/ABV_absolute
+    fslstats $output_dir_temp/ABV_absolute -M >> $output_dir_temp/ABV_absolute_in_decimal_mean.txt
 fi
 
 # Copy results to output directory
@@ -1629,6 +1643,7 @@ echo "Mean absolute CBF (1 to 99 percentile) value saved in "$outdir"/CBF_absolu
 # Arterial blood colume in absolute unit
 if [ ! -z $infer_arterial ]; then
     echo "Arterial blood volume (abv) in decimal saved in "$outdir"/ABV_relative"
+    echo "Mean ABV in decimal saved in "$outdir"/ABV_absolute_in_decimal_mean.txt"
 fi
 
 
