@@ -35,6 +35,7 @@ Usage() {
     echo " --iaf       : input ASl format: diff,tc,ct {default: diff}"
     echo " --ibf       : input block format (for multi-TI): rpt,tis {default: rpt}"
     echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
+    echo " --tiimg     : 4D image containing voxelwise TI values"
     echo " --casl      : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
     echo " --artsupp   : Arterial suppression (vascular crushing) was used"
     echo " --bolus     : Bolus duration - {default: 1}"
@@ -793,6 +794,8 @@ takeargs=0;boolarg="";isbool="";
 	      ;;
 	--tis) tis=$argument
 	    takeargs=1;;
+	--tiimg) tiimg=$argument
+	    takeargs=1;;
 	--bolus) boluset=1 boluslen=$argument
 	    takeargs=1;;
 	--bat) bat=$argument
@@ -1306,18 +1309,38 @@ if [ ! -z $gdcwarp ]; then
 fi
 
 ### deal with TIs (as specified on the command line)
-count=0
-tislist=""
-thetis=`echo $tis | sed 's:,: :g'`
-#echo $thetis
-for ti in $thetis; do
-    count=`expr ${count} + 1`
-    tislist=`echo $tislist --ti${count}=$ti`
-    alltis[`expr ${count} - 1`]=$ti
-done
-Log "Number of TIs in list: $count"
-Log "TIs list: $tislist"
-ntis=$count
+if [ ! -z $tiimg ]; then
+    # Cannot easily define alltis array - therefore cannot do epochwise analysis
+	if [ ! -z $epoch ]; then
+	    echo "ERROR: cannot do epochwise analysis with a voxelwise TI image"
+	    exit 1
+	fi
+    if [ ! -z $tis ]; then
+	    echo "ERROR: Cannot specify a TI image as well as a list of TIs"
+	    exit 1
+	fi
+    if [ ! -z $slicedt ]; then
+	    echo "ERROR: Cannot specify slice timing correction with a voxelwise TI image"
+	    exit 1
+	fi
+    Log "Using voxelwise TI image: $tiimg"
+    ntis=`fslinfo $tiimg | grep "^dim4" | sed 's:dim4[ ]*::' |tr -d [:blank:]`
+    tislist=" --tiimg=$tiimg"
+    Log "Number of TIs: $ntis"
+else
+    count=0
+    tislist=""
+    thetis=`echo $tis | sed 's:,: :g'`
+    #echo $thetis
+    for ti in $thetis; do
+        count=`expr ${count} + 1`
+        tislist=`echo $tislist --ti${count}=$ti`
+        alltis[`expr ${count} - 1`]=$ti
+    done
+    Log "Number of TIs in list: $count"
+    Log "TIs list: $tislist"
+    ntis=$count
+fi
 ### End of: Deal with the TIs
 
 ### Label-control subtraction (we repeat subtraction after doing distortion correction - when applicable)
