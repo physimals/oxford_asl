@@ -437,7 +437,7 @@ if [ ! -z $pvcorr ]; then
 
         # Upsample the T1 image estimated from calibration and use standard brain as reference
         echo "Upsample the T1 image estimated from calibration and use standard brain as reference"
-        standard_brain=$FSLDIR/data/standard/MNI152lin_T1_2mm_brain
+        standard_brain=$FSLDIR/data/linearMNI/MNI152lin_T1_2mm_brain
         ${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -ref $standard_brain -dof 6 -omat regmat.mat
         #${FSLDIR}/bin/flirt -in calib/T1t -out T1highres -applyisoxfm 1 -ref calib/T1t
         #${FSLDIR}/bin/flirt -in calib/M0t -out PDhighres -applyisoxfm 1 -ref calib/M0t
