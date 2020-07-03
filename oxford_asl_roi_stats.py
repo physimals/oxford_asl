@@ -16,10 +16,6 @@ import nibabel as nib
 import numpy as np
 import scipy.stats
 
-# This is the probability threshold below which we do not 
-# consider a voxel relevant to GM/WM averages
-PVE_THRESHOLD_BASE = 0.1
-
 class ArgumentParser(argparse.ArgumentParser):
     """
     ArgumentParser for program options
@@ -39,6 +35,10 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Probability threshold for 'pure' grey matter")
         self.add_argument("--wm-thresh", default=0.9, type=float,
                           help="Probability threshold for 'pure' white matter")
+        self.add_argument("--min-gm-thresh", default=0.1, type=float,
+                          help="Probability threshold for a voxel to be included in GM stats")
+        self.add_argument("--min-wm-thresh", default=0.1, type=float,
+                          help="Probability threshold for a voxel to be included in WM stats")
         self.add_argument("--roi-native", nargs="*", default=[],
                           help="Additional ROI as binarised mask in ASL space. The name of the ROI will be the stripped filename. May be specified multiple times")
         self.add_argument("--roi-struct", nargs="*", default=[],
@@ -231,7 +231,7 @@ def add_rois_from_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_nam
     for label in desc.labels:
         add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=50)
  
-def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, log=sys.stdout):
+def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, log=sys.stdout):
     perfusion_data = [
         {
             "suffix" : "", 
@@ -241,19 +241,19 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, log
         },
     ]
     if os.path.isdir(os.path.join(outdir, "pvcorr")):
-        log.write(" - Found partial volume corrected results - will mask ROIs using 'base' GM/WM masks (threshold: %.2f)\n" % PVE_THRESHOLD_BASE)
+        log.write(" - Found partial volume corrected results - will mask ROIs using 'base' GM/WM masks (PVE thresholds: %.2f / %.2f)\n" % (min_gm_thresh, min_wm_thresh))
         perfusion_data.extend([
             {
                 "suffix" : "_gm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_var_calib")),
-                "mask" : gm_pve_asl.data > PVE_THRESHOLD_BASE,
+                "mask" : gm_pve_asl.data > min_gm_thresh,
             },
             {
                 "suffix" : "_wm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_var_calib")),
-                "mask" : wm_pve_asl.data > PVE_THRESHOLD_BASE,
+                "mask" : wm_pve_asl.data > min_wm_thresh,
             },
         ])
     else:
@@ -303,12 +303,12 @@ def main():
     print("\nLoading perfusion images")
     gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
-    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh)
+    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
 
     rois = []
     print("\nLoading generic ROIs")
-    add_struct_roi(rois, gm_pve, "10%+GM", ref=asl_ref, struct2asl=struct2asl_mat, threshold=0.1)
-    add_struct_roi(rois, wm_pve, "10%+WM", ref=asl_ref, struct2asl=struct2asl_mat, threshold=0.1)
+    add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.min_gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_gm_thresh)
+    add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.min_wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_wm_thresh)
     add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
     add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
 
