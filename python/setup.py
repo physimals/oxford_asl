@@ -20,8 +20,8 @@ def get_filetext(rootdir, filename):
 def git_version():
     """ Get the full and python standardized version from Git tags (if possible) """
     try:
-        # Full version includes the Git commit hash
-        full_version = subprocess.check_output('git describe --dirty', shell=True).decode("utf-8").strip(" \n")
+        # Full version includes the Git commit hash. Must be Python 2.6 compatible!
+        full_version = subprocess.Popen(['git', 'describe', '--dirty'], stdout=subprocess.PIPE).communicate()[0].decode("utf-8").strip(" \n")
 
         # Python standardized version in form major.minor.patch.post<build>
         version_regex = re.compile(r"v?(\d+\.\d+\.\d+(-\d+)?).*")
@@ -38,7 +38,7 @@ def git_version():
 def git_timestamp():
     """ Get the last commit timestamp from Git (if possible)"""
     try:
-        return subprocess.check_output('git log -1 --format=%cd', shell=True).decode("utf-8").strip(" \n")
+        return subprocess.Popen(['git', 'log', '-1', '--format=%cd'], stdout=subprocess.PIPE).communicate()[0].decode("utf-8").strip(" \n")
     except:
         # Any failure, return None. We may not be in a Git repo at all
         return None
