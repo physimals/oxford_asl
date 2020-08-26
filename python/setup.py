@@ -21,7 +21,7 @@ def git_version():
     """ Get the full and python standardized version from Git tags (if possible) """
     try:
         # Full version includes the Git commit hash. Must be Python 2.6 compatible!
-        full_version = subprocess.Popen(['git', 'describe', '--dirty'], stdout=subprocess.PIPE).communicate()[0].decode("utf-8").strip(" \n")
+        full_version = subprocess.Popen(['git', 'describe', '--tags', '--dirty'], stdout=subprocess.PIPE).communicate()[0].decode("utf-8").strip(" \n")
 
         # Python standardized version in form major.minor.patch.post<build>
         version_regex = re.compile(r"v?(\d+\.\d+\.\d+(-\d+)?).*")
