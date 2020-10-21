@@ -81,7 +81,7 @@ def fsleyes_embed(parent=None, make_fsleyesframe=True, **kwargs):
         called[0] = True
         ret[0]    = (overlayList, displayCtx, frame)
 
-    fslgl.getGLContext(parent=parent, ready=ready)
+    fslgl.getGLContext(ready=ready, raiseErrors=True)
     idle.block(10, until=until)
 
     if ret[0] is None:
