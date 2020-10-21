@@ -72,6 +72,7 @@ Usage_extended() {
     echo "Extended options (all optional):"
     echo " Analysis"
     echo " --artoff     : Do not infer arterial signal - (same as --artsupp)"
+    echo " --artonly    : Only infer the arterial signal"
     echo " --fixbolus   : Bolus duration is fixed, e.g. by QUIPSSII or CASL (otheriwse it will be estimated)"
     echo "                 {default: on (cASL); off (pASL)"
     echo " --fixbat     : Fix the bolus arrival time (to value specified by --bat)"
@@ -875,6 +876,8 @@ takeargs=0;boolarg="";isbool="";
 	--infert1) infert1=1
 	    ;;
 	--artoff) artoff=1
+	    ;;
+	--artonly) artonly=1
 	    ;;
 	--artsupp) artoff=1 #this does same job as --artoff, but is explicitly linked to vascular crushers in the data
 	    ;;
@@ -1864,6 +1867,11 @@ fi
 if [ ! -z $batim ]; then
     basil_options=$basil_options"--batim=$batim "
     Log "Using supplied BAT (seconds) image in BASIL: $batim"
+fi
+
+if [ ! -z $artonly ]; then
+    basil_options=$basil_options"--artonly "
+    Log "BASIL fitting restricted to arterial component only"
 fi
 
 # data acquired using CASL?
