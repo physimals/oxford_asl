@@ -44,6 +44,7 @@ Usage() {
     echo " --t1b       : Blood T1 value - {default: 1.65}"
     echo " --slicedt   : Timing difference between slices - {default: 0}"
     echo " --sliceband : Number of slices per band in a multi-band setup - {default: n/a}."
+    echo " --fa        : Flip angle for Look-Locker readout correction."
     echo ""
     echo "Structural image (optional) (see also Registration)"
     echo " --fslanat=<dir> : An fsl_anat directory from structural image"
