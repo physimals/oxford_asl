@@ -1011,14 +1011,11 @@ if [ ! -z $transflag ]; then
 	echo "ERROR: Structural image is required along with transformation matrix to output results in standard space"
 	exit 1
     fi
-else
-    if [ ! -z $strucflag ]; then
+fi
+
+if [ ! -z $strucflag ]; then
 	# else-if strucutral image included output in structural space
 	structout=1;
-    else
-	#else output in native space
-	nativeout=1;
-    fi
 fi
 
 echo "OXFORD_ASL - running"
@@ -2354,7 +2351,13 @@ fi
 # Region analysis if requested
 if [ ! -z $region_analysis ]; then
     if [ -z $fslanat ]; then
-        echo "WARNING: Region analysis requested but no FSLANAT directory provided"
+        if [ -z $struc ]; then
+            echo "WARNING: Region analysis requested but no structural data provided"
+        elif [ -z $warp ]; then
+            echo "WARNING: Region analysis requested but no structural->std space transformation provided"
+        else
+            fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
+        fi
     else
         fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
     fi

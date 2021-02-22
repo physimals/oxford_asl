@@ -25,8 +25,12 @@ class ArgumentParser(argparse.ArgumentParser):
         argparse.ArgumentParser.__init__(self, prog="roi_stats", add_help=False, **kwargs)
         self.add_argument("--oxasl-output", required=True,
                           help="OXFORD_ASL or OXASL output directory")
-        self.add_argument("--fslanat", required=True,
-                          help="FSL_ANAT output directory - if not specified will try to use information from OXASL output directory")
+        self.add_argument("--fslanat",
+                          help="FSL_ANAT output directory - if not specified --struc --gm-pve --wm-pve and --struc2std must be given")
+        self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
+        self.add_argument("--gm-pve", help="GM PVE in structural space - ignored if --fslanat is given")
+        self.add_argument("--wm-pve", help="WM PVE in structural space - ignored if --fslanat is given")
+        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given")
         self.add_argument("--output", "-o", required=True,
                           help="Output directory")
         self.add_argument("--min-nvoxels", default=10, type=int,
@@ -279,9 +283,6 @@ def main():
     if options.oxasl_output is None:
         sys.stderr.write("oxford_asl output directory must be specified")
         sys.exit(1)
-    if options.fslanat is None:
-        sys.stderr.write("FSL_ANAT output directory must be specified")
-        sys.exit(1)
 
     print("Regionwise analysis\n")
     print(" - Using oxford_asl output in %s" % options.oxasl_output)
@@ -290,10 +291,21 @@ def main():
     # Get reference and transformation data from oxford_asl and fsl_anat output
     outdir = os.path.join(options.oxasl_output, "native_space")
     asl_ref = Image(os.path.join(outdir, "perfusion"))
-    struc_ref = Image(os.path.join(options.fslanat, "T1"))
-    gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
-    wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
-    struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
+
+    if options.fslanat is not None:
+        struc_ref = Image(os.path.join(options.fslanat, "T1"))
+        gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
+        wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
+        struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
+    elif options.struc is not None and options.gm_pve is not None and options.wm_pve is not None and options.struc2std is not None:
+        struc_ref = Image(options.struc)
+        gm_pve = Image(options.gm_pve)
+        wm_pve = Image(options.wm_pve)
+        struct2mni_warp = Image(options.struc2std)
+    else:
+        sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std")
+        sys.exit(1)
+
     mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
     with open(os.path.join(outdir, "asl2struct.mat")) as asl2struct_file:
         asl2struct_mat = np.array([[float(v) for v in line.split()] for line in asl2struct_file.readlines()])
