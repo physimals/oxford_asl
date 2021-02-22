@@ -2105,11 +2105,11 @@ fi
 if [ ! -z $pvexist ]; then
     # make some masks 
     # these are currently used for masking after model fitting
-    fslmaths $tempdir/pvgm_inasl -thr 0.1 -bin $tempdir/gmmask
-    fslmaths $tempdir/pvwm_inasl -thr 0.1 -bin $tempdir/wmmask
+    fslmaths $tempdir/pvgm_inasl -thr 0.1 -mas $tempdir/mask -bin $tempdir/gmmask
+    fslmaths $tempdir/pvwm_inasl -thr 0.1 -mas $tempdir/mask -bin $tempdir/wmmask
     # these are for calculating mean perfusion within tissue types
-    fslmaths $tempdir/pvgm_inasl -thr $gm_thresh -bin $tempdir/gmmask_pure
-    fslmaths $tempdir/pvwm_inasl -thr $wm_thresh -bin $tempdir/wmmask_pure
+    fslmaths $tempdir/pvgm_inasl -thr $gm_thresh -mas $tempdir/mask -bin $tempdir/gmmask_pure
+    fslmaths $tempdir/pvwm_inasl -thr $wm_thresh -mas $tempdir/mask -bin $tempdir/wmmask_pure
 fi
 ### End of: Partial Volume Estimates
 

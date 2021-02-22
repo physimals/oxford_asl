@@ -235,13 +235,13 @@ def add_rois_from_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_nam
     for label in desc.labels:
         add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=50)
  
-def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, log=sys.stdout):
+def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, brain_mask, log=sys.stdout):
     perfusion_data = [
         {
             "suffix" : "", 
             "f" : Image(os.path.join(outdir, "perfusion_calib")), 
             "var" : Image(os.path.join(outdir, "perfusion_var_calib")),
-            "mask" : None,
+            "mask" : brain_mask.data,
         },
     ]
     if os.path.isdir(os.path.join(outdir, "pvcorr")):
@@ -251,13 +251,13 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min
                 "suffix" : "_gm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_var_calib")),
-                "mask" : gm_pve_asl.data > min_gm_thresh,
+                "mask" : np.logical_and(brain_mask.data, gm_pve_asl.data > min_gm_thresh),
             },
             {
                 "suffix" : "_wm", 
                 "f" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_calib")), 
                 "var" : Image(os.path.join(outdir, "pvcorr", "perfusion_wm_var_calib")),
-                "mask" : wm_pve_asl.data > min_wm_thresh,
+                "mask" : np.logical_and(brain_mask.data, wm_pve_asl.data > min_wm_thresh),
             },
         ])
     else:
@@ -267,13 +267,13 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min
                 "suffix" : "_gm",
                 "f" : Image(os.path.join(outdir, "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "perfusion_var_calib")),
-                "mask" : gm_pve_asl.data > gm_thresh,
+                "mask" : np.logical_and(brain_mask.data, gm_pve_asl.data > gm_thresh),
             },
             {
                 "suffix" : "_wm",
                 "f" : Image(os.path.join(outdir, "perfusion_calib")), 
                 "var" : Image(os.path.join(outdir, "perfusion_var_calib")),
-                "mask" : wm_pve_asl.data > wm_thresh,
+                "mask" : np.logical_and(brain_mask.data, wm_pve_asl.data > wm_thresh),
             },
         ])
     return perfusion_data
@@ -291,6 +291,7 @@ def main():
     # Get reference and transformation data from oxford_asl and fsl_anat output
     outdir = os.path.join(options.oxasl_output, "native_space")
     asl_ref = Image(os.path.join(outdir, "perfusion"))
+    brain_mask = Image(os.path.join(outdir, "mask"))
 
     if options.fslanat is not None:
         struc_ref = Image(os.path.join(options.fslanat, "T1"))
@@ -315,7 +316,7 @@ def main():
     print("\nLoading perfusion images")
     gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
-    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
+    perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh, brain_mask)
 
     rois = []
     print("\nLoading generic ROIs")
