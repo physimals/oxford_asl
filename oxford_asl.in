@@ -2350,16 +2350,23 @@ fi
 
 # Region analysis if requested
 if [ ! -z $region_analysis ]; then
+
+    PYTHON="fslpython"
+    if ! [ -x "$(command -v fslpython)" ]; then
+        echo "WARNING: fslpython not found - using generic python executable"
+        PYTHON="python"
+    fi
+
     if [ -z $fslanat ]; then
         if [ -z $struc ]; then
             echo "WARNING: Region analysis requested but no structural data provided"
         elif [ -z $warp ]; then
             echo "WARNING: Region analysis requested but no structural->std space transformation provided"
         else
-            fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
+            $PYTHON -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
         fi
     else
-        fslpython -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
+        $PYTHON -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
     fi
 fi
 
