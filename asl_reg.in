@@ -307,7 +307,9 @@ echo "Registration FINAL stage (BBR)"
     cp $tempdir/low2high_final.mat $outdir/asl2struct.mat #the transformation matrix from epi_reg - this overwrites the version from MAIN registration
     convert_xfm -omat $outdir/struct2asl.mat -inverse $outdir/asl2struct.mat #often useful to have the inverse transform, so calcuate it
     if [ ! -z $fmap ]; then
-	imcp $tempdir/low2high_final_warp $outdir/asl2struct_warp #the warp from epi_reg
+	# Output the warp from epi_reg - note that we filter any NaN values as occasionally this can
+	# happen and if it does it will ruin the entire distortion correction
+	fslmaths $tempdir/low2high_final_warp -nan $outdir/asl2struct_warp
     fi
     imcp $tempdir/low2high_final $outdir/asl2struct # save the transformed image to check on the registration
     
