@@ -84,6 +84,7 @@ Usage_extended() {
     echo " --noiseprior : Use an informative prior for the noise estimation"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
     echo "   --noisesd  : Set a custom noise std. dev. for the nosie prior"
+    echo " --qc-output  : Include extended quality control output"
 
     echo " Registration (requires structural image)"
     echo " --asl2struc : transformation matrix from asl data to structural image"
@@ -935,6 +936,8 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--wm-thresh) wm_thresh=$argument
 	    takeargs=1;;
+    --qc-output) qc_output=1
+        ;;
 	--verbose) verbose=$argument
 	    takeargs=1;;
 	--debug) debug=1
@@ -2006,6 +2009,9 @@ if [ ! -z $devel ]; then
     basil_options=$basil_options" --devel "
 fi
 
+# Save model fit by default
+echo "--save-model-fit" >> $tempdir/basil_options.txt
+
 if [ ! -z $model_options ]; then
     echo "Appending additional BASIL options to $tempdir/basil_options.txt"
     cat $model_options >> $tempdir/basil_options.txt
@@ -2368,6 +2374,33 @@ if [ ! -z $region_analysis ]; then
     else
         $PYTHON -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
     fi
+fi
+
+# Optional QC outputs - this is a selection of useful intermediate outputs that may be
+# useful but not essential enough to be part of the default output, and avoids the
+# need to save the entire temporary directory.
+if [ ! -z $qc_output ]; then
+	qcdir=$outdir/qc_output
+    mkdir $qcdir
+    echo "Generating QC output in $qcdir"
+    
+    # Corrected and uncorrected data
+    imcp $tempdir/asldata $qcdir/asldata
+    imcp $tempdir/asldata_orig $qcdir/asldata_orig
+    imcp $tempdir/calib_wholehead $qcdir/calib_orig_wholehead
+    imcp $tempdir/calib_orig $qcdir/calib_orig_brain
+    imcp $tempdir/diffdata $qcdir/asldata_diff
+    imcp $tempdir/diffdata_mean $qcdir/asldata_diff_mean
+    
+    # Structural registration
+    if [ -d $tempdir/tmp_asl_reg ]; then
+        imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
+        imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
+    fi
+
+    # Model fit
+    finalstep=`ls -d $tempdir/basil/step? | sed -n '$ p'`
+    imcp $finalstep/modelfit $qcdir/modelfit
 fi
 
 # clearup
