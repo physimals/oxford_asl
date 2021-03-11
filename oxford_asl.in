@@ -2176,11 +2176,11 @@ if [ ! -z $calib ]; then
         # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
 	fslmaths $tempdir/calib -Tmean -mul $cgain $outdir/calib/M0
 	Mo=$outdir/calib/M0 
-	if [ 1 -eq `echo "$tr < 5" | bc`  ]; then
-	 # correct the M0 image for short TR using the equation from the white paper
-	    Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
-	    ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
-	    fslmaths $Mo -mul $ccorr $Mo
+    if [ 1 -eq `echo "if($tr < 5){a=1};a" | bc`  ]; then
+        # correct the M0 image for short TR using the equation from the white paper
+        Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
+        ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
+        fslmaths $Mo -mul $ccorr $Mo
 	fi
 
 	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
