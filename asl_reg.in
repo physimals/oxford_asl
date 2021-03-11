@@ -11,7 +11,12 @@
 # Make script use local copies of helper scripts/programs in the same
 # directory, if present. This allows for multiple versions of the scripts
 # to be used, possibly with bundled dependencies
-PATH=`dirname $0`:${FSLDEVDIR}/bin:${FSLDIR}/bin:${PATH}
+if [ -z "${FSLDEVDIR}" ]; then
+    FSLPATH="${FSLDIR}/bin"
+else
+    FSLPATH="${FSLDEVDIR}/bin:${FSLDIR}/bin"
+fi
+PATH=`dirname $0`:${FSLPATH}:${PATH}
 
 Usage() {
     echo "ASL_REG"
