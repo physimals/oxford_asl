@@ -22,7 +22,7 @@ class ArgumentParser(argparse.ArgumentParser):
     """
 
     def __init__(self, **kwargs):
-        argparse.ArgumentParser.__init__(self, prog="roi_stats", add_help=False, **kwargs)
+        argparse.ArgumentParser.__init__(self, prog="oxford_asl_roi_stats", add_help=False, **kwargs)
         self.add_argument("--oxasl-output", required=True,
                           help="OXFORD_ASL or OXASL output directory")
         self.add_argument("--fslanat",
@@ -47,9 +47,11 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Additional ROI as binarised mask in ASL space. The name of the ROI will be the stripped filename. May be specified multiple times")
         self.add_argument("--roi-struct", nargs="*", default=[],
                           help="Additional ROI as binarised mask in structural space. The name of the ROI will be the stripped filename. May be specified multiple times")
-        self.add_argument("--roi-mni", nargs="*", default=[],
-                          help="Additional ROI as binarised mask in MNI space. The name of the ROI will be the stripped filename. May be specified multiple times")
-        self.add_argument("--add-atlas-rois", action="store_true", default=False,
+        self.add_argument("--add-mni-atlas", nargs="*", default=[],
+                          help="Additional regions as labelled image in MNI space. If a single region is contained, the name of the ROI will be the stripped filename, otherwise use --add-mni-atlas-names. May be specified multiple times")
+        self.add_argument("--add-mni-atlas-labels", nargs="*", default=[],
+                          help="Filename containing names of regions in atlas given in --add-mni-atlas")
+        self.add_argument("--add-standard-atlases", action="store_true", default=False,
                           help="Add ROIs from Harvard-Oxford cortical/subcortical atlases")
         self.add_argument("--save-mni-rois", action="store_true", default=False,
                           help="Save ROIs in MNI space")
@@ -216,7 +218,7 @@ def add_mni_roi(rois, roi, name, mni2struc, ref, struct2asl, threshold=0.5, log=
     rois.append({"name" : name, "roi_mni" : roi, "roi_native" : roi_native, "mask_native" : roi_native.data > threshold})
     log.write("DONE\n")
  
-def add_rois_from_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_name, resolution=2, threshold=0.5, log=sys.stdout):
+def add_rois_from_fsl_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_name, resolution=2, threshold=50, log=sys.stdout):
     """
     Get ROIs from an FSL atlas
     
@@ -233,8 +235,29 @@ def add_rois_from_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_nam
     desc = registry.getAtlasDescription(atlas_name)
     atlas = registry.loadAtlas(desc.atlasID, resolution=2)
     for label in desc.labels:
-        add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=50)
+        add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=threshold)
+
+def add_rois_from_mni_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_img, region_names, log=sys.stdout):
+    """
+    Get ROIs from an atlas described by a label image in MNI space
  
+    :param rois: Mapping from name to ROI array which will be updated
+    :param mni2struc_warp: Warp image containing MNI->structural space warp
+    :param struct2asl_mat: Matrix for struct->ASL transformation
+    :param atlas_img: Atlas label image
+    :param region_names: Atlas label image
+    :param resolution: Resolution in mm
+    """
+    log.write("\nAdding ROIs from MNI atlas image: %s\n" % (atlas_img.name))
+    labels = [idx for idx in np.unique(atlas_img.data) if idx != 0]
+    if len(labels) != len(region_names):
+        region_names = ["Region %i" % label for label in labels]
+    for idx, label in enumerate(labels):
+        roi = atlas_img.data.copy()
+        roi[roi != label] = 0
+        name = region_names[idx]
+        add_mni_roi(rois, Image(roi, header=atlas_img.header), name, mni2struc_warp, ref_img, struct2asl_mat, threshold=0.5)
+
 def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, brain_mask, log=sys.stdout):
     perfusion_data = [
         {
@@ -331,13 +354,18 @@ def main():
         add_native_roi(rois, Image(fname), os.path.basename(fname).split(".")[0])
     for fname in options.roi_struct:
         add_struct_roi(rois, Image(fname), os.path.basename(fname).split(".")[0], asl_ref, struct2asl_mat)
-    for fname in options.roi_mni:
-        add_mni_roi(rois, Image(fname), os.path.basename(fname).split(".")[0], mni2struc_warp, asl_ref, struct2asl_mat)
+    for idx, fname in enumerate(options.add_mni_atlas):
+        if idx < len(options.add_mni_atlas_labels):
+            with open(options.add_mni_atlas_labels[idx]) as f:
+                names = [l.strip() for l in f.readlines()]
+        else:
+            names = [os.path.basename(fname).split(".")[0],]
+        add_rois_from_mni_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, Image(fname), names)
 
     # Add ROIs from standard atlases
-    if options.add_atlas_rois:
-        add_rois_from_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, "harvardoxford-cortical", threshold=0.5)
-        add_rois_from_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, "harvardoxford-subcortical", threshold=0.5)
+    if options.add_standard_atlases:
+        add_rois_from_fsl_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, "harvardoxford-cortical")
+        add_rois_from_fsl_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, "harvardoxford-subcortical")
 
     # Get stats in each ROI. Add name to stats dict to make TSV output easier
     print("\nGetting stats - minimum of %i voxels to report in region" % options.min_nvoxels)

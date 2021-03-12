@@ -153,8 +153,10 @@ Usage_extended() {
     echo " --model-options=<file>  : File containing additional model options to be passed to BASIL/Fabber"
     echo "                           This is an advanced setting for model-specific options ONLY"
     echo "                           Do NOT include any standard oxford_asl options here"
-    echo " --region-analysis       : Run region analysis using ROIs from Harvard-Oxford standard atlas"
-    echo "                           This requires an FSL_ANAT directory input"
+    echo " --region-analysis       : Run region analysis using ROIs (by default from Harvard-Oxford standard atlas)"
+    echo "                           This requires either an FSL_ANAT directory input or a structural->standard space transformation"
+    echo " --region-analysis-atlas : Label image containing ROIs to use for region analysis"
+    echo " --region-analysis-atlas-labels : Text file containing names of regions in the label image"
     echo " --gm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' GM (default 0.8)"
     echo " --wm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' WM (default 0.9)"
     echo ""
@@ -937,6 +939,10 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--region-analysis) region_analysis=1
 	    ;;
+	--region-analysis-atlas) region_analysis_atlas=$argument
+        takeargs=1;;
+	--region-analysis-atlas-labels) region_analysis_atlas_labels=$argument
+        takeargs=1;;
 	--gm-thresh) gm_thresh=$argument
 	    takeargs=1;;
 	--wm-thresh) wm_thresh=$argument
@@ -2368,16 +2374,26 @@ if [ ! -z $region_analysis ]; then
         PYTHON="python"
     fi
 
+    roi_analysis_args="--oxasl-output $outdir --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh"
+    if [ -z $region_analysis_atlas ]; then
+        roi_analysis_args="$roi_analysis_args --add-standard-atlases"
+    else
+        roi_analysis_args="$roi_analysis_args --add-mni-atlas=$region_analysis_atlas"
+        if [ ! -z $region_analysis_atlas_labels ]; then
+            roi_analysis_args="$roi_analysis_args --add-mni-atlas-labels=$region_analysis_atlas_labels"
+        fi
+    fi
+
     if [ -z $fslanat ]; then
         if [ -z $struc ]; then
             echo "WARNING: Region analysis requested but no structural data provided"
         elif [ -z $warp ]; then
             echo "WARNING: Region analysis requested but no structural->std space transformation provided"
         else
-            $PYTHON -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
+            $PYTHON -u `which oxford_asl_roi_stats.py` --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
         fi
     else
-        $PYTHON -u `which oxford_asl_roi_stats.py` --oxasl-output $outdir --fslanat $fslanat --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh --add-atlas-rois
+        $PYTHON -u `which oxford_asl_roi_stats.py` --fslanat $fslanat $roi_analysis_args
     fi
 fi
 
