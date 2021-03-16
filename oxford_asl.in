@@ -92,10 +92,16 @@ Usage_extended() {
     echo " --qc-output  : Include extended quality control output"
 
     echo " Registration (requires structural image)"
-    echo " --asl2struc : transformation matrix from asl data to structural image"
-    echo "                (skips registration)"
-    echo " --regfrom   : image to use a basis for inital registration (already BETed)"
-    echo "               (must be same resolution as ASL data)"
+    echo " --asl2struc     : transformation matrix from asl data to structural image"
+    echo "                   (skips registration)"
+    echo " --regfrom       : image to use a basis for inital registration (already BETed)"
+    echo "                   (must be same resolution as ASL data)"
+    echo " --regfrom-method: If --regfrom is not specified, how to choose the regfrom image."
+    echo "                   Choices are 'pwi' (mean differenced ASL data), 'calib' for "
+    echo "                   calibration image, 'mean' for mean ASL data. If no regfrom image"
+    echo "                   or method specified, the calibration image is used for subtracted"
+    echo "                   ASL data, and the mean ASL image for label/control pairs. The "
+    echo "                   image is brain extracted before use in registration."
 #    echo " -t          : structural to standard space transformation matrix"
 #    echo "               (requires structural image)"
 #    echo " --structout : (also) save the maps in structural space (for use with -t)"
@@ -863,7 +869,9 @@ takeargs=0;boolarg="";isbool="";
 	--t2bl) t2bl=$argument #custom T2 of blood
 	    takeargs=1;;
 	--regfrom) regfromflag=1 regfrom=$argument
-		   takeargs=1;;
+        takeargs=1;;
+	--regfrom-method) regfrom_method=$argument
+		takeargs=1;;
 	--finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
 		    boolarg=finalreg;
 		    ;;
@@ -1481,17 +1489,35 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
 fi
 
 if [ -z $regfrom ]; then
-# no regfrom iamge supplied so we will use the mean of the asl timeseries - unless it was diff data
-    # NB in the case of really good background suppresion this might not be best option even if raw ASL data has been supplied, in which case a calibration image could be provided to regfrom (or failing that the PWI). We wont force that here as we dont know.
-    if [ $iaf = "diff" ] && [ ! -z $calib ]; then
-	#if available use calibration image
-	bet $tempdir/calib $tempdir/calib_brain 
-	regfrom=$tempdir/calib_brain
+    # No regfrom iamge supplied. If --regfrom-pwi was specified we will use the PWI, if
+    # --regfrom-mean we will use the mean ASL image (subtracted or unsubtracted), if --regfrom-calib
+    # we will use the calibration image.
+    #
+    # The default if nothing is user-specified is to use the calibration image for differenced
+    # data (if available) or the mean ASL image if unsubtracted or there is no calibration imag
+    if [ $regfrom_method == "pwi" ]; then
+        echo "Using brain extracted PWI as initial registration reference"
+        bet $tempdir/pwi $tempdir/pwi_brain
+        regfrom=$tempdir/pwi_brain
+    elif [ $regfrom_method == "calib" ]; then
+        echo "Using brain extracted calibration image as initial registration reference"
+        bet $tempdir/calib $tempdir/calib_brain
+        regfrom=$tempdir/calib_brain
+    elif [ $regfrom_method == "mean" ]; then
+        echo "Using brain extracted mean ASL image as initial registration reference"
+        bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+        regfrom=$tempdir/meanasl_brain
+    elif [ $iaf = "diff" ] && [ ! -z $calib ]; then
+        echo "Defaulting to brain extracted calibration image as initial registration reference"
+        bet $tempdir/calib $tempdir/calib_brain
+        regfrom=$tempdir/calib_brain
     else
-	# brain extract the meanasl image
-	bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
-	regfrom=$tempdir/meanasl_brain
+        echo "Defaulting brain extracted mean ASL image as initial registration reference"
+        bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+        regfrom=$tempdir/meanasl_brain
     fi
+else
+    echo "Registration reference image specified by user: $regfrom"
 fi
 
 if [ $register -eq 1 ]; then
@@ -2438,8 +2464,9 @@ if [ ! -z $qc_output ]; then
     # Structural registration including original mask
     if [ -d $tempdir/tmp_asl_reg ]; then
         imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
-        imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
+        imcp $tempdir/tmp_asl_reg/low2high_f
     fi
+    imcp $tempdir/regfrom $qcdir/regfrom
     imcp $tempdir/mask_orig $qcdir/mask_orig
     imcp $tempdir/mask_dil_orig $qcdir/mask_dil_orig
 
