@@ -457,7 +457,8 @@ else
     initmvn=""
 fi
 
-$basil -i $1 -o $2/basil -m $tempdir/mask -@ $2/basil_options.txt $fast $initmvn $basil_options
+# Run Basil with dilated mask to ensure all required voxels are fitted
+$basil -i $1 -o $2/basil -m $tempdir/mask_dil -@ $2/basil_options.txt $fast $initmvn $basil_options
 
 
 # work out which is the final step from BASIL
@@ -497,7 +498,7 @@ fi
 
 if [ ! -z $varout ]; then
 #get varainces out of finalMVN
-    fabber_var -d ${finalstep} -m $tempdir/mask
+    fabber_var -d ${finalstep} -m $tempdir/mask_dil
 # do correction of negative values
     fslmaths ${finalstep}/var_ftiss -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_ftiss $2/var_ftiss
     if [ ! -z $senscorr ]; then
@@ -1623,6 +1624,18 @@ else
     fslmaths $mask -bin $tempdir/mask # just to be sure binarise the mask here
     Log "Using mask: $mask"
 fi
+
+# Generate dilated mask for BASIL analysis to ensure that when we do the final registration
+# and re-generate the mask, (hopefully) all the voxels in the final mask have been through
+# BASIL. We don't need to do this when the mask was user-specified as then it is unaffected
+# by registration
+if [ -z $mask ]; then
+    echo "Generating dilated mask for initial BASIL runs"
+    fslmaths $tempdir/mask -dilF $tempdir/mask_dil
+else
+    imcp $tempdir/mask $tempdir/mask_dil
+fi
+
 ### End of: Generate mask
 
 ### Distortion Correction
@@ -1786,11 +1799,11 @@ fi
 # Mask the calibration images, saving the wholehead images (although currently unused)
 if [ ! -z $calib ]; then
     imcp $tempdir/calib $tempdir/calib_wholehead
-    fslmaths $tempdir/calib -mas $tempdir/mask $tempdir/calib
+    fslmaths $tempdir/calib -mas $tempdir/mask_dil $tempdir/calib
 fi
 if [ ! -z $cref ]; then
     imcp $tempdir/cref $tempdir/cref_wholehead
-    fslmaths $tempdir/cref -mas $tempdir/mask $tempdir/cref
+    fslmaths $tempdir/cref -mas $tempdir/mask_dil $tempdir/cref
 fi
 
 # Copy or recalculate the sensitivity map (overwriting any created
@@ -1798,11 +1811,11 @@ fi
 if [ ! -z $isen ]; then
     # User-supplied sensitivity image
     Warn "User supplied sens image"
-    fslmaths $isen -mas $tempdir/mask $outdir/native_space/sensitivity
+    fslmaths $isen -mas $tempdir/mask_dil $outdir/native_space/sensitivity
     imcp $outdir/native_space/sensitivity $tempdir/sensitivity
 elif [ ! -z $cref ]; then
     # Calculate sensitivty image using user-supplied cref image
-    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask $outdir/native_space/sensitivity
+    fslmaths $tempdir/calib -div $tempdir/cref -mas $tempdir/mask_dil $outdir/native_space/sensitivity
     imcp $outdir/native_space/sensitivity $tempdir/sensitivity
 fi
 
@@ -2079,6 +2092,20 @@ if [ $register -eq 1 ]; then
 	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
     fi
 fi
+
+# Re-generate the mask from the structural image now that we have a better registration - as this might matter for PV correction
+# NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
+# NB Also, only regenerate the mask if there was no user-specified mask given
+if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
+    echo "Generating analysis mask from final structural registration"
+    imcp $tempdir/mask $tempdir/mask_orig
+    imcp $tempdir/mask_dil $tempdir/mask_dil_orig
+    fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
+    flirt -in $tempdir/struc_bet_mask -ref $tempdir/nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
+    fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
+    fslcpgeom $regfrom $tempdir/mask
+    imcp $tempdir/mask $tempdir/mask_dil
+fi
 ### End of: Registration (2/2)
 
 ### Partial Volume Estimates
@@ -2217,28 +2244,17 @@ fi
 
 ### End of: Calibration
 
-
 ### Output main BASIL results
 # Note we do this here, as we have the registration done and masks created and calibration complete
 Dooutput
 
-# save the mask used to the (native space) output directory
+# save the mask used to the (native space) output directory. Note this is the final reg mask
 imcp $tempdir/mask $outdir/native_space/mask
+
 ### End of: Output main BASIL results
 
 ### Partial Volume Correction BASIL
 if [ ! -z $pvcorr ]; then
-    # Re-generate the mask from the structural image now that we have a better registration - as this might matter for PV correction
-    # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
-    # NB Also, only regenerate the mask if there was no user-specified mask given
-    if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
-        fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
-        flirt -in $tempdir/struc_bet_mask -ref $tempdir/nativeref -applyxfm -init $tempdir/struct2asl.mat -out $tempdir/mask $APPLYXFM_OPTS
-        fslmaths $tempdir/mask -thr 0.25 -bin -fillh $tempdir/mask
-        fslcpgeom $regfrom $tempdir/mask
-        imcp $tempdir/mask $outdir/native_space/mask_pvcorr # copy new mask to output directory - indicate that it was used for PV correction analysis
-    fi
-
     # Structrual -> ASL registration may have changed slightly, so need to re-calculate sensitivity map, since it
     # either depends on the brain mask from the structural image, or the bias field extracted by FASL/FSL_ANAT
     # Save the original sensitivity map for comparison
@@ -2413,11 +2429,13 @@ if [ ! -z $qc_output ]; then
     imcp $tempdir/diffdata $qcdir/asldata_diff
     imcp $tempdir/diffdata_mean $qcdir/asldata_diff_mean
     
-    # Structural registration
+    # Structural registration including original mask
     if [ -d $tempdir/tmp_asl_reg ]; then
         imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
         imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
     fi
+    imcp $tempdir/mask_orig $qcdir/mask_orig
+    imcp $tempdir/mask_dil_orig $qcdir/mask_dil_orig
 
     # Model fit
     finalstep=`ls -d $tempdir/basil/step? | sed -n '$ p'`
