@@ -22,6 +22,9 @@ PATH=`dirname $0`:${FSLPATH}:${PATH}
 APPLYXFM_OPTS="-interp trilinear -paddingsize 1"
 APPLYWARP_OPTS="--interp=trilinear --paddingsize=1 --super --superlevel=a"
 
+# Save args for reference
+ARGS="$@"
+
 Usage() {
     echo "OXFORD_ASL"
     echo "Calculate perfusion maps from ASL data"
@@ -218,7 +221,7 @@ if [ ! -z $stdout ]; then
     elif [ ! -z $trans ]; then
 	flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname $APPLYXFM_OPTS
     else
-	echo "ERROR: cannot do standard space out - neither warp or transformation matrix found"
+	Log "ERROR: cannot do standard space out - neither warp or transformation matrix found"
     fi
 fi
 
@@ -317,7 +320,7 @@ Normalise_var() {
 
 
 Registration() {
-    echo "Performing registration"
+    Log "Performing registration"
     regbase=$1 #the i/p to the function is the image to use for registration
     transopt=$2 # other options to pass to asl_reg
     distout=$3 # we want to do distortion correction and save in the subdir distout
@@ -356,7 +359,7 @@ Registration() {
 }
 
 Calibration() {
- echo "Calculating M0a - calling ASL_CALIB"
+ Log "Calculating M0a - calling ASL_CALIB"
     extraoptions=""
     if [ ! -z $debug ]; then
 	extraoptions=$extraoptions" --debug"
@@ -663,17 +666,11 @@ fi
 }
 
 Log() {
-# save text to log, optionally also send to terminal
-    echo $1 >> $log
-    if [ $verbose -gt 1 ]; then
-	echo $1
+    # Output text to log and to standard output stream
+    echo $1
+    if [ ! -z $log ]; then
+        echo $1 >> $log
     fi
-}
-
-Warn() {
-    # save a warning to the log and echo to the terminal
-    echo "WARNING: $1"
-    echo "WARNING: $1" >> $log
 }
 
 ApplyWarps() {
@@ -1041,24 +1038,23 @@ if [ ! -z $strucflag ]; then
 	structout=1;
 fi
 
-echo "OXFORD_ASL - running"
-echo "Version: @GIT_SHA1@ @GIT_DATE@"
+log=$outdir/logfile
+
+Log "oxford_asl $ARGS"
+Log "OXFORD_ASL - running"
+Log "Version: @GIT_SHA1@ @GIT_DATE@"
 
 # set the output directory here if not specified
 if [ -z $outflag ]; then
-    echo "Ouput being placed in input directory"
+    Log "Ouput being placed in input directory"
     outdir=`pwd`;
 fi
 
 # Start by looking for the output directory (and create if need be)
 if [ ! -d $outdir ]; then
-  echo "Creating output directory"
   mkdir $outdir;
+  Log "Created output directory $outdir"
 fi
-
-# save command line to logfile
-log=$outdir/logfile
-echo $# > $log
 
 #check required inputs are present
 if [ -z $inflag ]; then
@@ -1097,15 +1093,15 @@ fi
 
 # Setup option outputs - main subdirectories and anything that would be common to all epochs
 if [ ! -z $nativeout ] && [ ! -d $outdir/native_space ]; then
-    echo "Saving results in natve (ASL aquisition) space to $outdir/native_space"
+    Log "Saving results in natve (ASL aquisition) space to $outdir/native_space"
     mkdir $outdir/native_space
 fi
 if [ ! -z $structout ] && [ ! -d $outdir/struct_space ]; then
-    echo "Saving results in structural space to $outdir/struct_space"
+    Log "Saving results in structural space to $outdir/struct_space"
     mkdir $outdir/struct_space
 fi
 if [ ! -z $advout ] && [ ! -d $outdir/advanced ]; then
-echo "Saving advanced outputs"
+Log "Saving advanced outputs"
     mkdir $outdir/advanced
 fi
 
@@ -1133,7 +1129,7 @@ fi
 ### End of Command line parameter interactions
 
 # general pre-processing
-echo "Pre-processing"
+Log "Pre-processing"
 if [ ! -z $fslanat ]; then
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
@@ -1274,7 +1270,7 @@ fslmaths $tempdir/asldata -Tmean $tempdir/nativeref
 ### Motion Correction (main)
 # note motion correction within calibration data is done above
 if [ ! -z $moco ]; then
-    echo "Motion Correction"
+    Log "Motion Correction"
     if [ ! -z $calib ]; then
 	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
 	# this also removes motion effects between asldata and calibration image
@@ -1415,12 +1411,12 @@ fslmaths $tempdir/diffdata_mean -Tmean $tempdir/pwi
 ### Establish the number of repeats in data - query the diffdata file (that will contain all repeats)
 tpoints=`fslinfo $tempdir/diffdata | grep "^dim4" | sed 's:dim4[ ]*::'`
 
-echo "Number of inversion times: $ntis"
-echo "Number of timepoints in data: $tpoints"
+Log "Number of inversion times: $ntis"
+Log "Number of timepoints in data: $tpoints"
 
 if [ -z $afrptstr ]; then
     repeats=`expr $tpoints / $ntis`
-    echo "Number of repeats in data: $repeats"
+    Log "Number of repeats in data: $repeats"
 else
     repeats=0 #variable number of repeats at each TI - have to handle specially
     ### deal with repeats (as specified on the command line)
@@ -1496,28 +1492,28 @@ if [ -z $regfrom ]; then
     # The default if nothing is user-specified is to use the calibration image for differenced
     # data (if available) or the mean ASL image if unsubtracted or there is no calibration imag
     if [ $regfrom_method == "pwi" ]; then
-        echo "Using brain extracted PWI as initial registration reference"
+        Log "Using brain extracted PWI as initial registration reference"
         bet $tempdir/pwi $tempdir/pwi_brain
         regfrom=$tempdir/pwi_brain
     elif [ $regfrom_method == "calib" ]; then
-        echo "Using brain extracted calibration image as initial registration reference"
+        Log "Using brain extracted calibration image as initial registration reference"
         bet $tempdir/calib $tempdir/calib_brain
         regfrom=$tempdir/calib_brain
     elif [ $regfrom_method == "mean" ]; then
-        echo "Using brain extracted mean ASL image as initial registration reference"
+        Log "Using brain extracted mean ASL image as initial registration reference"
         bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
         regfrom=$tempdir/meanasl_brain
     elif [ $iaf = "diff" ] && [ ! -z $calib ]; then
-        echo "Defaulting to brain extracted calibration image as initial registration reference"
+        Log "Defaulting to brain extracted calibration image as initial registration reference"
         bet $tempdir/calib $tempdir/calib_brain
         regfrom=$tempdir/calib_brain
     else
-        echo "Defaulting brain extracted mean ASL image as initial registration reference"
+        Log "Defaulting brain extracted mean ASL image as initial registration reference"
         bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
         regfrom=$tempdir/meanasl_brain
     fi
 else
-    echo "Registration reference image specified by user: $regfrom"
+    Log "Registration reference image specified by user: $regfrom"
 fi
 
 if [ $register -eq 1 ]; then
@@ -1559,7 +1555,6 @@ if [ ! -z $fslanat ]; then
 elif [ ! -z $struc ]; then
     # do we have the results from FAST already? If not run it
     if [ -z $fastsrc ]; then
-	echo "Segmenting the structural image"
 	Log "Segmenting the structural image"
 	fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
 	fastsrc=$tempdir/seg
@@ -1613,8 +1608,7 @@ fi
 ### Generate mask for ASL data
 # sort out the mask for processing the data
 if [ -z $mask ]; then
-echo "Creating mask"
-Log "Automatic mask generation"
+Log "Creating mask"
 # preferred option is to use brain extracted structural
 if [ ! -z $strucflag ]; then
     fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
@@ -1656,7 +1650,7 @@ fi
 # BASIL. We don't need to do this when the mask was user-specified as then it is unaffected
 # by registration
 if [ -z $mask ]; then
-    echo "Generating dilated mask for initial BASIL runs"
+    Log "Generating dilated mask for initial BASIL runs"
     fslmaths $tempdir/mask -dilF $tempdir/mask_dil
 else
     imcp $tempdir/mask $tempdir/mask_dil
@@ -1668,11 +1662,11 @@ fi
 # Do TOPUP if applicable
 if [ ! -z $cblip ]; then
     if [ -z $calib ]; then
-	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
+	Log "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
     elif [ -z $echospacing ] || [ -z $pedir ]; then
-	echo "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
+	Log "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
     else
-	echo "Distortion correction: running topup"
+	Log "Distortion correction: running topup"
 	
     # Create topup params. Note that TOPUP requires to total readout time which is the echo spacing multiplied
     # by the output dimension size - 1. We are interpreting the xyz axis as being the axes of the underlying
@@ -1717,7 +1711,7 @@ if [ ! -z $cblip ]; then
 		;;
 	esac
     
-    echo "For TOPUP using total read-out time of ($dimsize - 1) x $echospacing s = $totaltime s"
+    Log "For TOPUP using total read-out time of ($dimsize - 1) x $echospacing s = $totaltime s"
 
 	# do topup
 	fslmerge -t $tempdir/calib_blipped $tempdir/calib $tempdir/cblip 
@@ -1739,7 +1733,7 @@ elif [ ! -z $fmap ]; then
 fi
 
 if [ -e $tempdir/fmap.* ]; then
-    echo "Distortion Correction using asl_reg"
+    Log "Distortion Correction using asl_reg"
     
     # Do registration to T1 to get distortion correction warp
     # use whatever registration matrix we already have to initialise here 
@@ -1797,13 +1791,13 @@ if [ ! -z $topupresult ]; then
 #	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
 #	nofmapreg=1
 #    else
-	echo "Distortion Correction using TOPUP"
+	Log "Distortion Correction using TOPUP"
 	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
 	applytopup --imain=$tempdir/calib,$tempdir/cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
 	repeatsubtract=1;
 	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
 	if [ ! $cmethod="voxel" ]; then
-	    echo "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
+	    Log "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
 	fi
 	if [ ! -z $cref ]; then
 	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
@@ -1836,7 +1830,7 @@ fi
 # by FAST) if we have a cref image or a sensitivity image has been supplied directly
 if [ ! -z $isen ]; then
     # User-supplied sensitivity image
-    Warn "User supplied sens image"
+    Log "WARNING: User supplied sens image"
     fslmaths $isen -mas $tempdir/mask_dil $outdir/native_space/sensitivity
     imcp $outdir/native_space/sensitivity $tempdir/sensitivity
 elif [ ! -z $cref ]; then
@@ -1848,7 +1842,7 @@ fi
 # Senstivity correction cannot be done if this image hasn't been generated by this point
 if [ -z $outdir/native_space/sensitivity ]; then
     senscorr=""
-    Warn "sensitivity correction has been requested, but suitable map is not available, skipping that step"
+    Log "WARNING: sensitivity correction has been requested, but suitable map is not available, skipping that step"
 fi
 
 # Defaults for (some) parameters
@@ -1869,7 +1863,6 @@ Log "T1b: $t1bset"
 if [ -z $boluset ]; then
     boluslen=1.8; # use the WP default
 fi
-Log "Bolus duration(s): $boluslen"
 
 count=0
 tauslist=""
@@ -1903,8 +1896,7 @@ fi
 
 
 # write options file for BASIL - these are the core options that are appropraite whether we are doing a single or epochwise analysis
-echo "Setting up BASIL"
-Log "BASIL setup"
+Log "Setting up BASIL"
 
 # T1 values
 echo "--t1=$t1set --t1b=$t1bset" >> $tempdir/basil_options.txt
@@ -2030,16 +2022,14 @@ fi
 # Exteneded options for BASIL
 if [ ! -z $spatial ]; then
 # if we are using spatial smoothing on CBF then we will also do the analysis in a single step
-    echo "Instructing BASIL to use automated spatial smoothing"
+    Log "Instructing BASIL to use automated spatial smoothing"
     basil_options=$basil_options"--spatial "
-    Log "Employing spatial VB"
 
 fi
 
 if [ ! -z $infert1 ]; then
-    echo "Instructing BASIL to infer variable T1 values"
+    Log "Instructing BASIL to infer variable T1 values"
     basil_options=$basil_options"--infert1 "
-    Log "Including T1 uncertainty"
 fi
 
 
@@ -2063,7 +2053,7 @@ fi
 echo "--save-model-fit" >> $tempdir/basil_options.txt
 
 if [ ! -z $model_options ]; then
-    echo "Appending additional BASIL options to $tempdir/basil_options.txt"
+    Log "Appending additional BASIL options to $tempdir/basil_options.txt"
     cat $model_options >> $tempdir/basil_options.txt
 fi
 
@@ -2078,7 +2068,7 @@ cp $tempdir/basil_options.txt $tempdir/basil_options_core.txt # keep a copy of t
 
 ##### Analyse data using BASIL
 ### First analysis on whole data, normal perfusion image
-echo "Calling BASIL on data - conventional perusion image"
+Log "Calling BASIL on data - conventional perusion image"
 initbasil="" # Can be used to pass an intital MVN into the main run of BASIL from an intial run (below)
 if [ $repeats -gt 1 ] || [ $repeats -eq 0 ]; then
     # do an initial analysis using the data averaged at each TI
@@ -2112,8 +2102,7 @@ Dobasil $datafile $tempdir $initbasil
 # use existing registration for initial aligment
 if [ $register -eq 1 ]; then
     if [ $finalreg -eq 1 ]; then
-	echo "Performing final registration"
-	Log "Final registration"
+	Log "Performing final registration"
 	cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
 	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
     fi
@@ -2123,7 +2112,7 @@ fi
 # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 # NB Also, only regenerate the mask if there was no user-specified mask given
 if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
-    echo "Generating analysis mask from final structural registration"
+    Log "Generating analysis mask from final structural registration"
     imcp $tempdir/mask $tempdir/mask_orig
     imcp $tempdir/mask_dil $tempdir/mask_dil_orig
     fslmaths $tempdir/struc_bet -bin $tempdir/struc_bet_mask
@@ -2135,7 +2124,7 @@ if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
     fslmaths $tempdir/mask -sub $tempdir/mask_dil_orig -thr 0 $tempdir/missed_voxels
     num_missed=`fslstats $tempdir/missed_voxels -V |awk '{print $1}'`
     if [ $num_missed -ne 0 ]; then
-        echo "WARNING: Final analysis mask contains $num_missed voxels that were not in original model fitting mask"
+        Log "WARNING: Final analysis mask contains $num_missed voxels that were not in original model fitting mask"
     fi
 fi
 ### End of: Registration (2/2)
@@ -2161,7 +2150,7 @@ if [ ! -z $pvgm ]; then
     #using supplied PV images
 	Log "Loading supplied PV images"
 	if [ -z $pvwm ]; then
-	    echo "ERROR: no WM PV image has been supplied"
+	    Log "ERROR: no WM PV image has been supplied"
 	fi
 	Log "PV GM is: $pvgm"
 	fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
@@ -2232,7 +2221,7 @@ if [ ! -z $calib ]; then
     if [ $cmethod = 'single' ]; then
 	Log "Calibration is using a single M0 value with a CSF reference"
 	if [ -z $csf ] && [ -z $fasthasrun ]; then
-	    echo "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
+	    Log "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
 	    exit 1
 	fi
        # calcualte M0a from CSF
@@ -2264,13 +2253,13 @@ if [ ! -z $calib ]; then
 	    asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
 	fi
     else
-	echo "Error unrecognised calibration method: $cmethod, (use single or voxel)"
+	Log "Error unrecognised calibration method: $cmethod, (use single or voxel)"
     fi 
 elif [ ! -z $M0 ]; then
     # An M0 value has been supplied, use this
     cmethod=single # we are in 'single' mode as a single value has been supplied
     Mo=$M0
-    echo "M0: $Mo"
+    Log "M0: $Mo"
     Log "Using supplied M0 value: $Mo"
 fi
 
@@ -2293,7 +2282,7 @@ if [ ! -z $pvcorr ]; then
     imcp $outdir/native_space/sensitivity $outdir/native_space/sensitivity_non_pvcorr
     if [ ! -z $isen ]; then
       # User-supplied sensitivity image
-      Warn "User supplied sens image"
+      Log "WARNING: User supplied sens image"
       fslmaths $isen -mas $tempdir/mask $outdir/native_space/sensitivity
     elif [ ! -z $cref ]; then
       # Calculate sensitivty image using user-supplied cref image
@@ -2327,7 +2316,7 @@ fi
 ### Epoch BASIL
 if [ ! -z $epoch ]; then
     # epochwise analysis
-    echo "Epochwise analysis"
+    Log "Epochwise analysis"
 
     #genereate a list of epochs
     currdir=`pwd`
@@ -2418,7 +2407,7 @@ if [ ! -z $region_analysis ]; then
 
     PYTHON="fslpython"
     if ! [ -x "$(command -v fslpython)" ]; then
-        echo "WARNING: fslpython not found - using generic python executable"
+        Log "WARNING: fslpython not found - using generic python executable"
         PYTHON="python"
     fi
 
@@ -2434,9 +2423,9 @@ if [ ! -z $region_analysis ]; then
 
     if [ -z $fslanat ]; then
         if [ -z $struc ]; then
-            echo "WARNING: Region analysis requested but no structural data provided"
+            Log "WARNING: Region analysis requested but no structural data provided"
         elif [ -z $warp ]; then
-            echo "WARNING: Region analysis requested but no structural->std space transformation provided"
+            Log "WARNING: Region analysis requested but no structural->std space transformation provided"
         else
             $PYTHON -u `which oxford_asl_roi_stats.py` --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
         fi
@@ -2451,7 +2440,7 @@ fi
 if [ ! -z $qc_output ]; then
 	qcdir=$outdir/qc_output
     mkdir $qcdir
-    echo "Generating QC output in $qcdir"
+    Log "Generating QC output in $qcdir"
     
     # Corrected and uncorrected data
     imcp $tempdir/asldata $qcdir/asldata
@@ -2483,5 +2472,5 @@ else
 fi
 
 
-echo "Output is $outdir/"
-echo "OXFORD_ASL - done."
+Log "Output is $outdir/"
+Log "OXFORD_ASL - done."
