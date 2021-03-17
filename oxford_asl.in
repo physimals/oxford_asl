@@ -1275,7 +1275,7 @@ if [ ! -z $moco ]; then
 	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
 	# this also removes motion effects between asldata and calibration image
 	Log "Motion correction to calibration image"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib -mats
+	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib -mats -plots
 
 	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
 	# Extract the middle transformation
@@ -1298,7 +1298,7 @@ if [ ! -z $moco ]; then
     fi
     else
 	Log "Motion correction to middle volume of ASL data"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats
+	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats -plots
     # Save concatenated motion matrices for later use with applywarp if required
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
     fi
@@ -1484,6 +1484,16 @@ if [ ! -z $strucflag ]; then # if structural image has not been suppled then ski
     fi
 fi
 
+if [ -z $regfrom_method ]; then
+    if [ $iaf = "diff" ] && [ ! -z $calib ]; then
+        Log "Defaulting to brain extracted calibration image as initial registration reference"
+        regfrom_method="calib"
+    else
+        Log "Defaulting brain extracted mean ASL image as initial registration reference"
+        regfrom_method="mean"
+    fi
+fi
+
 if [ -z $regfrom ]; then
     # No regfrom iamge supplied. If --regfrom-pwi was specified we will use the PWI, if
     # --regfrom-mean we will use the mean ASL image (subtracted or unsubtracted), if --regfrom-calib
@@ -1503,14 +1513,9 @@ if [ -z $regfrom ]; then
         Log "Using brain extracted mean ASL image as initial registration reference"
         bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
         regfrom=$tempdir/meanasl_brain
-    elif [ $iaf = "diff" ] && [ ! -z $calib ]; then
-        Log "Defaulting to brain extracted calibration image as initial registration reference"
-        bet $tempdir/calib $tempdir/calib_brain
-        regfrom=$tempdir/calib_brain
     else
-        Log "Defaulting brain extracted mean ASL image as initial registration reference"
-        bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
-        regfrom=$tempdir/meanasl_brain
+        Log "ERROR: Unrecognized regfrom_method: $regfrom_method"
+        exit 1
     fi
 else
     Log "Registration reference image specified by user: $regfrom"
@@ -2108,6 +2113,12 @@ if [ $register -eq 1 ]; then
     fi
 fi
 
+# Do a registration of the calibration image too as this may be easier to visualise
+if [ ! -z $calib ]; then
+    Log "Generating calibration image in structural space"
+    flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib_struc $APPLYXFM_OPTS
+fi
+
 # Re-generate the mask from the structural image now that we have a better registration - as this might matter for PV correction
 # NB we dont use the PVE here since we dont (necessarily) want to exclude the ventricles from the mask as this has implications for the spatial priors
 # NB Also, only regenerate the mask if there was no user-specified mask given
@@ -2127,6 +2138,8 @@ if [ -f $tempdir/struc_bet.* -a -z "$mask" ]; then
         Log "WARNING: Final analysis mask contains $num_missed voxels that were not in original model fitting mask"
     fi
 fi
+
+
 ### End of: Registration (2/2)
 
 ### Partial Volume Estimates
@@ -2445,17 +2458,32 @@ if [ ! -z $qc_output ]; then
     # Corrected and uncorrected data
     imcp $tempdir/asldata $qcdir/asldata
     imcp $tempdir/asldata_orig $qcdir/asldata_orig
-    imcp $tempdir/calib_wholehead $qcdir/calib_orig_wholehead
-    imcp $tempdir/calib_orig $qcdir/calib_orig_brain
+    imcp $tempdir/calib_wholehead $qcdir/calib_wholehead
+    imcp $tempdir/calib $qcdir/calib_brain
+    imcp $tempdir/calib_orig $qcdir/calib_orig
     imcp $tempdir/diffdata $qcdir/asldata_diff
     imcp $tempdir/diffdata_mean $qcdir/asldata_diff_mean
     
+    # Motion parameters
+    if [ ! -z $moco ]; then
+        cp $tempdir/asldata.par $qcdir/moco_params.par
+        fsl_tsplot -i $tempdir/asldata.par \
+            -t "MCFLIRT estimated rotations (rads)" \
+            -u 1 --start=1 --finish=3 -a x,y,z -w 640 -h 144 \
+            -o $qcdir/moco_rotations.png
+        fsl_tsplot -i $tempdir/asldata.par \
+            -t "MCFLIRT estimated translations (mm)" \
+            -u 1 --start=4 --finish=6 -a x,y,z -w 640 -h 144 \
+            -o $qcdir/moco_translations.png
+    fi
+
     # Structural registration including original mask
     if [ -d $tempdir/tmp_asl_reg ]; then
         imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
-        imcp $tempdir/tmp_asl_reg/low2high_f
+        imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
+        imcp $tempdir/calib_struc $qcdir/calib2struc_final
     fi
-    imcp $tempdir/regfrom $qcdir/regfrom
+    imcp $regfrom $qcdir/regfrom
     imcp $tempdir/mask_orig $qcdir/mask_orig
     imcp $tempdir/mask_dil_orig $qcdir/mask_dil_orig
 
