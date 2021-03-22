@@ -1308,24 +1308,30 @@ fi
 fslmaths $tempdir/asldata -Tmean $tempdir/meanasl
 
 if [ ! -z $gdcwarp ]; then
-    ### User supplied distortion correction as (additional) warp
-    ### We apply this now, but later if additional distortion correction warps are derived, we will 
-    ### combine them together and re-apply to raw data to avoid multiple interpolations
+    fslinfo $gdcwarp >/dev/null 2>/dev/null
+    if [ $? -eq 0 ]; then
+        ### User supplied distortion correction as (additional) warp
+        ### We apply this now, but later if additional distortion correction warps are derived, we will
+        ### combine them together and re-apply to raw data to avoid multiple interpolations
 
-	Log "Initial application of GDC warp"
-    mkdir $tempdir/distcorr
+        Log "Initial application of GDC warp"
+        mkdir $tempdir/distcorr
 
-    # Convert the supplied warp image to extract the jacbbian (as parts) 
-    # (meanasl here is just a reference). Using relative warp convention
-    convertwarp -r $tempdir/nativeref -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts --constrainj
-    
-    # Calculation of the jacobian for the warp - method suggested in:
-    # https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;d3fee1e5.0908
-    fnirtfileutils -i $tempdir/asldist_userwarp -f spline -o $tempdir/asldist_userwarp_coef
-    fnirtfileutils -i $tempdir/asldist_userwarp_coef -j $tempdir/distcorr/jacobian
-    fslcpgeom $tempdir/asldist_userwarp $tempdir/distcorr/jacobian -d
+        # Convert the supplied warp image to extract the jacbbian (as parts)
+        # (meanasl here is just a reference). Using relative warp convention
+        convertwarp -r $tempdir/nativeref -o $tempdir/asldist_userwarp -w $gdcwarp --rel -j $tempdir/distcorr/jacobian_parts --constrainj
 
-    ApplyWarps $tempdir/asldist_userwarp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat 
+        # Calculation of the jacobian for the warp - method suggested in:
+        # https://www.jiscmail.ac.uk/cgi-bin/webadmin?A2=FSL;d3fee1e5.0908
+        fnirtfileutils -i $tempdir/asldist_userwarp -f spline -o $tempdir/asldist_userwarp_coef
+        fnirtfileutils -i $tempdir/asldist_userwarp_coef -j $tempdir/distcorr/jacobian
+        fslcpgeom $tempdir/asldist_userwarp $tempdir/distcorr/jacobian -d
+
+        ApplyWarps $tempdir/asldist_userwarp $tempdir/distcorr/jacobian $tempdir/asldata.cat $tempdir/calib2asl.mat
+    else
+        Log "WARNING: GDC warp file $gdcwarp not found - will not be used"
+        gdcwarp=""
+    fi
 fi
 
 ### deal with TIs (as specified on the command line)
