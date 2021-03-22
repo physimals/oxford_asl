@@ -310,18 +310,19 @@ def main():
 
     print("Regionwise analysis\n")
     print(" - Using oxford_asl output in %s" % options.oxasl_output)
-    print(" - Using fsl_anat output in %s" % options.fslanat)
 
     # Get reference and transformation data from oxford_asl and fsl_anat output
     outdir = os.path.join(options.oxasl_output, "native_space")
     asl_ref = Image(os.path.join(outdir, "perfusion"))
 
     if options.fslanat is not None:
+        print(" - Using fsl_anat output in %s" % options.fslanat)
         struc_ref = Image(os.path.join(options.fslanat, "T1"))
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
     elif options.struc is not None and options.gm_pve is not None and options.wm_pve is not None and options.struc2std is not None:
+        print(" - Using manually specified structural data")
         struc_ref = Image(options.struc)
         gm_pve = Image(options.gm_pve)
         wm_pve = Image(options.wm_pve)
