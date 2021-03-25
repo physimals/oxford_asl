@@ -105,6 +105,8 @@ Usage_extended() {
     echo "                   or method specified, the calibration image is used for subtracted"
     echo "                   ASL data, and the mean ASL image for label/control pairs. The "
     echo "                   image is brain extracted before use in registration."
+    echo " --reg-init-bbr  : Use BBR in the initial registration. This makes sense mostly when"
+    echo "                   using --regfrom-method=pwi"
 #    echo " -t          : structural to standard space transformation matrix"
 #    echo "               (requires structural image)"
 #    echo " --structout : (also) save the maps in structural space (for use with -t)"
@@ -325,7 +327,6 @@ Registration() {
     transopt=$2 # other options to pass to asl_reg
     distout=$3 # we want to do distortion correction and save in the subdir distout
     
-    extraoptions=" "
     if [ ! -z $lowstrucflag ]; then
 	extraoptions=$extraoptions"-r $tempdir/lowstruc"
     fi
@@ -869,6 +870,8 @@ takeargs=0;boolarg="";isbool="";
         takeargs=1;;
 	--regfrom-method) regfrom_method=$argument
 		takeargs=1;;
+	--reg-init-bbr) reg_init_bbr=1
+        ;;
 	--finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
 		    boolarg=finalreg;
 		    ;;
@@ -1476,6 +1479,76 @@ done
 echo ${alltis[*]}
 Log `echo ${alltis[*]}`
 
+### Segmentation of structural image - if we have a structural image we ALWAYS ensure we have a segmentation
+if [ ! -z $fslanat ]; then
+    # we are being supplied with an fslanat directory
+    fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
+    
+    # copy over the things we need and place them using the names used elsewhere
+    imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
+    imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
+    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
+
+    if [ ! -z $fslanat/T1_fast_bias ]; then # test to check that there is a bias field here
+       Log "Bias field extracted from $fslanat sucessfully"
+       imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
+       chmod u+w $tempdir/biasfield_struct.*
+    else
+	Log "No Bias field found in $fslanat"
+    fi
+    
+elif [ ! -z $struc ]; then
+    # do we have the results from FAST already? If not run it
+    if [ -z $fastsrc ]; then
+	Log "Segmenting the structural image"
+	fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+	fastsrc=$tempdir/seg
+    else
+	# FAST has been run externally
+	Log "Using FAST outputs at: $fastsrc"
+    fi
+	
+    # we are now sure we have FAST outputs
+    fasthasrun=1
+
+     # copy over the things we need and place them using the names used elsewhere
+    imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
+    imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
+    imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
+    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
+
+    if [ ! -z ${fastsrc}_bias ]; then # test to see if there is a bias field in the FAST output
+	Log "Bias field extracted from ${fastsrc} sucessfully"
+	imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    chmod u+w $tempdir/biasfield_struct.*
+    else
+	Log "No Bias field found with ${fastsrc}"
+    fi
+fi
+
+# some useful preproc to do with FAST outputs
+if [ ! -z $fasthasrun ]; then
+    # create a tissseg (wmseg) image for BBR in asl_reg
+    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
+
+    if [ ! -z $tempdir/biasfield_struct ]; then
+	# transform the bias field and invert to use for sensitivity correction in calibration
+	applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+    fi
+
+    if [ ! -z $senscorr ]; then
+	if [ ! -z $tempdir/biasfield ]; then #make sure we have the biasfield (from above) before attempting this
+	    Log "Creating sensitivity map from biasfield"
+	    fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+        imcp $outdir/native_space/sensitivity $tempdir/sensitivity
+        chmod u+w $tempdir/sensitivity.*
+	fi	    
+    fi
+
+fi
+### End of: Segmentation
+
 ### Registration (1/2)
 # Make sure we have some form of transformation between the ASL data and the structural (if that has been supplied)
 # only 'initial' step in asl_reg is used here
@@ -1533,88 +1606,31 @@ if [ $register -eq 1 ]; then
 	Log "Performing registration"
 	Log "Using $regfrom as base for inital registration"
 
-	extraoptions="--mainonly " # to ensure we only do the initil flirt part
 	if [ ! -z $lowstrucflag ]; then
-	    extraoptions=$extraoptions"-r $tempdir/lowstruc"
+	    extraoptions=$extraoptions" -r $tempdir/lowstruc"
 	fi
 
-	Registration $regfrom $extraoptions
+    if [ ! -z $reg_init_bbr ]; then
+        Log "Using BBR for initial registration"
+        fslmaths $regfrom -thr 0 -bin $tempdir/mask_reg_init
+        extraoptions=$extraoptions" -m $tempdir/mask_reg_init --tissseg $tempdir/tissseg"
+    else
+        Log "Initial registration is FLIRT only"
+        extraoptions=$extraoptions" --mainonly"
+    fi
+
+    Log "Reg options: $extraoptions"
+	Registration $regfrom "$extraoptions"
     fi
     convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+
+    # Do a registration of the calibration image too as this may be easier to visualise
+    if [ ! -z $calib ]; then
+        Log "Generating calibration image in structural space"
+        flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib_struc_orig $APPLYXFM_OPTS
+    fi
 fi
 ### End of: Registration (1/2)
-
-### Segmentation of structural image - if we have a structural image we ALWAYS ensure we have a segmentation
-if [ ! -z $fslanat ]; then
-    # we are being supplied with an fslanat directory
-    fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
-    
-    # copy over the things we need and place them using the names used elsewhere
-    imcp $fslanat/T1_fast_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
-    imcp $fslanat/T1_fast_pve_1 $tempdir/pvgm_struct
-    imcp $fslanat/T1_fast_pve_2 $tempdir/pvwm_struct
-    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
-
-    if [ ! -z $fslanat/T1_fast_bias ]; then # test to check that there is a bias field here
-       Log "Bias field extracted from $fslanat sucessfully"
-       imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
-       chmod u+w $tempdir/biasfield_struct.*
-    else
-	Log "No Bias field found in $fslanat"
-    fi
-    
-elif [ ! -z $struc ]; then
-    # do we have the results from FAST already? If not run it
-    if [ -z $fastsrc ]; then
-	Log "Segmenting the structural image"
-	fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
-	fastsrc=$tempdir/seg
-    else
-	# FAST has been run externally
-	Log "Using FAST outputs at: $fastsrc"
-    fi
-	
-    # we are now sure we have FAST outputs
-    fasthasrun=1
-
-     # copy over the things we need and place them using the names used elsewhere
-    imcp ${fastsrc}_pve_0 $tempdir/pvcsf_struct #indicate that it is in structural space!
-    imcp ${fastsrc}_pve_1 $tempdir/pvgm_struct
-    imcp ${fastsrc}_pve_2 $tempdir/pvwm_struct
-    chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
-
-    if [ ! -z ${fastsrc}_bias ]; then # test to see if there is a bias field in the FAST output
-	Log "Bias field extracted from ${fastsrc} sucessfully"
-	imcp ${fastsrc}_bias $tempdir/biasfield_struct
-    chmod u+w $tempdir/biasfield_struct.*
-    else
-	Log "No Bias field found with ${fastsrc}"
-    fi
-     
-fi
-
-# some useful preproc to do with FAST outputs
-if [ ! -z $fasthasrun ]; then
-    # create a tissseg (wmseg) image for BBR in asl_reg
-    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
-
-    if [ ! -z $tempdir/biasfield_struct ]; then
-	# transform the bias field and invert to use for sensitivity correction in calibration
-	applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
-    fi
-
-    if [ ! -z $senscorr ]; then
-	if [ ! -z $tempdir/biasfield ]; then #make sure we have the biasfield (from above) before attempting this
-	    Log "Creating sensitivity map from biasfield"
-	    fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
-        imcp $outdir/native_space/sensitivity $tempdir/sensitivity
-        chmod u+w $tempdir/sensitivity.*
-	fi	    
-    fi
-
-fi
-    
-### End of: Segmentation
 
 ### Generate mask for ASL data
 # sort out the mask for processing the data
@@ -2486,6 +2502,7 @@ if [ ! -z $qc_output ]; then
     # Structural registration including original mask
     if [ -d $tempdir/tmp_asl_reg ]; then
         imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
+        imcp $tempdir/calib_struc_orig $qcdir/calib2struc_initial
         imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
         imcp $tempdir/calib_struc $qcdir/calib2struc_final
     fi
