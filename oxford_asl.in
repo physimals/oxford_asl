@@ -1601,33 +1601,37 @@ else
 fi
 
 if [ $register -eq 1 ]; then
-# registration here using asl_reg (inital only)
+    # registration here using asl_reg (inital only)
     if [ ! -z $regfrom ]; then
-	Log "Performing registration"
-	Log "Using $regfrom as base for inital registration"
+        Log "Performing registration"
+        Log "Using $regfrom as base for inital registration"
 
-	if [ ! -z $lowstrucflag ]; then
-	    extraoptions=$extraoptions" -r $tempdir/lowstruc"
-	fi
+        if [ ! -z $lowstrucflag ]; then
+            extraoptions=$extraoptions" -r $tempdir/lowstruc"
+        fi
 
-    if [ ! -z $reg_init_bbr ]; then
-        Log "Using BBR for initial registration"
-        fslmaths $regfrom -thr 0 -bin $tempdir/mask_reg_init
-        extraoptions=$extraoptions" -m $tempdir/mask_reg_init --tissseg $tempdir/tissseg"
-    else
-        Log "Initial registration is FLIRT only"
-        extraoptions=$extraoptions" --mainonly"
-    fi
+        if [ ! -z $reg_init_bbr ]; then
+            Log "Using BBR for initial registration"
+            fslmaths $regfrom -thr 0 -bin $tempdir/mask_reg_init
+            extraoptions=$extraoptions" -m $tempdir/mask_reg_init --tissseg $tempdir/tissseg"
+            regto=low2high_final
+        else
+            Log "Initial registration is FLIRT only"
+            extraoptions=$extraoptions" --mainonly"
+            regto=lowtohigh
+        fi
 
-    Log "Reg options: $extraoptions"
-	Registration $regfrom "$extraoptions"
+        Registration $regfrom "$extraoptions"
+
+        # Save the registered image
+        imcp $regto $tempdir/asl2struc_initial
     fi
     convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
 
-    # Do a registration of the calibration image too as this may be easier to visualise
+    # Do a registration of the calibration image as this may be easier to visualise
     if [ ! -z $calib ]; then
         Log "Generating calibration image in structural space"
-        flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib_struc_orig $APPLYXFM_OPTS
+        flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib2struc_initial $APPLYXFM_OPTS
     fi
 fi
 ### End of: Registration (1/2)
@@ -2501,8 +2505,8 @@ if [ ! -z $qc_output ]; then
 
     # Structural registration including original mask
     if [ -d $tempdir/tmp_asl_reg ]; then
-        imcp $tempdir/tmp_asl_reg/low2high $qcdir/asl2struc_initial
-        imcp $tempdir/calib_struc_orig $qcdir/calib2struc_initial
+        imcp $tempdir/asl2struc_initial $qcdir/asl2struc_initial
+        imcp $tempdir/calib2struc_initial $qcdir/calib2struc_initial
         imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
         imcp $tempdir/calib_struc $qcdir/calib2struc_final
     fi
