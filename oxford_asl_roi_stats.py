@@ -151,7 +151,7 @@ STATS_FNS = {
     "I2" : i2,
 }
 
-def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=True, min_nvoxels=10, mask=None):
+def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=True, ignore_zerovar=True, min_nvoxels=10, mask=None):
     """
     Get a set of statistics for a 3D image within an roi
 
@@ -178,6 +178,8 @@ def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=T
         effective_roi = np.logical_and(effective_roi, ~np.isnan(img))
     if ignore_inf:
         effective_roi = np.logical_and(effective_roi, np.isfinite(img))
+    if ignore_zerovar:
+        effective_roi = np.logical_and(effective_roi, var_img > 0)
     if mask is not None:
         effective_roi = np.logical_and(effective_roi, mask)
 
