@@ -1624,7 +1624,7 @@ if [ $register -eq 1 ]; then
         Registration $regfrom "$extraoptions"
 
         # Save the registered image
-        imcp $regto $tempdir/asl2struc_initial
+        imcp $tempdir/tmp_asl_reg/$regto $tempdir/asl2struc_initial
     fi
     convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
 
