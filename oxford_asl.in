@@ -1662,7 +1662,7 @@ fi
 # by registration
 if [ -z $mask ]; then
     Log "Generating dilated mask for initial BASIL runs"
-    fslmaths $tempdir/mask -dilF $tempdir/mask_dil
+    fslmaths $tempdir/mask -kernel boxv 5 -dilF $tempdir/mask_dil
 else
     imcp $tempdir/mask $tempdir/mask_dil
 fi
