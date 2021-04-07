@@ -266,6 +266,12 @@ Report() {
 	echo $repval > $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
 
+    if [ -f "$tempdir/${masktype}mask_pure_cort."* ]; then
+	    repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure_cort -m`
+	    echo $repval > $outdir/native_space/$subdir/${parname}_cortical_${masktype}_mean.txt
+	    Log "Mean $parname in cortical $masktype is $repval"
+    fi
+
     fi
 }
 
@@ -2214,6 +2220,40 @@ if [ ! -z $pvexist ]; then
     # these are for calculating mean perfusion within tissue types
     fslmaths $tempdir/pvgm_inasl -thr $gm_thresh -mas $tempdir/mask -bin $tempdir/gmmask_pure
     fslmaths $tempdir/pvwm_inasl -thr $wm_thresh -mas $tempdir/mask -bin $tempdir/wmmask_pure
+
+    # If we have a structural -> std space transformation, generate cortical-only masks for GM
+    # and WM using FSL atlases. This involves using the 'Cerebral Cortex' and 'Cerebral White Matter'
+    # maps from the Harvard-Oxford subcortical mask and summing them to get a cortical mask that
+    # excludes subcortical regions including the cerebellum
+    if [ ! -z $warp ]; then
+        struc2std_warp=$warp
+	    Log "Using user-supplied structural->standard space warp to generate cortical GM/WM masks"
+    elif [ -f "$fslanat/T1_to_MNI_nonlin_coeff."* ]; then
+	    Log "Using FSL_ANAT structural->standard space warp to generate cortical GM/WM masks"
+	    struc2std_warp=$fslanat/T1_to_MNI_nonlin_coeff
+    elif [ -e "$fslanat/T1_to_MNI_lin.mat" ]; then
+	    Log "Using FSL_ANAT structural->standard space linear transformation to generate cortical GM/WM masks"
+	    struc2std_trans=$fslanat/T1_to_MNI_lin.mat
+    fi
+
+    if [ ! -z $struc2std_warp ] || [ ! -z $struc2std_trans ]; then
+        fslroi $FSLDIR/data/atlases/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz $tempdir/lcort_std 0 2
+        fslroi $FSLDIR/data/atlases/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz $tempdir/rcort_std 11 2
+        fslmaths $tempdir/lcort_std -add $tempdir/rcort_std -Tmean -mul 2 $tempdir/cort_std
+        if [ ! -z $struc2std_warp ]; then
+	        invwarp --ref=$tempdir/struc --warp="$struc2std_warp" --out=$tempdir/std2struc_warp
+	        applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --warp=$tempdir/std2struc_warp --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+        else
+            convert_xfm -omat "$struc2std_trans" -inverse $tempdir/std2struc_trans
+	        applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --premat=$tempdir/std2struc_trans --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+        fi
+
+        fslmaths $tempdir/cort_asl -thr 50 -bin $tempdir/cort_mask_asl
+        fslmaths $tempdir/gmmask_pure -mas $tempdir/cort_mask_asl $tempdir/gmmask_pure_cort
+        fslmaths $tempdir/wmmask_pure -mas $tempdir/cort_mask_asl $tempdir/wmmask_pure_cort
+    else
+	    Log "WARNING: No structural->standard space transformation - cannot generate cortical-only GM/WM masks"
+    fi
 fi
 ### End of: Partial Volume Estimates
 
@@ -2439,6 +2479,8 @@ if [ ! -z $pvexist ]; then
     imcp $tempdir/wmmask $outdir/native_space/wm_mask
     imcp $tempdir/gmmask_pure $outdir/native_space/gm_roi
     imcp $tempdir/wmmask_pure $outdir/native_space/wm_roi
+    imcp $tempdir/gmmask_pure_cort $outdir/native_space/cortical_gm_roi
+    imcp $tempdir/wmmask_pure_cort $outdir/native_space/cortical_wm_roi
 fi
 
 # Region analysis if requested
