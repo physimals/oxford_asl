@@ -2493,12 +2493,13 @@ if [ ! -z $region_analysis ]; then
     fi
 
     roi_analysis_args="--oxasl-output $outdir --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh"
-    if [ -z $region_analysis_atlas ]; then
-        roi_analysis_args="$roi_analysis_args --add-standard-atlases"
-    else
+    roi_analysis_args="$roi_analysis_args --add-standard-atlases"
+    if [ ! -z $region_analysis_atlas ]; then
         roi_analysis_args="$roi_analysis_args --add-mni-atlas=$region_analysis_atlas"
+        Log "Adding custom region analysis atlas: $region_analysis_atlas"
         if [ ! -z $region_analysis_atlas_labels ]; then
             roi_analysis_args="$roi_analysis_args --add-mni-atlas-labels=$region_analysis_atlas_labels"
+            Log "  - Using custom labels in: $region_analysis_atlas_labels"
         fi
     fi
 
