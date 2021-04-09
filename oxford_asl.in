@@ -2494,6 +2494,11 @@ if [ ! -z $region_analysis ]; then
 
     roi_analysis_args="--oxasl-output $outdir --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh"
     roi_analysis_args="$roi_analysis_args --add-standard-atlases"
+    if [ -f "$tempdir/gmmask_pure_cort."* ]; then
+        # If we have cortical GM mask assume we have WM one too
+        roi_analysis_args="$roi_analysis_args --roi-native $tempdir/gmmask_pure_cort $tempdir/wmmask_pure_cort"
+    fi
+
     if [ ! -z $region_analysis_atlas ]; then
         roi_analysis_args="$roi_analysis_args --add-mni-atlas=$region_analysis_atlas"
         Log "Adding custom region analysis atlas: $region_analysis_atlas"
