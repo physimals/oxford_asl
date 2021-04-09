@@ -55,6 +55,8 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Add ROIs from Harvard-Oxford cortical/subcortical atlases")
         self.add_argument("--save-mni-rois", action="store_true", default=False,
                           help="Save ROIs in MNI space")
+        self.add_argument("--save-struct-rois", action="store_true", default=False,
+                          help="Save ROIs in structural space")
         self.add_argument("--save-native-rois", action="store_true", default=False,
                           help="Save ROIs in native (ASL) space")
         self.add_argument("--save-native-masks", action="store_true", default=False,
@@ -90,7 +92,7 @@ def _transform(img, warp, ref, premat=None, postmat=None, interp="trilinear", pa
 
     if output_is_roi:
         # Binarise mask images
-        ret = Image((ret.data > output_roi_threshold).astype(np.int), header=ret.header)
+        ret = Image((ret.data > output_roi_thresh).astype(np.int), header=ret.header)
     return ret
 
 def _write_nii(img, fname, header=None):
@@ -200,7 +202,7 @@ def add_native_roi(rois, roi, name, log=sys.stdout):
     Add an ROI in native (ASL) space
     """
     rois.append({"name" : name, "mask_native" : roi.data})
-    log.write(" - %s...DONE" % name)
+    log.write(" - %s...DONE\n" % name)
 
 def add_struct_roi(rois, roi, name, ref, struct2asl, threshold=0.5, log=sys.stdout):
     """
@@ -216,7 +218,7 @@ def add_mni_roi(rois, roi, name, mni2struc, ref, struct2asl, threshold=0.5, log=
     Add an ROI in MNI space
     """
     log.write(" - %s..." % name)
-    roi_native = _transform(roi, mni2struc, ref=ref, postmat=struct2asl)
+    roi_native = _transform(roi, warp=mni2struc, ref=ref, postmat=struct2asl)
     rois.append({"name" : name, "roi_mni" : roi, "roi_native" : roi_native, "mask_native" : roi_native.data > threshold})
     log.write("DONE\n")
  
@@ -317,18 +319,21 @@ def main():
     outdir = os.path.join(options.oxasl_output, "native_space")
     asl_ref = Image(os.path.join(outdir, "perfusion"))
 
+    gm_pve, wm_pve = None, None
     if options.fslanat is not None:
         print(" - Using fsl_anat output in %s" % options.fslanat)
         struc_ref = Image(os.path.join(options.fslanat, "T1"))
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
-    elif options.struc is not None and options.gm_pve is not None and options.wm_pve is not None and options.struc2std is not None:
+    elif options.struc is not None and options.struc2std is not None:
         print(" - Using manually specified structural data")
         struc_ref = Image(options.struc)
-        gm_pve = Image(options.gm_pve)
-        wm_pve = Image(options.wm_pve)
         struct2mni_warp = Image(options.struc2std)
+        if options.gm_pve is not None:
+            gm_pve = Image(options.gm_pve)
+        if options.wm_pve is not None:
+            wm_pve = Image(options.wm_pve)
     else:
         sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std")
         sys.exit(1)
@@ -346,10 +351,12 @@ def main():
 
     rois = []
     print("\nLoading generic ROIs")
-    add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.min_gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_gm_thresh)
-    add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.min_wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_wm_thresh)
-    add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
-    add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
+    if gm_pve is not None:
+        add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.min_gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_gm_thresh)
+        add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
+    if wm_pve is not None:
+        add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.min_wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_wm_thresh)
+        add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
 
     # Add ROIs from command line
     print("\nLoading user-specified ROIs")
@@ -400,6 +407,8 @@ def main():
             _write_nii(roi["roi_native"], os.path.join(options.output, "rois_native", fname))
         if options.save_native_masks and "mask_native" in roi:
             _write_nii(roi["mask_native"], os.path.join(options.output, "masks_native", fname), header=asl_ref.header)
+        if options.save_struct_rois and "roi_struct" in roi:
+            _write_nii(roi["roi_struct"], os.path.join(options.output, "rois_struct", fname))
         if options.save_mni_rois and "roi_mni" in roi:
             _write_nii(roi["roi_mni"], os.path.join(options.output, "rois_mni", fname))
 
