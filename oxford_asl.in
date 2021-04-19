@@ -755,6 +755,10 @@ finalreg=1; # we always try to refine the registration using the perfusion image
 fixbolus=undef; # the default for this is determined by other command line parameters.
 edgecorr=1; # we do edge correction with the voxelwise calibration method by default
 
+# Declare arrays for additional ROI atlases
+declare -a region_analysis_atlases
+declare -a region_analysis_atlases_labels
+
 # parse command line here
 until [ -z $1 ]; do
 
@@ -954,9 +958,9 @@ takeargs=0;boolarg="";isbool="";
 	    takeargs=1;;
 	--region-analysis) region_analysis=1
 	    ;;
-	--region-analysis-atlas) region_analysis_atlas=$argument
+	--region-analysis-atlas) region_analysis_atlases+=( "$argument" )
         takeargs=1;;
-	--region-analysis-atlas-labels) region_analysis_atlas_labels=$argument
+	--region-analysis-atlas-labels) region_analysis_atlases_labels+=( "$argument" )
         takeargs=1;;
 	--gm-thresh) gm_thresh=$argument
 	    takeargs=1;;
@@ -2499,13 +2503,20 @@ if [ ! -z $region_analysis ]; then
         roi_analysis_args="$roi_analysis_args --roi-native $tempdir/gmmask_pure_cort $tempdir/wmmask_pure_cort"
     fi
 
-    if [ ! -z $region_analysis_atlas ]; then
-        roi_analysis_args="$roi_analysis_args --add-mni-atlas=$region_analysis_atlas"
-        Log "Adding custom region analysis atlas: $region_analysis_atlas"
-        if [ ! -z $region_analysis_atlas_labels ]; then
-            roi_analysis_args="$roi_analysis_args --add-mni-atlas-labels=$region_analysis_atlas_labels"
-            Log "  - Using custom labels in: $region_analysis_atlas_labels"
-        fi
+    for atlas in ${region_analysis_atlases[@]}; do
+        Log "Adding custom region analysis atlas: $atlas"
+        roi_analysis_add_atlases="$roi_analysis_add_atlases $atlas"
+    done
+    if [ ! -z "$roi_analysis_add_atlases" ]; then
+        roi_analysis_args="$roi_analysis_args --add-mni-atlas $roi_analysis_add_atlases"
+    fi
+
+    for atlas_labels in ${region_analysis_atlases_labels[@]}; do
+        Log "Using custom atlas labels in: $atlas_labels"
+        roi_analysis_add_atlases_labels="$roi_analysis_add_atlases_labels $atlas_labels"
+    done
+    if [ ! -z "$roi_analysis_add_atlases_labels" ]; then
+        roi_analysis_args="$roi_analysis_args --add-mni-atlas-labels $roi_analysis_add_atlases_labels"
     fi
 
     if [ -z $fslanat ]; then
