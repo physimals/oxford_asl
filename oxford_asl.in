@@ -166,6 +166,7 @@ Usage_extended() {
     echo "                           Do NOT include any standard oxford_asl options here"
     echo " --region-analysis       : Run region analysis using ROIs (by default from Harvard-Oxford standard atlas)"
     echo "                           This requires either an FSL_ANAT directory input or a structural->standard space transformation"
+    echo " --region-analysis-save-rois : Save ROIs used for region analysis"
     echo " --region-analysis-atlas : Label image containing ROIs to use for region analysis"
     echo " --region-analysis-atlas-labels : Text file containing names of regions in the label image"
     echo " --gm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' GM (default 0.8)"
@@ -964,6 +965,8 @@ takeargs=0;boolarg="";isbool="";
 	--model-options) model_options=$argument
 	    takeargs=1;;
 	--region-analysis) region_analysis=1
+	    ;;
+	--region-analysis-save-rois) region_analysis_save_rois=1
 	    ;;
 	--region-analysis-atlas) region_analysis_atlases+=( "$argument" )
         takeargs=1;;
@@ -2524,6 +2527,10 @@ if [ ! -z $region_analysis ]; then
     done
     if [ ! -z "$roi_analysis_add_atlases_labels" ]; then
         roi_analysis_args="$roi_analysis_args --add-mni-atlas-labels $roi_analysis_add_atlases_labels"
+    fi
+
+    if [ ! -z $region_analysis_save_rois ]; then
+        roi_analysis_args="$roi_analysis_args --save-mni-rois --save-struct-rois --save-native-rois --save-native-masks"
     fi
 
     if [ -z $fslanat ]; then
