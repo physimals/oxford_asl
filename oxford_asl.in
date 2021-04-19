@@ -271,6 +271,13 @@ Report() {
 	    echo $repval > $outdir/native_space/$subdir/${parname}_cortical_${masktype}_mean.txt
 	    Log "Mean $parname in cortical $masktype is $repval"
     fi
+    # This nonsense exists because we want the WM mask minus subcortial structures to be
+    # referred to as 'cerebral' rather than 'cortical'
+    if [ -f "$tempdir/${masktype}mask_pure_cereb."* ]; then
+	    repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure_cereb -m`
+	    echo $repval > $outdir/native_space/$subdir/${parname}_cerebral_${masktype}_mean.txt
+	    Log "Mean $parname in cerebral $masktype is $repval"
+    fi
 
     fi
 }
@@ -2254,7 +2261,7 @@ if [ ! -z $pvexist ]; then
 
         fslmaths $tempdir/cort_asl -thr 50 -bin $tempdir/cort_mask_asl
         fslmaths $tempdir/gmmask_pure -mas $tempdir/cort_mask_asl $tempdir/gmmask_pure_cort
-        fslmaths $tempdir/wmmask_pure -mas $tempdir/cort_mask_asl $tempdir/wmmask_pure_cort
+        fslmaths $tempdir/wmmask_pure -mas $tempdir/cort_mask_asl $tempdir/wmmask_pure_cereb
     else
 	    Log "WARNING: No structural->standard space transformation - cannot generate cortical-only GM/WM masks"
     fi
@@ -2484,7 +2491,7 @@ if [ ! -z $pvexist ]; then
     imcp $tempdir/gmmask_pure $outdir/native_space/gm_roi
     imcp $tempdir/wmmask_pure $outdir/native_space/wm_roi
     imcp $tempdir/gmmask_pure_cort $outdir/native_space/cortical_gm_roi
-    imcp $tempdir/wmmask_pure_cort $outdir/native_space/cortical_wm_roi
+    imcp $tempdir/wmmask_pure_cereb $outdir/native_space/cerebral_wm_roi
 fi
 
 # Region analysis if requested
@@ -2500,7 +2507,7 @@ if [ ! -z $region_analysis ]; then
     roi_analysis_args="$roi_analysis_args --add-standard-atlases"
     if [ -f "$tempdir/gmmask_pure_cort."* ]; then
         # If we have cortical GM mask assume we have WM one too
-        roi_analysis_args="$roi_analysis_args --roi-native $tempdir/gmmask_pure_cort $tempdir/wmmask_pure_cort"
+        roi_analysis_args="$roi_analysis_args --roi-native $tempdir/gmmask_pure_cort $tempdir/wmmask_pure_cereb"
     fi
 
     for atlas in ${region_analysis_atlases[@]}; do
