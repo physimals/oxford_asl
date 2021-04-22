@@ -1061,12 +1061,6 @@ if [ ! -z $strucflag ]; then
 	structout=1;
 fi
 
-log=$outdir/logfile
-
-Log "oxford_asl $ARGS"
-Log "OXFORD_ASL - running"
-Log "Version: @GIT_SHA1@ @GIT_DATE@"
-
 # set the output directory here if not specified
 if [ -z $outflag ]; then
     Log "Ouput being placed in input directory"
@@ -1078,6 +1072,13 @@ if [ ! -d $outdir ]; then
   mkdir $outdir;
   Log "Created output directory $outdir"
 fi
+
+log=$outdir/logfile
+rm "$log"
+
+Log "oxford_asl $ARGS"
+Log "OXFORD_ASL - running"
+Log "Version: @GIT_SHA1@ @GIT_DATE@"
 
 #check required inputs are present
 if [ -z $inflag ]; then
@@ -1546,27 +1547,6 @@ elif [ ! -z $struc ]; then
 	Log "No Bias field found with ${fastsrc}"
     fi
 fi
-
-# some useful preproc to do with FAST outputs
-if [ ! -z $fasthasrun ]; then
-    # create a tissseg (wmseg) image for BBR in asl_reg
-    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
-
-    if [ ! -z $tempdir/biasfield_struct ]; then
-	# transform the bias field and invert to use for sensitivity correction in calibration
-	applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
-    fi
-
-    if [ ! -z $senscorr ]; then
-	if [ ! -z $tempdir/biasfield ]; then #make sure we have the biasfield (from above) before attempting this
-	    Log "Creating sensitivity map from biasfield"
-	    fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
-        imcp $outdir/native_space/sensitivity $tempdir/sensitivity
-        chmod u+w $tempdir/sensitivity.*
-	fi	    
-    fi
-
-fi
 ### End of: Segmentation
 
 ### Registration (1/2)
@@ -1652,6 +1632,26 @@ if [ $register -eq 1 ]; then
     if [ ! -z $calib ]; then
         Log "Generating calibration image in structural space"
         flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib2struc_initial $APPLYXFM_OPTS
+    fi
+fi
+
+# Some useful preproc to do with FAST outputs once we have the initial registration
+if [ ! -z $fasthasrun ]; then
+    # create a tissseg (wmseg) image for BBR in asl_reg
+    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
+
+    if [ ! -z $tempdir/biasfield_struct ]; then
+        # transform the bias field and invert to use for sensitivity correction in calibration
+        applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+    fi
+
+    if [ ! -z $senscorr ]; then
+        if [ ! -z $tempdir/biasfield ]; then #make sure we have the biasfield (from above) before attempting this
+            Log "Creating sensitivity map from biasfield"
+            fslmaths $tempdir/biasfield -recip $outdir/native_space/sensitivity
+            imcp $outdir/native_space/sensitivity $tempdir/sensitivity
+            chmod u+w $tempdir/sensitivity.*
+        fi
     fi
 fi
 ### End of: Registration (1/2)
