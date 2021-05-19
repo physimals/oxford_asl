@@ -2577,12 +2577,10 @@ if [ ! -z $qc_output ]; then
     fi
 
     # Structural registration including original mask
-    if [ -d $tempdir/tmp_asl_reg ]; then
-        imcp $tempdir/asl2struc_initial $qcdir/asl2struc_initial
-        imcp $tempdir/calib2struc_initial $qcdir/calib2struc_initial
-        imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
-        imcp $tempdir/calib_struc $qcdir/calib2struc_final
-    fi
+    imcp $tempdir/asl2struc_initial $qcdir/asl2struc_initial
+    imcp $tempdir/calib2struc_initial $qcdir/calib2struc_initial
+    imcp $tempdir/tmp_asl_reg/low2high_final $qcdir/asl2struc_final
+    imcp $tempdir/calib_struc $qcdir/calib2struc_final
     imcp $regfrom $qcdir/regfrom
     imcp $tempdir/mask_orig $qcdir/mask_orig
     imcp $tempdir/mask_dil_orig $qcdir/mask_dil_orig
