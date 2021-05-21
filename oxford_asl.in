@@ -1502,6 +1502,7 @@ Log `echo ${alltis[*]}`
 
 ### Segmentation of structural image - if we have a structural image we ALWAYS ensure we have a segmentation
 if [ ! -z $fslanat ]; then
+	Log "Using FSL_ANAT outputs at: $fslanat"
     # we are being supplied with an fslanat directory
     fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
     
@@ -1600,6 +1601,13 @@ else
     Log "Registration reference image specified by user: $regfrom"
 fi
 
+# Create the wmseg here in case it's needed for the initial registration
+if [ ! -z $fasthasrun ]; then
+    # create a tissseg (wmseg) image for BBR in asl_reg
+    Log "Creating WMseg for BBR registration"
+    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
+fi
+
 if [ $register -eq 1 ]; then
     # registration here using asl_reg (inital only)
     if [ ! -z $regfrom ]; then
@@ -1637,9 +1645,6 @@ fi
 
 # Some useful preproc to do with FAST outputs once we have the initial registration
 if [ ! -z $fasthasrun ]; then
-    # create a tissseg (wmseg) image for BBR in asl_reg
-    fslmaths $tempdir/pvwm_struct -thr 0.5 -bin ${tempdir}/tissseg
-
     if [ ! -z $tempdir/biasfield_struct ]; then
         # transform the bias field and invert to use for sensitivity correction in calibration
         applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$tempdir/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
