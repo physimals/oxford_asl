@@ -25,6 +25,8 @@ class ArgumentParser(argparse.ArgumentParser):
         argparse.ArgumentParser.__init__(self, prog="oxford_asl_roi_stats", add_help=False, **kwargs)
         self.add_argument("--oxasl-output", required=True,
                           help="OXFORD_ASL or OXASL output directory")
+        self.add_argument("--add-arrival", action="store_true", default=False,
+                          help="Generate output for arrival time as well as perfusion")
         self.add_argument("--fslanat",
                           help="FSL_ANAT output directory - if not specified --struc --gm-pve --wm-pve and --struc2std must be given")
         self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
@@ -61,6 +63,8 @@ class ArgumentParser(argparse.ArgumentParser):
                           help="Save ROIs in native (ASL) space")
         self.add_argument("--save-native-masks", action="store_true", default=False,
                           help="Save binary masks in native (ASL) space")
+        self.add_argument("--output-prefix", help="Prefix for output files",
+                          default="region_analysis")
 
 def _transform(img, warp, ref, premat=None, postmat=None, interp="trilinear", paddingsize=1, output_is_roi=False, output_roi_thresh=0.5):
     """
@@ -306,6 +310,18 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min
         ])
     return perfusion_data
 
+def get_arrival_data(outdir, log=sys.stdout):
+    brain_mask = Image(os.path.join(outdir, "mask"))
+    arrival_data = [
+        {
+            "suffix" : "_arrival",
+            "f" : Image(os.path.join(outdir, "arrival")),
+            "var" : Image(os.path.join(outdir, "arrival_var")),
+            "mask" : brain_mask.data,
+        },
+    ]
+    return arrival_data
+
 def main():
     options = ArgumentParser().parse_args()
     if options.oxasl_output is None:
@@ -348,6 +364,9 @@ def main():
     gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
+    if options.add_arrival:
+        print(" - Also generating stats for arrival data")
+        perfusion_data += get_arrival_data(outdir)
 
     rois = []
     print("\nLoading generic ROIs")
@@ -384,7 +403,7 @@ def main():
         os.makedirs(options.output, exist_ok=True)
         writer = None
         # Save TSV stats output. Note we give TSV file a CSV extension to make Excel happier
-        with open(os.path.join(options.output, "region_analysis%s.csv" % suffix), mode="w", newline='') as tsv_file:
+        with open(os.path.join(options.output, "%s%s.csv" % (options.output_prefix, suffix)), mode="w", newline='') as tsv_file:
             for roi in rois:
                 roi["stats"] = {"name" : roi["name"]}
                 get_stats(roi["stats"], item["f"].data, item["var"].data, roi["mask_native"], mask=item["mask"], min_nvoxels=options.min_nvoxels)
