@@ -312,12 +312,24 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min
 
 def get_arrival_data(outdir, log=sys.stdout):
     brain_mask = Image(os.path.join(outdir, "mask"))
+    f = Image(os.path.join(outdir, "perfusion_calib"))
+    f_var = Image(os.path.join(outdir, "perfusion_var_calib"))
+
+    # Note that for the arrival mask we also remove voxels which will be
+    # eliminated from the perfusion stats because of nan/inf values or zero
+    # variances. This is a bit of a hack but should help ensure that the
+    # voxel set is consistent between the two measures. Perfusion can have
+    # invalid values in voxels where the arrival time is valid because of
+    # voxelwise calibration, however we do not expect the reverse to occur
     arrival_data = [
         {
             "suffix" : "_arrival",
             "f" : Image(os.path.join(outdir, "arrival")),
             "var" : Image(os.path.join(outdir, "arrival_var")),
-            "mask" : brain_mask.data,
+            "mask" : np.logical_and(
+                np.logical_and(brain_mask.data, np.isfinite(f.data)),
+                f_var.data > 0
+            )
         },
     ]
     return arrival_data
