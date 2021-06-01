@@ -310,7 +310,7 @@ def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min
         ])
     return perfusion_data
 
-def get_arrival_data(outdir, log=sys.stdout):
+def get_arrival_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, log=sys.stdout):
     brain_mask = Image(os.path.join(outdir, "mask"))
     f = Image(os.path.join(outdir, "perfusion_calib"))
     f_var = Image(os.path.join(outdir, "perfusion_var_calib"))
@@ -332,6 +332,36 @@ def get_arrival_data(outdir, log=sys.stdout):
             )
         },
     ]
+    if os.path.isdir(os.path.join(outdir, "pvcorr")):
+        arrival_data.extend([
+            {
+                "suffix" : "_arrival_gm",
+                "f" : Image(os.path.join(outdir, "pvcorr", "arrival")),
+                "var" : Image(os.path.join(outdir, "pvcorr", "arrival_var")),
+                "mask" : np.logical_and(brain_mask.data, gm_pve_asl.data > min_gm_thresh),
+            },
+            {
+                "suffix" : "_arrival_wm",
+                "f" : Image(os.path.join(outdir, "pvcorr", "arrival_wm")),
+                "var" : Image(os.path.join(outdir, "pvcorr", "arrival_wm_var")),
+                "mask" : np.logical_and(brain_mask.data, wm_pve_asl.data > min_wm_thresh),
+            },
+        ])
+    else:
+        arrival_data.extend([
+            {
+                "suffix" : "_arrival_gm",
+                "f" : Image(os.path.join(outdir, "arrival")),
+                "var" : Image(os.path.join(outdir, "arrival_var")),
+                "mask" : np.logical_and(brain_mask.data, gm_pve_asl.data > gm_thresh),
+            },
+            {
+                "suffix" : "_arrival_wm",
+                "f" : Image(os.path.join(outdir, "arrival")),
+                "var" : Image(os.path.join(outdir, "arrival_var")),
+                "mask" : np.logical_and(brain_mask.data, wm_pve_asl.data > wm_thresh),
+            },
+        ])
     return arrival_data
 
 def main():
@@ -378,7 +408,7 @@ def main():
     perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
     if options.add_arrival:
         print(" - Also generating stats for arrival data")
-        perfusion_data += get_arrival_data(outdir)
+        perfusion_data += get_arrival_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
 
     rois = []
     print("\nLoading generic ROIs")
