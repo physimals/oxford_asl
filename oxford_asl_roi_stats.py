@@ -314,6 +314,7 @@ def get_arrival_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_g
     brain_mask = Image(os.path.join(outdir, "mask"))
     f = Image(os.path.join(outdir, "perfusion_calib"))
     f_var = Image(os.path.join(outdir, "perfusion_var_calib"))
+    f_good = np.logical_and(np.isfinite(f.data), f_var.data > 0)
 
     # Note that for the arrival mask we also remove voxels which will be
     # eliminated from the perfusion stats because of nan/inf values or zero
@@ -326,10 +327,7 @@ def get_arrival_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_g
             "suffix" : "_arrival",
             "f" : Image(os.path.join(outdir, "arrival")),
             "var" : Image(os.path.join(outdir, "arrival_var")),
-            "mask" : np.logical_and(
-                np.logical_and(brain_mask.data, np.isfinite(f.data)),
-                f_var.data > 0
-            )
+            "mask" : np.logical_and(brain_mask.data, f_good)
         },
     ]
     if os.path.isdir(os.path.join(outdir, "pvcorr")):
@@ -353,13 +351,19 @@ def get_arrival_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_g
                 "suffix" : "_arrival_gm",
                 "f" : Image(os.path.join(outdir, "arrival")),
                 "var" : Image(os.path.join(outdir, "arrival_var")),
-                "mask" : np.logical_and(brain_mask.data, gm_pve_asl.data > gm_thresh),
+                "mask" : np.logical_and(
+                    np.logical_and(brain_mask.data, gm_pve_asl.data > gm_thresh),
+                    f_good
+                )
             },
             {
                 "suffix" : "_arrival_wm",
                 "f" : Image(os.path.join(outdir, "arrival")),
                 "var" : Image(os.path.join(outdir, "arrival_var")),
-                "mask" : np.logical_and(brain_mask.data, wm_pve_asl.data > wm_thresh),
+                "mask" : np.logical_and(
+                    np.logical_and(brain_mask.data, wm_pve_asl.data > wm_thresh),
+                    f_good
+                )
             },
         ])
     return arrival_data
