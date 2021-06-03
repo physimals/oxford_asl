@@ -32,6 +32,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
         self.add_argument("--gm-pve", help="GM PVE in structural space - ignored if --fslanat is given")
         self.add_argument("--wm-pve", help="WM PVE in structural space - ignored if --fslanat is given")
+        self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/native_space/asl2struct.mat")
         self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given")
         self.add_argument("--output", "-o", required=True,
                           help="Output directory")
@@ -401,7 +402,10 @@ def main():
         sys.exit(1)
 
     mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
-    with open(os.path.join(outdir, "asl2struct.mat")) as asl2struct_file:
+    asl2struc_filename = options.asl2struc
+    if asl2struc_filename is None:
+        asl2struc_filename = os.path.join(outdir, "asl2struct.mat")
+    with open(asl2struc_filename) as asl2struct_file:
         asl2struct_mat = np.array([[float(v) for v in line.split()] for line in asl2struct_file.readlines()])
         struct2asl_mat = np.linalg.inv(asl2struct_mat)
 
