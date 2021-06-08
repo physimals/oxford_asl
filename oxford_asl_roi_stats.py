@@ -30,10 +30,13 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--fslanat",
                           help="FSL_ANAT output directory - if not specified --struc --gm-pve --wm-pve and --struc2std must be given")
         self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
-        self.add_argument("--gm-pve", help="GM PVE in structural space - ignored if --fslanat is given")
-        self.add_argument("--wm-pve", help="WM PVE in structural space - ignored if --fslanat is given")
+        self.add_argument("--gm-pve", help="GM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
+        self.add_argument("--wm-pve", help="WM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
+        self.add_argument("--native_pves", action='store_true', default=False,
+                          help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
         self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/native_space/asl2struct.mat")
-        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given")
+        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given and not needed if --std2struc is given")
+        self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given")
         self.add_argument("--output", "-o", required=True,
                           help="Output directory")
         self.add_argument("--min-nvoxels", default=10, type=int,
@@ -202,11 +205,11 @@ def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=T
         else:
             stats[stat + suffix] = fn(sample_data, sample_var)
 
-def add_native_roi(rois, roi, name, log=sys.stdout):
+def add_native_roi(rois, roi, name, threshold=0.5, log=sys.stdout):
     """
     Add an ROI in native (ASL) space
     """
-    rois.append({"name" : name, "mask_native" : roi.data})
+    rois.append({"name" : name, "mask_native" : roi.data > threshold})
     log.write(" - %s...DONE\n" % name)
 
 def add_struct_roi(rois, roi, name, ref, struct2asl, threshold=0.5, log=sys.stdout):
@@ -389,19 +392,23 @@ def main():
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
-    elif options.struc is not None and options.struc2std is not None:
+    elif options.struc is not None and (options.struc2std is not None or options.std2struc is not None):
         print(" - Using manually specified structural data")
         struc_ref = Image(options.struc)
-        struct2mni_warp = Image(options.struc2std)
+        if options.std2struc is not None:
+            mni2struc_warp = Image(options.std2struc)
+        elif options.struc2std is not None:
+            struct2mni_warp = Image(options.struc2std)
         if options.gm_pve is not None:
             gm_pve = Image(options.gm_pve)
         if options.wm_pve is not None:
             wm_pve = Image(options.wm_pve)
     else:
-        sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std")
+        sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std/--std2struc \n")
         sys.exit(1)
 
-    mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
+    if (options.std2struc is None and options.struc2std is not None) or options.fslanat is not None:
+        mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
     asl2struc_filename = options.asl2struc
     if asl2struc_filename is None:
         asl2struc_filename = os.path.join(outdir, "asl2struct.mat")
@@ -411,8 +418,14 @@ def main():
 
     # Look for PVC or non-PVC results
     print("\nLoading perfusion images")
-    gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
-    wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
+    if options.native_pves:
+        print("Using native space PVEs.")
+        gm_pve_asl = gm_pve
+        wm_pve_asl = wm_pve
+    else:
+        print("Transforming PVEs from structural to native space.")
+        gm_pve_asl = _transform(gm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
+        wm_pve_asl = _transform(wm_pve, warp=None, ref=asl_ref, premat=struct2asl_mat)
     perfusion_data = get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, options.gm_thresh, options.wm_thresh, options.min_gm_thresh, options.min_wm_thresh)
     if options.add_arrival:
         print(" - Also generating stats for arrival data")
@@ -420,12 +433,18 @@ def main():
 
     rois = []
     print("\nLoading generic ROIs")
-    if gm_pve is not None:
+    if gm_pve is not None and options.native_pves is False:
         add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.min_gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_gm_thresh)
         add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
-    if wm_pve is not None:
+    elif gm_pve is not None:
+        add_native_roi(rois, gm_pve_asl, "%i%%+GM" % (options.min_gm_thresh*100), threshold=options.min_gm_thresh)
+        add_native_roi(rois, gm_pve_asl, "%i%%+GM" % (options.gm_thresh*100), threshold=options.gm_thresh)
+    if wm_pve is not None and options.native_pves is False:
         add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.min_wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_wm_thresh)
         add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
+    elif wm_pve is not None:
+        add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.min_wm_thresh*100), threshold=options.min_wm_thresh)
+        add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.wm_thresh*100), threshold=options.wm_thresh)
 
     # Add ROIs from command line
     print("\nLoading user-specified ROIs")
