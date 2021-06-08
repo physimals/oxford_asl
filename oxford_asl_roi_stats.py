@@ -35,7 +35,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--native-pves", action='store_true', default=False,
                           help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
         self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/native_space/asl2struct.mat")
-        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given")
+        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given. Only required if --std2struc is not given")
         self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given. If not specified will be derived by inverting --struc2std warp")
         self.add_argument("--output", "-o", required=True,
                           help="Output directory")
@@ -392,16 +392,14 @@ def main():
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
-    elif options.struc is not None and options.struc2std is not None:
+    elif options.struc is not None and (options.struc2std is not None or options.std2struc is not None):
         print(" - Using manually specified structural data")
         struc_ref = Image(options.struc)
-        struct2mni_warp = Image(options.struc2std)
         if options.std2struc is not None:
-            print(" - Inverse std->struc transformation warp provided directly")
+            print(" - std->struc transformation warp provided directly")
             mni2struc_warp = Image(options.std2struc)
-        else:
-            print(" - Inverting struc->std transformation warp")
-            mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
+        elif options.struc2std is not None:
+            struct2mni_warp = Image(options.struc2std)
         if options.gm_pve is not None:
             gm_pve = Image(options.gm_pve)
         if options.wm_pve is not None:
@@ -409,6 +407,10 @@ def main():
     else:
         sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std/--std2struc \n")
         sys.exit(1)
+
+    if options.fslanat is not None or options.std2struc is None:
+        print(" - Generating std->struc transformation by inverting struc->std transformation warp")
+        mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
 
     asl2struc_filename = options.asl2struc
     if asl2struc_filename is None:
