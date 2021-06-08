@@ -32,11 +32,11 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
         self.add_argument("--gm-pve", help="GM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
         self.add_argument("--wm-pve", help="WM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
-        self.add_argument("--native_pves", action='store_true', default=False,
+        self.add_argument("--native-pves", action='store_true', default=False,
                           help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
         self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/native_space/asl2struct.mat")
-        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given and not needed if --std2struc is given")
-        self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given")
+        self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given")
+        self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given. If not specified will be derived by inverting --struc2std warp")
         self.add_argument("--output", "-o", required=True,
                           help="Output directory")
         self.add_argument("--min-nvoxels", default=10, type=int,
@@ -392,13 +392,16 @@ def main():
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
-    elif options.struc is not None and (options.struc2std is not None or options.std2struc is not None):
+    elif options.struc is not None and options.struc2std is not None:
         print(" - Using manually specified structural data")
         struc_ref = Image(options.struc)
+        struct2mni_warp = Image(options.struc2std)
         if options.std2struc is not None:
+            print(" - Inverse std->struc transformation warp provided directly")
             mni2struc_warp = Image(options.std2struc)
-        elif options.struc2std is not None:
-            struct2mni_warp = Image(options.struc2std)
+        else:
+            print(" - Inverting struc->std transformation warp")
+            mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
         if options.gm_pve is not None:
             gm_pve = Image(options.gm_pve)
         if options.wm_pve is not None:
@@ -407,12 +410,11 @@ def main():
         sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std/--std2struc \n")
         sys.exit(1)
 
-    if (options.std2struc is None and options.struc2std is not None) or options.fslanat is not None:
-        mni2struc_warp = fsl.invwarp(struct2mni_warp, struc_ref, out=fsl.LOAD)["out"]
     asl2struc_filename = options.asl2struc
     if asl2struc_filename is None:
         asl2struc_filename = os.path.join(outdir, "asl2struct.mat")
     with open(asl2struc_filename) as asl2struct_file:
+        print(" - Loading ASL->struc transformation matrix from %s" % asl2struc_filename)
         asl2struct_mat = np.array([[float(v) for v in line.split()] for line in asl2struct_file.readlines()])
         struct2asl_mat = np.linalg.inv(asl2struct_mat)
 
@@ -433,13 +435,13 @@ def main():
 
     rois = []
     print("\nLoading generic ROIs")
-    if gm_pve is not None and options.native_pves is False:
+    if gm_pve is not None and not options.native_pves:
         add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.min_gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_gm_thresh)
         add_struct_roi(rois, gm_pve, "%i%%+GM" % (options.gm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.gm_thresh)
     elif gm_pve is not None:
         add_native_roi(rois, gm_pve_asl, "%i%%+GM" % (options.min_gm_thresh*100), threshold=options.min_gm_thresh)
         add_native_roi(rois, gm_pve_asl, "%i%%+GM" % (options.gm_thresh*100), threshold=options.gm_thresh)
-    if wm_pve is not None and options.native_pves is False:
+    if wm_pve is not None and not options.native_pves:
         add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.min_wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.min_wm_thresh)
         add_struct_roi(rois, wm_pve, "%i%%+WM" % (options.wm_thresh*100), ref=asl_ref, struct2asl=struct2asl_mat, threshold=options.wm_thresh)
     elif wm_pve is not None:
