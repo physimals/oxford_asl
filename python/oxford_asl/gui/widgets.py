@@ -362,8 +362,8 @@ class NumberChooser(wx.Panel):
         self.slider = wx.Slider(self, value=initial, minValue=0, maxValue=100)
         self.slider.SetValue(100*(initial-self.minval)/(self.maxval-self.minval))
         self.slider.Bind(wx.EVT_SLIDER, self._slider_changed)
-        self.hbox.Add(self.slider, proportion=1, flag=wx.EXPAND | wx.ALIGN_CENTRE_VERTICAL)
-        self.hbox.Add(self.spin, proportion=0, flag=wx.EXPAND | wx.ALIGN_CENTRE_VERTICAL)
+        self.hbox.Add(self.slider, proportion=1, flag=wx.EXPAND)
+        self.hbox.Add(self.spin, proportion=0, flag=wx.EXPAND)
         self.SetSizer(self.hbox)
 
     def GetValue(self):
