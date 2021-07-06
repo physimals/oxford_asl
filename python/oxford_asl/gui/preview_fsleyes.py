@@ -15,7 +15,6 @@ import fsleyes.overlay as fsloverlay
 import fsleyes.displaycontext as fsldc
 import fsleyes.views.orthopanel as orthopanel
 import fsleyes.profiles as profiles
-import fsleyes.profiles.profilemap as profilemap
 import fsleyes.colourmaps as colourmaps
 
 from fsl.utils.platform import platform as fslplatform
