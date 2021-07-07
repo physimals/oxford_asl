@@ -55,4 +55,4 @@ clean:
 	rm -f ${VERSIONED} asl_file *.o
 
 FORCE:
-	python python/setup.py build
+	fslpython python/setup.py build
