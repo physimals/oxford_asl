@@ -10,6 +10,11 @@
 
 #include "asl_functions.h"
 
+using namespace std;
+using namespace NEWMAT;
+using namespace MISCMATHS;
+using namespace NEWIMAGE;
+
 namespace OXASL
 {
 void data2stdform(Matrix &datamtx, vector<Matrix> &asldata, int ntis, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs)
@@ -221,7 +226,7 @@ void separatepairs(vector<Matrix> &asldata, vector<Matrix> &asldataodd, vector<M
 	// data is in the form of a block of all tag (control) followed by a block of control (tag)
 	oddmtx = asldata[ti].Rows(1,nrpts);
 	evenmtx = asldata[ti].Rows(nrpts+1,nmeas);
-	
+
       }
       else {*/
         // data is in the form of adjacent tag control pairs

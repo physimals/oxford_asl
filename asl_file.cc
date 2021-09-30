@@ -21,6 +21,7 @@
 #include "asl_functions.h"
 #include "readoptions.h"
 
+using namespace std;
 using namespace Utilities;
 using namespace NEWMAT;
 using namespace NEWIMAGE;
