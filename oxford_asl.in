@@ -2325,7 +2325,7 @@ if [ ! -z $nbsupp ]; then
     bsuppalpha=`echo "scale=10; $bsuppeff^$nbsupp" | bc`
     Log "Combined background suppression pulse efficiency: $bsuppalpha"
     alpha=`echo "scale=10; $alpha*$bsuppalpha" | bc`
-    Log "Adjusting inversion efficiency (currently --alpha=$alpha) to account for effect of background suppression pulses: $alpha"
+    Log "Adjusting inversion efficiency (--alpha) to account for effect of background suppression pulses: $alpha"
 fi
 
 if [ -z $cmethod ]; then
