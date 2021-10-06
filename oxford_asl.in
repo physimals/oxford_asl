@@ -155,7 +155,11 @@ Usage_extended() {
     echo "   User supplied PV estimates (--pvgm, --pvwm)"   
     echo "   --pvgm    : Partial volume estimates for GM"
     echo "   --pvwm    : Partial volume estimates for WM"
-
+    echo ""
+    echo "Background suppression"
+    echo " --nbsupp=<val>          : Number of background suppression inversion pulses (default 0)"
+    echo " --bsupp-eff=<val>       : Efficiency of the background suppression pulses (default 0.95)"
+    echo ""
     echo " Epochs "
     echo " --elen      : Length of each epoch in TIs"
     echo " --eol       : Overlap of each epoch in TIs- {deafult: 0}"
@@ -942,6 +946,12 @@ takeargs=0;boolarg="";isbool="";
 	       takeargs=1;;
 	--fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
 		;;
+
+    # background suppression related arguments
+    --nbsupp) nbsupp=$argument
+        takeargs=1;;
+    --bsupp-eff) bsuppeff=$argument
+        takeargs=1;;
 
 	# fieldmap/distorition correction related arguments
 	--fmap) fmap=$argument
@@ -2302,6 +2312,20 @@ if [ -z $alpha ]; then
     else
 	alpha=0.85;
     fi
+fi
+
+# Adjust alpha to account for the efficiency of background suppression pulses
+# if appropriate, defaulting to an assumed pulse efficiency of 0.95 if
+# --bsupp-eff wasn't provided as an argument
+if [ ! -z $nbsupp ]; then
+    if [ -z $bsuppeff ]; then
+        bsuppeff=0.95
+    fi
+    Log "Background suppression has been applied: $nbsupp pulses each with efficiency of $bsuppeff"
+    bsuppalpha=`echo "scale=10; $bsuppeff^$nbsupp" | bc`
+    Log "Combined background suppression pulse efficiency: $bsuppalpha"
+    alpha=`echo "scale=10; $alpha*$bsuppalpha" | bc`
+    Log "Adjusting inversion efficiency (currently --alpha=$alpha) to account for effect of background suppression pulses: $alpha"
 fi
 
 if [ -z $cmethod ]; then
