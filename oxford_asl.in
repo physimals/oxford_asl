@@ -2172,12 +2172,12 @@ if [ $register -eq 1 ]; then
 	cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
 	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
     fi
-fi
 
-# Do a registration of the calibration image too as this may be easier to visualise
-if [ ! -z $calib ]; then
-    Log "Generating calibration image in structural space"
-    flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib_struc $APPLYXFM_OPTS
+    # Do a registration of the calibration image too as this may be easier to visualise
+    if [ ! -z $calib ]; then
+        Log "Generating calibration image in structural space"
+        flirt -in $tempdir/calib -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat -out $tempdir/calib_struc $APPLYXFM_OPTS
+    fi
 fi
 
 # Re-generate the mask from the structural image now that we have a better registration - as this might matter for PV correction
