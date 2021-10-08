@@ -42,7 +42,7 @@ Usage() {
     echo " Acquisition/Data specific"
     echo " --iaf       : input ASl format: diff,tc,ct {default: diff}"
     echo " --ibf       : input block format (for multi-TI): rpt,tis {default: rpt}"
-    echo " --tis       : comma separated list of inversion times, e.g. --tis 0.2,0.4,0.6"
+    echo " --plds      : comma separated list of post-labelling delay times in second, e.g. --plds 0.2,0.4,0.6"
     echo " --tiimg     : 4D image containing voxelwise TI values"
     echo " --casl      : ASL acquisition is  pseudo cASL (pcASL) rather than pASL"
     echo " --artsupp   : Arterial suppression (vascular crushing) was used"
@@ -827,6 +827,8 @@ takeargs=0;boolarg="";isbool="";
 	      ;;
 	--tis) tis=$argument
 	    takeargs=1;;
+	--plds) plds=$argument
+	    takeargs=1;;
 	--tiimg) tiimg=$argument
 	    takeargs=1;;
 	--bolus) boluset=1 boluslen=$argument
@@ -1358,6 +1360,27 @@ if [ ! -z $gdcwarp ]; then
     fi
 fi
 
+### Bolus duration(s)
+if [ -z $boluset ]; then
+    boluslen=1.8; # use the WP default
+fi
+
+taucount=0
+tauslist=""
+thetaus=`echo $boluslen | sed 's:,: :g'`
+for tau in $thetaus; do
+    taucount=`expr ${taucount} + 1`
+    tauslist=`echo $tauslist --tau${taucount}=$tau`
+done
+
+if [ $taucount -eq 1 ]; then
+    tauslist="--tau=$tau" #single univerisal bolus duration
+    Log "Bolus duration: $tau"
+else
+    Log "Bolus duration list: $tauslist"
+fi
+### End of Bolus duration(s)
+
 ### deal with TIs (as specified on the command line)
 if [ ! -z $tiimg ]; then
     # Cannot easily define alltis array - therefore cannot do epochwise analysis
@@ -1378,18 +1401,36 @@ if [ ! -z $tiimg ]; then
     tislist=" --tiimg=$tiimg"
     Log "Number of TIs: $ntis"
 else
-    count=0
+    if [ ! -z $tis ] && [ ! -z $plds ]; then
+        echo "ERROR: Cannot specify both TIs and PLDs"
+        exit 1
+    fi
+    ticount=0
     tislist=""
-    thetis=`echo $tis | sed 's:,: :g'`
+    thetis=`echo $tis $plds | sed 's:,: :g'`
+    tausarray=($thetaus)
     #echo $thetis
     for ti in $thetis; do
-        count=`expr ${count} + 1`
-        tislist=`echo $tislist --ti${count}=$ti`
-        alltis[`expr ${count} - 1`]=$ti
+        ticount=`expr ${ticount} + 1`
+        if [ ! -z $plds ]; then
+            if [ $taucount -eq 1 ]; then
+                # Single univerisal labelling duration
+                ti=`echo $ti + $tau |bc`
+            else
+                tauidx=`expr ${ticount} - 1`
+                ti=`echo $ti + ${tausarray[$tauidx]} |bc`
+            fi
+        fi
+        tislist=`echo $tislist --ti${ticount}=$ti`
+        alltis[`expr ${ticount} - 1`]=$ti
     done
-    Log "Number of TIs in list: $count"
+    Log "Number of TIs in list: $ticount"
     Log "TIs list: $tislist"
-    ntis=$count
+    if [ $taucount -ne 1 ] && [ $taucount -ne $ticount ]; then
+        echo "ERROR: Number of bolus durations specified does not match the number of TIs - this is not possible for multiple bolus duration processing"
+        exit 1
+    fi
+    ntis=$ticount
 fi
 ### End of: Deal with the TIs
 
@@ -1913,32 +1954,6 @@ if [ -z $t1bset ]; then
     t1bset=1.65;
 fi
 Log "T1b: $t1bset"
-
-
-### Bolus duration(s)
-if [ -z $boluset ]; then
-    boluslen=1.8; # use the WP default
-fi
-
-count=0
-tauslist=""
-thetaus=`echo $boluslen | sed 's:,: :g'`
-for tau in $thetaus; do
-    count=`expr ${count} + 1`
-    tauslist=`echo $tauslist --tau${count}=$tau`
-done
-
-if [ $count -eq 1 ]; then
-    tauslist="--tau=$tau" #single univerisal bolus duration
-    Log "Bolus duration: $tau"
-else
-    Log "bolus duration list: $tauslist"
-    if [ $count -ne $ntis ]; then
-	Echo "Error: number bolus durations specified does not match the number of TIs - this is not possible for multiple bolus duration processing"
-	exit 1
-    fi
-fi
-### End of Bolus duration(s)
 
 #pre-processing for epochwise analysis
 # separate data into epochs here
