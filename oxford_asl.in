@@ -2559,10 +2559,10 @@ if [ ! -z $region_analysis ]; then
         elif [ -z $warp ]; then
             Log "WARNING: Region analysis requested but no structural->std space transformation provided"
         else
-            $PYTHON -u `which oxford_asl_roi_stats.py` --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
+            $PYTHON -u `which oxford_asl_roi_stats` --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
         fi
     else
-        $PYTHON -u `which oxford_asl_roi_stats.py` --fslanat $fslanat $roi_analysis_args
+        $PYTHON -u `which oxford_asl_roi_stats` --fslanat $fslanat $roi_analysis_args
     fi
 fi
 

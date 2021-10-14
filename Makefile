@@ -21,7 +21,7 @@ LIBS = -lutils -lnewimage -lmiscmaths -lprob ${MATLIB} ${NIFTILIB} -lznz -lz
 
 XFILES = asl_file
 SCRIPTS = oxford_asl asl_calib asl_reg quasil toast oxford_asl_roi_stats.py oxford_asl_hadamard_decode.py
-PYMODULES = python/oxford_asl/__init__.py python/oxford_asl/_version.py
+PYMODULES = python/oxford_asl/*.py
 PYGUI = python/oxford_asl/gui/*.py python/oxford_asl/gui/*.png
 VERSIONED = oxford_asl asl_calib quasil asl_reg toast 
 
@@ -47,8 +47,8 @@ $(VERSIONED): %: %.in FORCE
 postinstallscript: $(PYMODULES) $(PYGUI)
 	mkdir -p $(DESTDIR)/python/oxford_asl/gui ; \
 	cp $(PYMODULES) $(DESTDIR)/python/oxford_asl/ ; \
-	cp $(PYGUI) $(DESTDIR)/python/oxford_asl/gui ; \
-        cp asl_gui_fsl $(DESTDIR)/bin/asl_gui ; \
+	cp $(PYGUI) $(DESTDIR)/python/oxford_asl/gui/ ; \
+        cp wrappers/* $(DESTDIR)/bin/ ; \
 	cd ..
 
 clean:

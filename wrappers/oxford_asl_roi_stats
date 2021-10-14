@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env fslpython
 
 # Use modules in the same dir as wrapper script if present, then default
 # to FSL modules
@@ -9,8 +9,8 @@ for d in [os.environ.get("FSLDIR", None),
     if d:
         sys.path.insert(0, os.path.join(d, "python"))
 
-from oxford_asl.gui import main
+from oxford_asl.roi_stats import main
 try:
-    main.main()
+    main()
 except RuntimeError as e:
     print("Error: %s" % e)
