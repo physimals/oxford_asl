@@ -341,6 +341,7 @@ Registration() {
     transopt=$2 # other options to pass to asl_reg
     distout=$3 # we want to do distortion correction and save in the subdir distout
     
+    extraoptions=" "
     if [ ! -z $lowstrucflag ]; then
 	extraoptions=$extraoptions"-r $tempdir/lowstruc"
     fi
