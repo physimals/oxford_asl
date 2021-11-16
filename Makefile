@@ -15,8 +15,8 @@ else
   endif
   USRINCFLAGS = -I${INC_NEWMAT} -I${INC_ZLIB} \
                 -I${FSLDIR}/extras/include/armawrap
-  USRLDFLAGS  = -L${LIB_NEWMAT} -L${LIB_ZLIB}         \
-                -lutils -lnewimage -lmiscmaths -lprob \
+  USRLDFLAGS  = -L${LIB_NEWMAT} -L${LIB_ZLIB} -L${LIB_CPROB} \
+                -lutils -lnewimage -lmiscmaths -lcprob       \
                 ${MATLIB} -lNewNifti -lznz -lz
 endif
 
