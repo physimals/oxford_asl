@@ -24,7 +24,7 @@ class ArgumentParser(argparse.ArgumentParser):
     def __init__(self, **kwargs):
         argparse.ArgumentParser.__init__(self, prog="oxford_asl_roi_stats", add_help=False, **kwargs)
         self.add_argument("--oxasl-output", required=True,
-                          help="OXFORD_ASL or OXASL output directory")
+                          help="OXFORD_ASL or OXASL native space output directory")
         self.add_argument("--add-arrival", action="store_true", default=False,
                           help="Generate output for arrival time as well as perfusion")
         self.add_argument("--fslanat",
@@ -34,7 +34,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--wm-pve", help="WM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
         self.add_argument("--native-pves", action='store_true', default=False,
                           help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
-        self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/native_space/asl2struct.mat")
+        self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/asl2struct.mat")
         self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given. Only required if --std2struc is not given")
         self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given. If not specified will be derived by inverting --struc2std warp")
         self.add_argument("--output", "-o", required=True,
@@ -382,7 +382,7 @@ def main():
     print(" - Using oxford_asl output in %s" % options.oxasl_output)
 
     # Get reference and transformation data from oxford_asl and fsl_anat output
-    outdir = os.path.join(options.oxasl_output, "native_space")
+    outdir = options.oxasl_output
     asl_ref = Image(os.path.join(outdir, "perfusion"))
 
     gm_pve, wm_pve = None, None

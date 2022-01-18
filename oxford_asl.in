@@ -74,6 +74,8 @@ Usage() {
     echo "                 M0 value will be calculated within automatically created CSF mask"
     echo "                voxel  - default if no structral image is supplied"
     echo "                 voxelwise M0 values derrived from calibration image"
+    echo "                both   - Do single and voxelwise calibaration methods, outputing results"
+    echo "                 in separate subdirectories of output directories"
     echo ""
 }
 
@@ -207,24 +209,27 @@ Output() {
     shift
     parname=$1 #parameter name as called in the output directory
     shift
-    subdir=$1 # a subdirectory name in which to find and place results
+    subdir_in=$1 # a subdirectory name in which to find and place results
+    shift
+    subdir_out=$1 # Subdirectory to place results
 
+Log "Output: $param $parname $subdir_in $subdir_out"
 if [ ! -z $nativeout ]; then
-    if [ ! -d  $outdir/native_space/$subdir ]; then mkdir $outdir/native_space/$subdir; fi
-    imcp $tempdir/$subdir/$param $outdir/native_space/$subdir/$parname
+    if [ ! -d  $outdir/native_space/$subdir_out ]; then mkdir -p $outdir/native_space/$subdir_out; fi
+    imcp $tempdir/$subdir_in/$param $outdir/native_space/$subdir_out/$parname
 fi
 if [ ! -z $structout ]; then
-    if [ ! -d  $outdir/struct_space/$subdir ]; then mkdir $outdir/struct_space/$subdir; fi
-    flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir/$parname $APPLYXFM_OPTS
+    if [ ! -d  $outdir/struct_space/$subdir_out ]; then mkdir -p $outdir/struct_space/$subdir_out; fi
+    flirt -in $tempdir/$subdir_in/$param -applyxfm -init $tempdir/asl2struct.mat -ref $tempdir/struc -out $outdir/struct_space/$subdir_out/$parname $APPLYXFM_OPTS
 fi
 if [ ! -z $stdout ]; then
-    if [ ! -d  $outdir/std_space/$subdir ]; then mkdir $outdir/std_space/$subdir; fi
+    if [ ! -d  $outdir/std_space/$subdir_out ]; then mkdir -p $outdir/std_space/$subdir_out; fi
     if [ ! -z $warp ]; then
-	applywarp --in=$tempdir/$subdir/$param --out=$outdir/std_space/$subdir/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp $APPLYWARP_OPTS
+	    applywarp --in=$tempdir/$subdir_in/$param --out=$outdir/std_space/$subdir_out/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp $APPLYWARP_OPTS
     elif [ ! -z $trans ]; then
-	flirt -in $tempdir/$subdir/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir/$parname $APPLYXFM_OPTS
+	    flirt -in $tempdir/$subdir_in/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir_out/$parname $APPLYXFM_OPTS
     else
-	Log "ERROR: cannot do standard space out - neither warp or transformation matrix found"
+	    Log "ERROR: cannot do standard space out - neither warp or transformation matrix found"
     fi
 fi
 
@@ -235,11 +240,11 @@ OutputMasked() {
     # currently we only do this in native space
 
     parname=$1
-    subdir=$2
+    subdir_out=$2
     maskname=$3
 
     if [ ! -z $nativeout ]; then
-	fslmaths $outdir/native_space/$subdir/$parname -mas $tempdir/${maskname}mask $outdir/native_space/$subdir/${parname}_masked
+	fslmaths $outdir/native_space/$subdir_out/$parname -mas $tempdir/${maskname}mask $outdir/native_space/$subdir_out/${parname}_masked
     fi
 }
 
@@ -249,10 +254,11 @@ Calibrate() {
     parname=$2 #parameter name as called in the output directory
     Moval=$3 # Either a number or an image in native space for the calibration scaling
     multiplier=$4 # multiplier that we might use to get parameter into physiological units
-    subdir=$5; # subdirectory to use for finding and saving the result
-    
-    fslmaths  $tempdir/$subdir/$param -div $Moval -mul $multiplier $tempdir/$subdir/${param}_calib 
-    Output ${param}_calib ${parname}_calib $subdir
+    subdir_in=$5 # subdirectory to use for finding the result
+    subdir_out=$6 # subdirectory to use for saving the result
+
+    fslmaths  $tempdir/$subdir_in/$param -div $Moval -mul $multiplier $tempdir/$subdir_in/${param}_calib
+    Output ${param}_calib ${parname}_calib $subdir_in $subdir_out
 }
 
 Report() {
@@ -260,23 +266,23 @@ Report() {
 	# generate text reports on parameters - the parameter must have been output first for this to work
 	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
 	parname=$1
-	subdir=$2
+	subdir_out=$2
 	masktype=$3
 
-	repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure -m`
-	echo $repval > $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt
+	repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure -m`
+	echo $repval > $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt
 	Log "Mean $parname in $masktype is $repval"
 
     if [ -f "$tempdir/${masktype}mask_pure_cort."* ]; then
-	    repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure_cort -m`
-	    echo $repval > $outdir/native_space/$subdir/${parname}_cortical_${masktype}_mean.txt
+	    repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cort -m`
+	    echo $repval > $outdir/native_space/$subdir_out/${parname}_cortical_${masktype}_mean.txt
 	    Log "Mean $parname in cortical $masktype is $repval"
     fi
     # This nonsense exists because we want the WM mask minus subcortial structures to be
     # referred to as 'cerebral' rather than 'cortical'
     if [ -f "$tempdir/${masktype}mask_pure_cereb."* ]; then
-	    repval=`fslstats $outdir/native_space/$subdir/$parname -k $tempdir/${masktype}mask_pure_cereb -m`
-	    echo $repval > $outdir/native_space/$subdir/${parname}_cerebral_${masktype}_mean.txt
+	    repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cereb -m`
+	    echo $repval > $outdir/native_space/$subdir_out/${parname}_cerebral_${masktype}_mean.txt
 	    Log "Mean $parname in cerebral $masktype is $repval"
     fi
 
@@ -288,20 +294,20 @@ Normalise() {
 	# also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
 	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
 	parname=$1
-	subdir=$2
+	subdir_out=$2
 	masktype=$3
 	
 	# get normalization from reported value in the output directory
-	normval=`cat $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt`
+	normval=`cat $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt`
 	
 	if [ ! -z $stdout ]; then
-	    fslmaths $outdir/std_space/$subdir/$parname -div $normval $outdir/std_space/$subdir/${parname}_norm 
+	    fslmaths $outdir/std_space/$subdir_out/$parname -div $normval $outdir/std_space/$subdir_out/${parname}_norm
 	fi
 	if [ ! -z $nativeout ]; then
-	    fslmaths $outdir/native_space/$subdir/$parname -div $normval $outdir/native_space/$subdir/${parname}_norm
+	    fslmaths $outdir/native_space/$subdir_out/$parname -div $normval $outdir/native_space/$subdir_out/${parname}_norm
 	fi
 	if [ ! -z $structout ]; then
-	    fslmaths $outdir/struct_space/$subdir/$parname -div $normval $outdir/struct_space/$subdir/${parname}_norm 
+	    fslmaths $outdir/struct_space/$subdir_out/$parname -div $normval $outdir/struct_space/$subdir_out/${parname}_norm
 	fi
 
     fi
@@ -311,24 +317,24 @@ Normalise_var() {
     if [ ! -z $pvexist ]; then
     # normalisaiton for a variance image
     parname=$1
-    subdir=$2
+    subdir_out=$2
     masktype=$3
 
     # get normalization from reported value in the output directory
-    normval=`cat $outdir/native_space/$subdir/${parname}_${masktype}_mean.txt`
+    normval=`cat $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt`
     #need to square the value as we are outputting a variance
     normval=`echo "$normval * $normval" | bc`
     
     
     
     if [ ! -z $stdout ]; then
-	fslmaths $outdir/std_space/$subdir/${parname}_var -div $normval $outdir/std_space/$subdir/${parname}_var_norm 
+	fslmaths $outdir/std_space/$subdir_out/${parname}_var -div $normval $outdir/std_space/$subdir_out/${parname}_var_norm
     fi
     if [ ! -z $nativeout ]; then
-	fslmaths $outdir/native_space/$subdir/${parname}_var -div $normval $outdir/native_space/$subdir/${parname}_var_norm
+	fslmaths $outdir/native_space/$subdir_out/${parname}_var -div $normval $outdir/native_space/$subdir_out/${parname}_var_norm
     fi
     if [ ! -z $structout ]; then
-	fslmaths $outdir/struct_space/$subdir/${parname}_var -div $normval $outdir/struct_space/$subdir/${parname}_var_norm 
+	fslmaths $outdir/struct_space/$subdir_out/${parname}_var -div $normval $outdir/struct_space/$subdir_out/${parname}_var_norm
     fi
 
     fi
@@ -555,128 +561,126 @@ cp ${finalstep}/paramnames.txt $2/paramnames.txt
 }
 
 Dooutput() {
-# Do all the outputs - using the supplied subdirectiory of the results
 
-if [ -z $1 ]; then
-    subdir=/ #need a default 'empty' value for this
-else
-    subdir=$1
-fi
+# Do all the outputs - using the supplied subdirectiory of the results
+subdir_in=$1
+subdir_out=$2
+cmethod_output=$3
 
 # perfusion
-Output ftiss perfusion $subdir
-Report perfusion $subdir gm
-Normalise perfusion $subdir gm
+Output ftiss perfusion $subdir_in $subdir_out
+Report perfusion $subdir_out gm
+Normalise perfusion $subdir_out gm
 
 # arrival
 if [ -z $fixbat ]; then
-    Output delttiss arrival $subdir
-    Report arrival $subdir gm
+    Output delttiss arrival $subdir_in $subdir_out
+    Report arrival $subdir_out gm
 fi
 # aBV
 if [ -z $artoff ]; then
-    Output fblood aCBV $subdir
+    Output fblood aCBV $subdir_in $subdir_out
 fi
 
 # white matter values
-if [ $subdir = "pvcorr" ]; then
-    Output ftisswm perfusion_wm $subdir
-    Report perfusion_wm $subdir wm
-    Normalise perfusion_wm $subdir wm
+if [ $subdir_in = "pvcorr" ]; then
+    Output ftisswm perfusion_wm $subdir_in $subdir_out
+    Report perfusion_wm $subdir_out wm
+    Normalise perfusion_wm $subdir_out wm
     if [ -z $fixbat ]; then
-	Output deltwm arrival_wm $subdir
-	Report arrival_wm $subdir wm
+	    Output deltwm arrival_wm $subdir_in $subdir_out
+	    Report arrival_wm $subdir_out wm
     fi
     
 else 
-    Report perfusion $subdir wm
+    Report perfusion $subdir_out wm
     if [ -z $fixbat ]; then
-	Report arrival $subdir wm
+	    Report arrival $subdir_out wm
     fi
 fi
 
 # Masked results (PVcorr)
-if [ $subdir = "pvcorr" ]; then
-    OutputMasked perfusion $subdir gm
-    OutputMasked perfusion_wm $subdir wm
+if [ $subdir_in = "pvcorr" ]; then
+    OutputMasked perfusion $subdir_out gm
+    OutputMasked perfusion_wm $subdir_out wm
     if [ -z $fixbat ]; then
-	OutputMasked arrival $subdir gm
-	OutputMasked arrival_wm $subdir wm
+	    OutputMasked arrival $subdir_out gm
+	    OutputMasked arrival_wm $subdir_out wm
     fi
 fi
 
-#Optionally provide variance results
+# Optionally provide variance results
 if [ ! -z $varout ]; then
-    Output var_ftiss perfusion_var $subdir
-    Normalise_var perfusion $subdir gm
+    Output var_ftiss perfusion_var $subdir_in $subdir_out
+    Normalise_var perfusion $subdir_out gm
     if [ -z $fixbat ]; then
-    Output var_delttiss arrival_var $subdir
+        Output var_delttiss arrival_var $subdir_in $subdir_out
     fi
         
     # PVcorr
-    if [ $subdir = "pvcorr" ]; then
-        Output var_ftisswm perfusion_wm_var $subdir
-        Normalise_var perfusion_wm $subdir wm
+    if [ $subdir_in = "pvcorr" ]; then
+        Output var_ftisswm perfusion_wm_var $subdir_in $subdir_out
+        Normalise_var perfusion_wm $subdir_out wm
         if [ -z $fixbat ]; then
-        Output var_deltwm arrival_wm_var $subdir
+            Output var_deltwm arrival_wm_var $subdir_in $subdir_out
         fi
     fi
 fi
 
 # calibrated results
 if [ ! -z $calibflag ]; then
-    if [ $cmethod = 'single' ]; then
-	malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
-    elif [ $cmethod = 'voxel' ]; then
-    # Sensitivity map is re-calculated in PVC mode, so 'undo' the old correction and re-do the new one
-    if [ ! -z $senscorr ]; then
-        if [ $subdir = "pvcorr" ]; then
-            fslmaths $outdir/calib/M0 -mul $outdir/native_space/sensitivity_non_pvcorr $outdir/calib/M0
+    if [ $cmethod_output = 'single' ]; then
+	    malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
+    elif [ $cmethod_output = 'voxel' ]; then
+        # Sensitivity map is re-calculated in PVC mode, so 'undo' the old correction and re-do the new one
+        if [ ! -z $senscorr ]; then
+            if [ $subdir_in = "pvcorr" ]; then
+                fslmaths $outdir/calib/M0 -mul $outdir/native_space/sensitivity_non_pvcorr $outdir/calib/M0
+            fi
+            fslmaths $outdir/calib/M0 -div $outdir/native_space/sensitivity $outdir/calib/M0
         fi
-        fslmaths $outdir/calib/M0 -div $outdir/native_space/sensitivity $outdir/calib/M0
-    fi
-	fslmaths $outdir/calib/M0 -mul $alpha $tempdir/malpha
-	malpha=$tempdir/malpha
+        fslmaths $outdir/calib/M0 -mul $alpha $tempdir/malpha
+        malpha=$tempdir/malpha
     fi
 
-    Calibrate ftiss perfusion $malpha 6000 $subdir
-    Report perfusion_calib $subdir gm
+    Calibrate ftiss perfusion $malpha 6000 $subdir_in $subdir_out
+    Report perfusion_calib $subdir_out gm
    
-    if [ $subdir = "pvcorr" ]; then
-	OutputMasked perfusion_calib $subdir gm
-	Calibrate ftisswm perfusion_wm $malpha 6000 $subdir
-	Report perfusion_wm_calib $subdir wm
-	OutputMasked perfusion_wm_calib $subdir wm
+    if [ $subdir_in = "pvcorr" ]; then
+        OutputMasked perfusion_calib $subdir_out gm
+        Calibrate ftisswm perfusion_wm $malpha 6000 $subdir_in $subdir_out
+        Report perfusion_wm_calib $subdir_out wm
+        OutputMasked perfusion_wm_calib $subdir_out wm
     else
-	Report perfusion_calib $subdir wm
+	    Report perfusion_calib $subdir_out wm
     fi
 
     if [ ! -z $varout ]; then
-        if [ $cmethod = 'single' ]; then
+        if [ $cmethod_output = 'single' ]; then
             Mosq=`echo "$Mo * $Mo * $alpha * $alpha" | bc` #include the inversion efficiency when we do the final calibration
-        elif [ $cmethod = 'voxel' ]; then
+        elif [ $cmethod_output = 'voxel' ]; then
             fslmaths $outdir/calib/M0 -mul $outdir/calib/M0 -mul $alpha -mul $alpha $tempdir/mosq
             Mosq=$tempdir/mosq
         fi
         
-        Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir
+        Calibrate var_ftiss perfusion_var $Mosq 36000000 $subdir_in $subdir_out
 
-        if [ $subdir = "pvcorr" ]; then
-            Calibrate var_ftisswm perfusion_wm_var $Mosq 36000000 $subdir
+        if [ $subdir_in = "pvcorr" ]; then
+            Calibrate var_ftisswm perfusion_wm_var $Mosq 36000000 $subdir_in $subdir_out
         fi
     fi
 
     if [ -z $artoff ];then
         # output aCBV as a percentage
-	    Calibrate fblood aCBV $malpha 100 $subdir
+	    Calibrate fblood aCBV $malpha 100 $subdir_in $subdir_out
     fi
 fi
 
 # advanced output
 if [ ! -z $advout ]; then
-    if [ ! -d  $outdir/advanced/$subdir ]; then mkdir $outdir/advanced/$subdir; fi
-    imcp $tempdir/$subdir/finalMVN $outdir/advanced/$subdir/finalMVN
-   cp $tempdir/$subdir/paramnames.txt $outdir/advanced/$subdir/paramnames.txt
+    if [ ! -d  $outdir/advanced/$subdir_out ]; then mkdir $outdir/advanced/$subdir_out; fi
+    imcp $tempdir/$subdir_in/finalMVN $outdir/advanced/$subdir_out/finalMVN
+   cp $tempdir/$subdir_in/paramnames.txt $outdir/advanced/$subdir_out/paramnames.txt
 fi
 
 }
@@ -2331,43 +2335,44 @@ fi
 
 if [ ! -z $calib ]; then
 
-    # Single M0 value for calibration
-    if [ $cmethod = 'single' ]; then
-	Log "Calibration is using a single M0 value with a CSF reference"
-	if [ -z $csf ] && [ -z $fasthasrun ]; then
-	    Log "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
-	    exit 1
-	fi
-       # calcualte M0a from CSF
-	Calibration
-	Mo=`cat $outdir/calib/M0.txt`
+    if [ $cmethod = 'single' ] || [ $cmethod = 'both' ]; then
+        # Single M0 value for calibration
+        Log "Doing calibration using a single M0 value with a CSF reference"
+        if [ -z $csf ] && [ -z $fasthasrun ]; then
+            Log "ERROR: Provide either a structural image or CSF mask for calibration when using --cmethod=single"
+            exit 1
+        fi
+        # calcualte M0a from CSF
+        Calibration
+        Mo=`cat $outdir/calib/M0.txt`
+    fi
+    if [ $cmethod = 'voxel' ] || [ $cmethod = 'both' ]; then
+        # Voxelwise M0 values for calibration
+        Log "Doing calibration using voxelwise M0 map"
+        mkdir $outdir/calib
 
-    # Voxelwise M0 values for calibration
-    elif [ $cmethod = 'voxel' ]; then
-	Log "Calibration is voxelwise"
-	mkdir $outdir/calib
-        # copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
-	fslmaths $tempdir/calib -Tmean -mul $cgain $outdir/calib/M0
-	Mo=$outdir/calib/M0 
-    if [ 1 -eq `echo "if($tr < 5){a=1};a" | bc`  ]; then
-        # correct the M0 image for short TR using the equation from the white paper
-        Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
-        ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
-        fslmaths $Mo -mul $ccorr $Mo
-	fi
+        # Copy over the calibration image and apply the cgain setting - this increases the magntiude of M0 to match that of the ASL data (acquired with a higher gain - cgain>=1 normally)
+        fslmaths $tempdir/calib -Tmean -mul $cgain $outdir/calib/M0
+        Momap=$outdir/calib/M0
+        if [ 1 -eq `echo "if($tr < 5){a=1};a" | bc`  ]; then
+            # correct the M0 image for short TR using the equation from the white paper
+            Log "Correcting the calibration (M0) image for short TR (using T1 of tissue $t1tset)"
+            ccorr=`echo "1 / (1 - e(- $tr / $t1tset) )" | bc -l`
+            fslmaths $Momap -mul $ccorr $Momap
+        fi
 
-	#inlcude partiition co-effcient in M0 image to convert from M0 tissue to M0 arterial
-	fslmaths $Mo -div 0.9 $Mo
+        # Include partition co-effcient in M0 image to convert from M0 tissue to M0 arterial
+        fslmaths $Momap -div 0.9 $Momap
 
-	if [ ! -z $edgecorr ]; then
-	    # correct for (partial volume) edge effects
-	    # median smoothing and erosion
-	    fslmaths $Mo -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
-	    # extrapolation to match mask
-	    asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Mo
-	fi
-    else
-	Log "Error unrecognised calibration method: $cmethod, (use single or voxel)"
+        if [ ! -z $edgecorr ]; then
+            # Correct for (partial volume) edge effects
+            # Median smoothing and erosion
+            fslmaths $Momap -fmedian -mas $tempdir/mask -ero $tempdir/calib_ero
+            # Extrapolation to match mask
+            asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Momap
+        fi
+    elif [ $cmethod != 'single' ]; then
+	    Log "Error unrecognised calibration method: $cmethod, (use single, voxel or both)"
     fi 
 elif [ ! -z $M0 ]; then
     # An M0 value has been supplied, use this
@@ -2380,8 +2385,14 @@ fi
 ### End of: Calibration
 
 ### Output main BASIL results
-# Note we do this here, as we have the registration done and masks created and calibration complete
-Dooutput
+if [ $cmethod = 'both' ]; then
+    # Output with voxelwise and refregion calibration in separate subdirs
+    Dooutput / voxelwise voxel
+    Dooutput / refregion single
+else
+    # Only one calibration method so can use default output dir
+    Dooutput / / $cmethod
+fi
 
 # save the mask used to the (native space) output directory. Note this is the final reg mask
 imcp $tempdir/mask $outdir/native_space/mask
@@ -2422,8 +2433,15 @@ if [ ! -z $pvcorr ]; then
 
     imcp $tempdir/pvcorr/finalMVN $tempdir/finalMVN #just in case we are about to do a epochwise analysis
 
-    #output the results
-    Dooutput pvcorr
+    # Output the PVC results
+    if [ $cmethod = 'both' ]; then
+        # Output with voxelwise and refregion calibration in separate subdirs
+        Dooutput pvcorr voxelwise/pvcorr voxel
+        Dooutput pvcorr refregion/pvcorr single
+    else
+        # Only one calibration method so can use default output dir
+        Dooutput pvcorr pvcorr $cmethod
+    fi
 fi
 ### End of: Partial Volume Correction
 
@@ -2463,9 +2481,16 @@ if [ ! -z $epoch ]; then
 	
 	Dobasil $tempdir/$e $tempdir/$e $tempdir/basil/finalMVN # init with results of first basil run
 
-        #output 
+    # Output epochwise results
 	Log "Saving results from epoch: $e"
-	Dooutput $e
+    if [ $cmethod = 'both' ]; then
+        # Output with voxelwise and refregion calibration in separate subdirs
+        Dooutput / voxelwise/$e voxel
+        Dooutput / refregion/$e single
+    else
+        # Only one calibration method so can use default output dir
+        Dooutput / $e $cmethod
+    fi
 
 	ecount=`expr $ecount + 1`
     done
@@ -2518,6 +2543,13 @@ if [ ! -z $pvexist ]; then
     imcp $tempdir/wmmask_pure_cereb $outdir/native_space/cerebral_wm_roi
 fi
 
+# If using both calibration methods move all files into both subdirs and delete from generic output dir
+if [ $cmethod = 'both' ]; then
+    cp $outdir/native_space/* $outdir/native_space/voxelwise
+    cp $outdir/native_space/* $outdir/native_space/refregion
+    find $outdir/native_space -maxdepth 1 -type f -delete
+fi
+
 # Region analysis if requested
 if [ ! -z $region_analysis ]; then
 
@@ -2527,7 +2559,7 @@ if [ ! -z $region_analysis ]; then
         PYTHON="python"
     fi
 
-    roi_analysis_args="--oxasl-output $outdir --add-arrival --output $outdir/native_space/region_analysis --gm-thresh $gm_thresh --wm-thresh $wm_thresh"
+    roi_analysis_args="--add-arrival --gm-thresh $gm_thresh --wm-thresh $wm_thresh"
     roi_analysis_args="$roi_analysis_args --add-standard-atlases"
     if [ -f "$tempdir/gmmask_pure_cort."* ]; then
         # If we have cortical GM mask assume we have WM one too
@@ -2560,10 +2592,20 @@ if [ ! -z $region_analysis ]; then
         elif [ -z $warp ]; then
             Log "WARNING: Region analysis requested but no structural->std space transformation provided"
         else
-            $PYTHON -u `which oxford_asl_roi_stats` --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
+            if [ $cmethod = 'both' ]; then
+                $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space/voxelwise --output $outdir/native_space/voxelwise/region_analysis --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
+                $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space/refregion --output $outdir/native_space/refregion/region_analysis --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
+            else
+                $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space --output $outdir/native_space/region_analysis --gm-pve $tempdir/pvgm_struct --wm-pve $tempdir/pvwm_struct --struc $struc --struc2std $warp $roi_analysis_args
+            fi
         fi
     else
-        $PYTHON -u `which oxford_asl_roi_stats` --fslanat $fslanat $roi_analysis_args
+        if [ $cmethod = 'both' ]; then
+            $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space/voxelwise --output $outdir/native_space/voxelwise/region_analysis --fslanat $fslanat $roi_analysis_args
+            $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space/refregion --output $outdir/native_space/refregion/region_analysis --fslanat $fslanat $roi_analysis_args
+        else
+            $PYTHON -u `which oxford_asl_roi_stats` --oxasl-output $outdir/native_space --output $outdir/native_space/region_analysis --fslanat $fslanat $roi_analysis_args
+        fi
     fi
 fi
 
