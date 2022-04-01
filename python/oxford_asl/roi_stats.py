@@ -34,6 +34,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--wm-pve", help="WM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
         self.add_argument("--native-pves", action='store_true', default=False,
                           help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
+        self.add_argument("--roi-psf", help="Point-spread function for ROIs. If specified, PSF will be applied to ROIs (in native space) and 'fuzzy' mean used")
         self.add_argument("--asl2struc", help="File containing ASL->Structural transformation matrix - if not specified will look in <oxasl_output>/asl2struct.mat")
         self.add_argument("--struc2std", help="Structural -> standard space nonlinear warp map - ignored if --fslanat is given. Only required if --std2struc is not given")
         self.add_argument("--std2struc", help="Standard -> structural space nonlinear warp map - ignored if --fslanat is given. If not specified will be derived by inverting --struc2std warp")
@@ -103,14 +104,20 @@ def _transform(img, warp, ref, premat=None, postmat=None, interp="trilinear", pa
         ret = Image((ret.data > output_roi_thresh).astype(np.int), header=ret.header)
     return ret
 
-def _write_nii(img, fname, header=None):
+def _write_nii(img, fname, header=None, vol=0):
     os.makedirs(os.path.dirname(fname), exist_ok=True)
     if isinstance(img, Image):
-        img.save(fname)
-    else:
-        nii = nib.Nifti1Image(img, None, header=header)
-        nii.update_header()
-        nii.to_filename(fname)
+        header = img.header
+        img = img.data
+
+    if img.ndim == 4 and vol > 0:
+        img = img[..., vol]
+    elif img.ndim == 3 and vol > 0:
+        raise RuntimeError("Tried to save multiple volumes of 3D data")
+
+    nii = nib.Nifti1Image(img, None, header=header)
+    nii.update_header()
+    nii.to_filename(fname)
 
 def _addvar(f):
     """ Add an unused 'variance' parameter to a function which doesn't use it """
@@ -124,16 +131,17 @@ def mean_invvarweighted(val, var):
     prec[~np.isfinite(prec)] = 0
     return np.sum(val * prec) / np.sum(prec)
 
-def i2(val, var):
+def i2(val, var, mean_precweighted=None):
     """ I^2 Measure of heterogenaity """
     prec = 1 / var
     prec[~np.isfinite(prec)] = 0
     n = len(val)
-    mu_bar = mean_invvarweighted(val, var)
+    if mean_precweighted is not None:
+        mu_bar = mean_precweighted
+    else:
+        mu_bar = mean_invvarweighted(val, var)
 
-    #out = []
     Q = np.sum(prec * (val - mu_bar)**2)
-    #H = np.sqrt(Q/(n - 1))
     if Q == 0:
         i2 = 0
     else:
@@ -141,13 +149,6 @@ def i2(val, var):
 
     # Negative values map to 0 (see https://www.ncbi.nlm.nih.gov/pmc/articles/PMC192859/)
     i2 = max(i2, 0)
-    #tau2_DL = (Q - n + 1)/(sum(w) - sum([x**2 for x in w])/sum(w))
-    #tau2_DL = max(0, tau2_DL)
-    #out.extend([mu_bar,Q,H,I2,tau2_DL])
-
-    #out = pd.DataFrame(out)
-    #out['index']=['Weighted_Mean', 'Q', 'H', 'I2', 'tau2_DL']
-    #out = out.set_index('index', drop=True)
 
     # Return I2 as an integer percentage
     return int(100*i2+0.5)
@@ -161,7 +162,7 @@ STATS_FNS = {
     "I2" : i2,
 }
 
-def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=True, ignore_zerovar=True, min_nvoxels=10, mask=None):
+def get_stats_binary(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=True, ignore_zerovar=True, min_nvoxels=10, mask=None):
     """
     Get a set of statistics for a 3D image within an roi
 
@@ -183,15 +184,19 @@ def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=T
     if mask is not None and list(mask.shape) != list(roi.shape):
         raise ValueError("Mask must have same dimensions as ROI")
 
-    effective_roi = roi
+    if mask is None:
+        mask = np.ones(roi.shape, dtype=np.int)
     if ignore_nan:
-        effective_roi = np.logical_and(effective_roi, ~np.isnan(img))
+        mask = np.logical_and(mask, ~np.isnan(img))
     if ignore_inf:
-        effective_roi = np.logical_and(effective_roi, np.isfinite(img))
+        mask = np.logical_and(mask, np.isfinite(img))
     if ignore_zerovar:
-        effective_roi = np.logical_and(effective_roi, var_img > 0)
-    if mask is not None:
-        effective_roi = np.logical_and(effective_roi, mask)
+        mask = np.logical_and(mask, var_img > 0)
+    print(" - Base mask has %i voxels" % np.count_nonzero(mask))
+
+    # Only take voxels where at least one of the ROIs has non-zero percentage
+    effective_roi = np.logical_and(roi, mask)
+    print(" - Effective ROI has %i voxels" % np.count_nonzero(effective_roi))
 
     sample_data = img[effective_roi]
     sample_var = var_img[effective_roi]
@@ -204,6 +209,114 @@ def get_stats(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=T
             stats[stat + suffix] = None
         else:
             stats[stat + suffix] = fn(sample_data, sample_var)
+
+def standardise(roi_set, mode="expand"):
+    """
+    Ensure that fuzzy ROI set has PVs that sum to 1 in every voxel
+
+    :param mode: 'expand' adds an ROI to the set containing any non-included PV.
+                 'normalise' scales PVs so they sum to 1
+    """
+    if mode not in ("normalise", "expand"):
+        raise ValueError(f"Mode {mode} not supported - expected `normalise` or `expand`")
+
+    # Warning if normalising and ROI only has one label
+    if np.shape(roi_set)[1] == 1 and mode == "normalise":
+        print("Warning: Only one ROI in set with mode='normalise' - all nonzero voxels will have PV=1")
+
+    # Get total PV in each voxel
+    roi_sum = np.sum(roi_set, axis=1, keepdims=True)
+
+    if mode == "normalise":
+        roi_set = np.where(roi_sum!=0, roi_set/roi_sum, 0)
+    elif mode == "expand":
+        # TODO: insert a check to see if any diff_img < 0 and raise a warning
+        roi_set = np.concatenate((roi_set, 1 - roi_sum), axis=-1)
+    return roi_set
+
+def get_stats_fuzzy(stats, img, var_img, roi_set, suffix="", ignore_nan=True, ignore_inf=True, ignore_zerovar=True, mask=None, pv_threshold=0.):
+    """
+    Get a set of statistics for a set of 'fuzzy' ROIs
+
+    :param img: 3D Numpy array
+    :param roi_set: 4D Numpy array with same dimensions as img and each volume
+                    containing partial volumes for each ROI in the set
+
+    :return: Mapping from name of statistic to sequence of values, one for each ROI in the set.
+             This may be NaN or infinite depending on the input arguments. 
+    """
+    roi_shape = list(roi_set.shape)[:3]
+    if list(img.shape) != roi_shape:
+        raise ValueError("Image must have same dimensions as ROI")
+    if list(var_img.shape) != roi_shape:
+        raise ValueError("Variance image must have same dimensions as ROI")
+    if mask is not None and list(mask.shape) != roi_shape:
+        raise ValueError("Mask must have same dimensions as ROI")
+
+    if mask is None:
+        mask = np.ones(roi_shape, dtype=np.int)
+    if ignore_nan:
+        mask = np.logical_and(mask, ~np.isnan(img))
+    if ignore_inf:
+        mask = np.logical_and(mask, np.isfinite(img))
+    if ignore_zerovar:
+        mask = np.logical_and(mask, var_img > 0)
+    print(" - Base mask has %i voxels" % np.count_nonzero(mask))
+
+    # Only take voxels where at least one of the ROIs has non-zero percentage
+    mask = np.logical_and(mask, np.sum(roi_set, axis=3) > pv_threshold)
+    print(" - Excluding voxels with zero PV - mask now has %i voxels" % np.count_nonzero(mask))
+
+    # Flatten ROI PVs and data into masked 2D array
+    roi_array = roi_set[mask]
+    g = img[mask]
+
+    # Standardize ROI set so total PV is 1
+    roi_array = standardise(roi_array, mode='expand')
+
+    # Ask Jack about this???
+    #if var:
+    #    roi_array = np.square(roi_array)
+
+    HT = roi_array.T
+    print(f" - Condition number for transfer matrix (unweighted) = {np.linalg.cond(HT):.2f}.")
+
+    # Calculate roi means by linear regression
+    means_lstsq, _res, _rank, _s = np.linalg.lstsq(HT@roi_array, HT@g[..., np.newaxis],
+                                                   rcond=None) # None uses future default
+                                                               # and silences warning
+
+    # Note that we do not report stats for the 'background' ROI added to ensure total PV of 1
+    for idx in range(roi_set.shape[-1]):
+        nvox1 = np.count_nonzero(np.logical_and(mask, roi_set[..., idx] > pv_threshold))
+        nvox2 = np.count_nonzero(roi_array[:, idx] > pv_threshold)
+        print(nvox1, nvox2)
+    stats["Nvoxels" + suffix] = [np.count_nonzero(np.logical_and(mask, roi_set[..., idx] > pv_threshold)) for idx in range(roi_set.shape[-1])]
+    stats["Mean" + suffix] = np.atleast_1d(np.squeeze(means_lstsq[:-1]))
+
+    # If variance has been supplied add a precision-weighted mean
+    if var_img is not None:
+        #print(len(np.argwhere(var_image.get_fdata().flatten()[mask] == 0)))
+        V_inv = scipy.sparse.diags(1/var_img[mask])
+        HT = roi_array.T @ V_inv
+        print(f" - Condition number for transfer matrix (prec-weighted) = {np.linalg.cond(HT):.2f}.")
+
+        # Calculate roi means by linear regression
+        means_lstsq, _res, _rank, _s = np.linalg.lstsq(HT@roi_array, HT@g[..., np.newaxis],
+                                                       rcond=None) # None uses future default
+                                                                   # and silences warning
+        stats["Precision-weighted mean" + suffix] = np.atleast_1d(np.squeeze(means_lstsq[:-1]))
+
+def get_stats(roi, data_item, options):
+    if "fuzzy_native" in roi:
+        print(" - Fuzzy ROI set: %s" % roi["names"])
+        get_stats_fuzzy(roi["stats"], data_item["f"].data, data_item["var"].data, roi["fuzzy_native"], mask=data_item["mask"])
+    elif "mask_native" in roi:
+        print(" - Binarised ROI: %s" % roi["name"])
+        get_stats_binary(roi["stats"], data_item["f"].data, data_item["var"].data, roi["mask_native"], mask=data_item["mask"], min_nvoxels=options.min_nvoxels)
+    else:
+        # Should never happen
+        raise RuntimeError("No native ROI to get stats: %s" % str(roi))
 
 def add_native_roi(rois, roi, name, threshold=0.5, log=sys.stdout):
     """
@@ -229,7 +342,7 @@ def add_mni_roi(rois, roi, name, mni2struc, ref, struct2asl, threshold=0.5, log=
     roi_native = _transform(roi, warp=mni2struc, ref=ref, postmat=struct2asl)
     rois.append({"name" : name, "roi_mni" : roi, "roi_native" : roi_native, "mask_native" : roi_native.data > threshold})
     log.write("DONE\n")
- 
+
 def add_rois_from_fsl_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_name, resolution=2, threshold=50, log=sys.stdout):
     """
     Get ROIs from an FSL atlas
@@ -249,7 +362,57 @@ def add_rois_from_fsl_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas
     for label in desc.labels:
         add_mni_roi(rois, atlas.get(label=label), label.name, mni2struc_warp, ref_img, struct2asl_mat, threshold=threshold)
 
-def add_rois_from_mni_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_img, region_names, log=sys.stdout):
+def apply_psf(mask_set_native, psf):
+    # FIXME todo
+    return mask_set_native.astype(np.float)
+
+def add_struct_roi_set(rois, roi_set, names, ref, struct2asl, threshold=None, psf=None, log=sys.stdout):
+    """
+    Add an ROI set defined in structural space with optional PSF
+
+    :param rois: Mapping from name to ROI array which will be updated
+    :param roi_set: 4D Image where volumes define disjoint masks in MNI space
+    :param names: Array of ROI names
+    :param mni2struc: Warp image containing MNI->structural space warp
+    :param struct2asl: Matrix for struct->ASL transformation
+    :param threshol: Threshold for generating binary native space mask
+    :param psf: Optional point spread function for binary ROIs. If specified, will be
+                applied to ROIs and 'fuzzy' stats will be used
+    """
+    log.write(" - %s..." % ",".join(names))
+    roi_set_native = _transform(roi_set, warp=None, ref=ref, premat=struct2asl)
+    if threshold:
+        mask_set_native = roi_set_native.data > threshold
+    else:
+        mask_set_native = roi_set_native.data
+    fuzzy_set_native = apply_psf(mask_set_native, psf)
+    rois.append({"names" : names, "roi_struct" : roi_set, "roi_native" : roi_set_native, "mask_native" : mask_set_native, "fuzzy_native" : fuzzy_set_native})
+    log.write("DONE\n")
+
+def add_mni_roi_set(rois, roi_set, names, mni2struc, ref, struct2asl, threshold=None, psf=None, log=sys.stdout):
+    """
+    Add an ROI set defined in MNI space with optional PSF
+
+    :param rois: Mapping from name to ROI array which will be updated
+    :param roi_set: 4D Image where volumes define disjoint masks in MNI space
+    :param names: Array of ROI names
+    :param mni2struc: Warp image containing MNI->structural space warp
+    :param struct2asl: Matrix for struct->ASL transformation
+    :param threshol: Threshold for generating binary native space mask
+    :param psf: Optional point spread function for binary ROIs. If specified, will be
+                applied to ROIs and 'fuzzy' stats will be used
+    """
+    log.write(" - %s..." % ",".join(names))
+    roi_set_native = _transform(roi_set, warp=mni2struc, ref=ref, postmat=struct2asl)
+    if threshold:
+        mask_set_native = roi_set_native.data > threshold
+    else:
+        mask_set_native = roi_set_native.data
+    fuzzy_set_native = apply_psf(mask_set_native, psf)
+    rois.append({"names" : names, "roi_mni" : roi_set, "roi_native" : roi_set_native, "mask_native" : mask_set_native, "fuzzy_native" : fuzzy_set_native})
+    log.write("DONE\n")
+
+def add_roi_set_from_mni_label_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas_img, region_names, psf=None, log=sys.stdout):
     """
     Get ROIs from an atlas described by a label image in MNI space
  
@@ -257,18 +420,25 @@ def add_rois_from_mni_atlas(rois, mni2struc_warp, ref_img, struct2asl_mat, atlas
     :param mni2struc_warp: Warp image containing MNI->structural space warp
     :param struct2asl_mat: Matrix for struct->ASL transformation
     :param atlas_img: Atlas label image
-    :param region_names: Atlas label image
-    :param resolution: Resolution in mm
+    :param region_names: array of names for atlas regions
+    :param psf: Optional point spread function for binary ROIs. If specified, will be
+                applied to ROIs and 'fuzzy' stats will be used
     """
-    log.write("\nAdding ROIs from MNI atlas image: %s\n" % (atlas_img.name))
+    log.write("\nAdding ROI set from MNI atlas image: %s\n" % (atlas_img.name))
     labels = [idx for idx in np.unique(atlas_img.data) if idx != 0]
     if len(labels) != len(region_names):
         region_names = ["Region %i" % label for label in labels]
-    for idx, label in enumerate(labels):
+    roi_set = []
+    for name, label in zip(region_names, labels):
         roi = atlas_img.data.copy()
-        roi[roi != label] = 0
-        name = region_names[idx]
-        add_mni_roi(rois, Image(roi, header=atlas_img.header), name, mni2struc_warp, ref_img, struct2asl_mat, threshold=0.5)
+        roi_bin = (roi == label).astype(np.int)
+        roi_set.append(roi_bin)
+        roi_bin = Image(roi_bin, header=atlas_img.header)
+        if not psf:
+            add_mni_roi(rois, roi_bin, name, mni2struc_warp, ref_img, struct2asl_mat, threshold=0.5)
+    if psf:
+        roi_set = Image(np.stack(roi_set, axis=3), header=atlas_img.header)
+        add_mni_roi_set(rois, roi_set, region_names, mni2struc_warp, ref_img, struct2asl_mat, psf=psf)
 
 def get_perfusion_data(outdir, gm_pve_asl, wm_pve_asl, gm_thresh, wm_thresh, min_gm_thresh, min_wm_thresh, log=sys.stdout):
     brain_mask = Image(os.path.join(outdir, "mask"))
@@ -391,6 +561,7 @@ def main():
         struc_ref = Image(os.path.join(options.fslanat, "T1"))
         gm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_1"))
         wm_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_2"))
+        csf_pve = Image(os.path.join(options.fslanat, "T1_fast_pve_0"))
         struct2mni_warp = Image(os.path.join(options.fslanat, "T1_to_MNI_nonlin_coeff"))
     elif options.struc is not None and (options.struc2std is not None or options.std2struc is not None):
         print(" - Using manually specified structural data")
@@ -404,6 +575,8 @@ def main():
             gm_pve = Image(options.gm_pve)
         if options.wm_pve is not None:
             wm_pve = Image(options.wm_pve)
+        if options.csf_pve is not None:
+            csf_pve = Image(options.csf_pve)
     else:
         sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std/--std2struc \n")
         sys.exit(1)
@@ -450,19 +623,26 @@ def main():
         add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.min_wm_thresh*100), threshold=options.min_wm_thresh)
         add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.wm_thresh*100), threshold=options.wm_thresh)
 
+    print("\nLoading tissue PV ROI set")
+    if gm_pve is not None and wm_pve is not None and csf_pve is not None and not options.native_pves:
+        roi_set = Image(np.stack([gm_pve.data, wm_pve.data, csf_pve.data], axis=-1), header=gm_pve.header)
+        add_struct_roi_set(rois, roi_set, ["GM PV", "WM PV", "CSF PV"], ref=asl_ref, struct2asl=struct2asl_mat)
+
     # Add ROIs from command line
     print("\nLoading user-specified ROIs")
     for fname in options.roi_native:
         add_native_roi(rois, Image(fname), os.path.basename(fname).split(".")[0])
     for fname in options.roi_struct:
         add_struct_roi(rois, Image(fname), os.path.basename(fname).split(".")[0], asl_ref, struct2asl_mat)
+
+    print("\nLoading user-specified label atlases")
     for idx, fname in enumerate(options.add_mni_atlas):
         if idx < len(options.add_mni_atlas_labels):
             with open(options.add_mni_atlas_labels[idx]) as f:
                 names = [l.strip() for l in f.readlines()]
         else:
             names = [os.path.basename(fname).split(".")[0],]
-        add_rois_from_mni_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, Image(fname), names)
+        add_roi_set_from_mni_label_atlas(rois, mni2struc_warp, asl_ref, struct2asl_mat, Image(fname), names)
 
     # Add ROIs from standard atlases
     if options.add_standard_atlases:
@@ -478,31 +658,52 @@ def main():
         # Save TSV stats output. Note we give TSV file a CSV extension to make Excel happier
         with open(os.path.join(options.output, "%s%s.csv" % (options.output_prefix, suffix)), mode="w", newline='') as tsv_file:
             for roi in rois:
-                roi["stats"] = {"name" : roi["name"]}
-                get_stats(roi["stats"], item["f"].data, item["var"].data, roi["mask_native"], mask=item["mask"], min_nvoxels=options.min_nvoxels)
-            
+                roi["stats"] = {"name" : roi.get("name", None), "names" : roi.get("names", None)}
+                get_stats(roi, item, options)
+
                 if writer is None:
                     writer = csv.DictWriter(tsv_file, fieldnames=list(roi["stats"].keys()))
                     writer.writeheader()
 
+                # The ROI might just be a single ROI or it might be a 'fuzzy set' - need
+                # to handle both cases
+                roi_stats = dict(roi["stats"])
+                if roi_stats["name"] is not None:
+                    all_roi_stats = [roi_stats]
+                else:
+                    all_roi_stats = []
+                    for idx in range(len(roi_stats["names"])):
+                        roi_stats_copy = dict(roi_stats)
+                        for k in list(roi_stats.keys()):
+                            if roi_stats_copy[k] is not None:
+                                roi_stats_copy[k] = roi_stats_copy[k][idx]
+                        roi_stats_copy["name"] = roi_stats_copy.pop("names")
+                        all_roi_stats.append(roi_stats_copy)
+
                 # Round floats to 2 d.p. - should be fine for calibrated perfusion values
-                rounded = dict(roi["stats"])
-                for k, v in roi["stats"].items():
-                    if isinstance(v, (float, np.float, np.float32, np.float64)):
-                        rounded[k] = "%.2f" % v
-                writer.writerow(rounded)
+                for roi_stats in all_roi_stats:
+                    rounded = dict(roi_stats)
+                    for k, v in roi_stats.items():
+                        if isinstance(v, (float, np.float, np.float32, np.float64)):
+                            rounded[k] = "%.2f" % v
+                    writer.writerow(rounded)
 
     # Save output masks/PVE maps
     for roi in rois:
-        fname = roi["name"].replace(" ", "_").replace(",", "").lower() + ".nii.gz"
-        if options.save_native_rois and "roi_native" in roi:
-            _write_nii(roi["roi_native"], os.path.join(options.output, "rois_native", fname))
-        if options.save_native_masks and "mask_native" in roi:
-            _write_nii(roi["mask_native"], os.path.join(options.output, "masks_native", fname), header=asl_ref.header)
-        if options.save_struct_rois and "roi_struct" in roi:
-            _write_nii(roi["roi_struct"], os.path.join(options.output, "rois_struct", fname))
-        if options.save_mni_rois and "roi_mni" in roi:
-            _write_nii(roi["roi_mni"], os.path.join(options.output, "rois_mni", fname))
+        if "name" in roi:
+            names = [roi["name"]]
+        else:
+            names = roi["names"]
+        for idx, name in enumerate(names):
+            fname = name.replace(" ", "_").replace(",", "").lower() + ".nii.gz"
+            if options.save_native_rois and "roi_native" in roi:
+                _write_nii(roi["roi_native"], os.path.join(options.output, "rois_native", fname), vol=idx)
+            if options.save_native_masks and "mask_native" in roi:
+                _write_nii(roi["mask_native"], os.path.join(options.output, "masks_native", fname), header=asl_ref.header, vol=idx)
+            if options.save_struct_rois and "roi_struct" in roi:
+                _write_nii(roi["roi_struct"], os.path.join(options.output, "rois_struct", fname), vol=idx)
+            if options.save_mni_rois and "roi_mni" in roi:
+                _write_nii(roi["roi_mni"], os.path.join(options.output, "rois_mni", fname), vol=idx)
 
     print("\nDONE - Output in %s" % options.output)
 
