@@ -5,7 +5,7 @@
 import sys, os
 for d in [os.environ.get("FSLDIR", None), 
           os.environ.get("FSLDEVDIR", None, ),
-          os.path.dirname(os.path.abspath(sys.argv[0]))]:
+          os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), os.pardir)]:
     if d:
         sys.path.insert(0, os.path.join(d, "python"))
 
