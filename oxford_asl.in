@@ -171,6 +171,7 @@ Usage_extended() {
     echo " --region-analysis-save-rois : Save ROIs used for region analysis"
     echo " --region-analysis-atlas : Label image containing ROIs to use for region analysis"
     echo " --region-analysis-atlas-labels : Text file containing names of regions in the label image"
+    echo " --region-analysis-psf   : Text file containing Z-blurring point spread function for blurred region analysis"
     echo " --gm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' GM (default 0.8)"
     echo " --wm-thresh=<val>       : Probability threshold for a voxel to be considered 'pure' WM (default 0.9)"
     echo ""
@@ -978,6 +979,8 @@ takeargs=0;boolarg="";isbool="";
 	--region-analysis-atlas) region_analysis_atlases+=( "$argument" )
         takeargs=1;;
 	--region-analysis-atlas-labels) region_analysis_atlases_labels+=( "$argument" )
+        takeargs=1;;
+	--region-analysis-psf) region_analysis_psf+=( "$argument" )
         takeargs=1;;
 	--gm-thresh) gm_thresh=$argument
 	    takeargs=1;;
@@ -2584,6 +2587,10 @@ if [ ! -z $region_analysis ]; then
 
     if [ ! -z $region_analysis_save_rois ]; then
         roi_analysis_args="$roi_analysis_args --save-mni-rois --save-struct-rois --save-native-rois --save-native-masks"
+    fi
+
+    if [ ! -z $region_analysis_psf ]; then
+        roi_analysis_args="$roi_analysis_args --psf=$region_analysis_psf"
     fi
 
     if [ -z $fslanat ]; then
