@@ -33,6 +33,7 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("--struc", "-s", help="Structural space reference image - ignored if --fslanat is given")
         self.add_argument("--gm-pve", help="GM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
         self.add_argument("--wm-pve", help="WM PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
+        self.add_argument("--csf-pve", help="CSF PVE, assumed to be in structural space unless --native_pves option is specified - ignored if --fslanat is given")
         self.add_argument("--native-pves", action='store_true', default=False,
                           help="If specified, it is assumed that the GM and WM PVEs provided are in native asl space - ignored if --fslanat is given")
         self.add_argument("--psf", help="Point-spread function for ROI sets. If specified, PSF will be applied to ROI sets (in native space) and 'fuzzy' mean used")
@@ -592,7 +593,7 @@ def main():
     outdir = options.oxasl_output
     asl_ref = Image(os.path.join(outdir, "perfusion"))
 
-    gm_pve, wm_pve = None, None
+    gm_pve, wm_pve, csf_pve = None, None, None
     if options.fslanat is not None:
         print(" - Using fsl_anat output in %s" % options.fslanat)
         struc_ref = Image(os.path.join(options.fslanat, "T1"))
@@ -615,7 +616,7 @@ def main():
         if options.csf_pve is not None:
             csf_pve = Image(options.csf_pve)
     else:
-        sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve and --struc2std/--std2struc \n")
+        sys.stderr.write("Either --fslanat must be specified or all of --struc, --gm-pve, --wm-pve --csf-pve and --struc2std/--std2struc \n")
         sys.exit(1)
 
     if options.fslanat is not None or options.std2struc is None:
@@ -665,8 +666,8 @@ def main():
         add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.min_wm_thresh*100), threshold=options.min_wm_thresh)
         add_native_roi(rois, wm_pve_asl, "%i%%+WM" % (options.wm_thresh*100), threshold=options.wm_thresh)
 
-    print("\nLoading tissue PV ROI set")
     if gm_pve is not None and wm_pve is not None and csf_pve is not None and not options.native_pves:
+        print("\nLoading tissue PV ROI set")
         roi_set = Image(np.stack([gm_pve.data, wm_pve.data, csf_pve.data], axis=-1), header=gm_pve.header)
         add_struct_roi_set(rois, roi_set, ["GM PV", "WM PV", "CSF PV"], ref=asl_ref, struct2asl=struct2asl_mat, psf=options.psf)
 
