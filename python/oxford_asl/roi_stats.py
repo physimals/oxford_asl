@@ -706,13 +706,15 @@ def main():
                 get_stats(roi, item, options)
 
                 if writer is None:
-                    writer = csv.DictWriter(tsv_file, fieldnames=list(roi["stats"].keys()))
+                    fieldnames = [k for k in roi["stats"].keys() if k != 'names']
+                    writer = csv.DictWriter(tsv_file, fieldnames=fieldnames)
                     writer.writeheader()
 
                 # The ROI might just be a single ROI or it might be a 'fuzzy set' - need
                 # to handle both cases
                 roi_stats = dict(roi["stats"])
                 if roi_stats["name"] is not None:
+                    roi_stats.pop("names")
                     all_roi_stats = [roi_stats]
                 else:
                     all_roi_stats = []
