@@ -6,18 +6,20 @@
 
 /*  CCOPYRIGHT  */
 
-#define WANT_STREAM
-#define WANT_MATH
-
-#include "readoptions.h"
-#include "utils/log.h"
-#include "utils/tracer_plus.h"
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "utils/log.h"
+#include "utils/tracer_plus.h"
+#include "armawrap/newmat.h"
+
+#include "readoptions.h"
+
+using namespace std;
 using namespace Utilities;
+using namespace NEWMAT;
 
 namespace OXASL
 {
@@ -46,12 +48,12 @@ bool ReadOptions::parse_command_line(int argc, char **argv)
         options.usage();
         return false;
     }
-    else if (version.value()) 
+    else if (version.value())
     {
         cout << GIT_SHA1 << " (" << GIT_DATE << ")" << endl;
         return false;
     }
-    else if (!options.check_compulsory_arguments()) 
+    else if (!options.check_compulsory_arguments())
     {
         options.usage();
         throw Exception("Not all of the compulsory arguments have been provided");

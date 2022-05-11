@@ -11,67 +11,67 @@
 #if !defined(asl_functions_h)
 #define asl_functions_h
 
-#include "miscmaths/miscmaths.h"
-#include "newimage/newimageall.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <vector>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 
-using namespace MISCMATHS;
-using namespace NEWIMAGE;
+#include "armawrap/newmat.h"
+#include "miscmaths/miscmaths.h"
+#include "newimage/newimageall.h"
 
 namespace OXASL
 {
-void data2stdform(Matrix &datamtx, vector<Matrix> &asldata, int ntis, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
-void stdform2data(vector<Matrix> &asldata, Matrix &datareturn, bool outblocked, bool outpairs);
+void data2stdform(NEWMAT::Matrix &datamtx, std::vector<NEWMAT::Matrix> &asldata, int ntis, std::vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+void stdform2data(std::vector<NEWMAT::Matrix> &asldata, NEWMAT::Matrix &datareturn, bool outblocked, bool outpairs);
 
 // separate the pairs in the data (into seprate standard form items)
-void separatepairs(vector<Matrix> &asldata, vector<Matrix> &asldataodd, vector<Matrix> &asldataeven);
-void mergepairs(vector<Matrix> &asldata, vector<Matrix> &asldataodd, vector<Matrix> &asldataeven);
+void separatepairs(std::vector<NEWMAT::Matrix> &asldata, std::vector<NEWMAT::Matrix> &asldataodd, std::vector<NEWMAT::Matrix> &asldataeven);
+void mergepairs(std::vector<NEWMAT::Matrix> &asldata, std::vector<NEWMAT::Matrix> &asldataodd, std::vector<NEWMAT::Matrix> &asldataeven);
 
 // mean the data at each TI
-void timeans(vector<Matrix> &asldata, vector<Matrix> &aslmean);
+void timeans(std::vector<NEWMAT::Matrix> &asldata, std::vector<NEWMAT::Matrix> &aslmean);
 // output data having taken mean at each TI
-void timeanout(vector<Matrix> &asldata, volume<float> &mask, string fname, bool outpairs);
+void timeanout(std::vector<NEWMAT::Matrix> &asldata, NEWIMAGE::volume<float> &mask, std::string fname, bool outpairs);
 
 // output data split into individual TIs
-void splitout(vector<Matrix> &asldata, volume<float> &mask, string froot);
+void splitout(std::vector<NEWMAT::Matrix> &asldata, NEWIMAGE::volume<float> &mask, std::string froot);
 
 // output epochs of data
-void epochout(vector<Matrix> &asldata, volume<float> &mask, string froot, int epadv, int epol, bool outpairs, bool tiunit = false);
+void epochout(std::vector<NEWMAT::Matrix> &asldata, NEWIMAGE::volume<float> &mask, std::string froot, int epadv, int epol, bool outpairs, bool tiunit = false);
 // generate epochs
-void genepochs(vector<Matrix> &asldata, vector<Matrix> &epochreturn, int epadv, int epol);
+void genepochs(std::vector<NEWMAT::Matrix> &asldata, std::vector<NEWMAT::Matrix> &epochreturn, int epadv, int epol);
 // generate TI epochs
-void gentiepochs(Matrix &asldata, vector<Matrix> &epochreturn, int epadv, int epol);
+void gentiepochs(NEWMAT::Matrix &asldata, std::vector<NEWMAT::Matrix> &epochreturn, int epadv, int epol);
 
 //output the result of deconvolution with an AIF
-void deconvout(vector<Matrix> &asldata, volume<float> &mask, Matrix &aif, string fname);
+void deconvout(std::vector<NEWMAT::Matrix> &asldata, NEWIMAGE::volume<float> &mask, NEWMAT::Matrix &aif, std::string fname);
 // do SVD convoloution
-ReturnMatrix SVDdeconv(const Matrix &data, const Matrix &aif);
+NEWMAT::ReturnMatrix SVDdeconv(const NEWMAT::Matrix &data, const NEWMAT::Matrix &aif);
 // create a (simple) convolution matrix
-ReturnMatrix convmtx(const ColumnVector &invec);
+NEWMAT::ReturnMatrix convmtx(const NEWMAT::ColumnVector &invec);
 
 // Partial volume correction functions
 // function to perform partial volume correction by linear regression
-void pvcorr_LR(vector<Matrix> &data_in, int ndata_in, volume<float> &mask, volume<float> &pv_map_gm, volume<float> &pv_map_wm, int kernel, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+void pvcorr_LR(std::vector<NEWMAT::Matrix> &data_in, int ndata_in, NEWIMAGE::volume<float> &mask, NEWIMAGE::volume<float> &pv_map_gm, NEWIMAGE::volume<float> &pv_map_wm, int kernel, std::vector<NEWMAT::Matrix> &data_out, bool outblocked, bool outpairs, std::vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 
 // PV correction using linear regression (Asllani's method)
-volume<float> correct_pv_lr(const volume<float> &data_in, const volume<float> &mask, const volume<float> &pv_map_gm, const volume<float> &pv_map_wm, int kernel);
+NEWIMAGE::volume<float> correct_pv_lr(const NEWIMAGE::volume<float> &data_in, const NEWIMAGE::volume<float> &mask, const NEWIMAGE::volume<float> &pv_map_gm, const NEWIMAGE::volume<float> &pv_map_wm, int kernel);
 
 // Function to correct NaN values
-volume<float> correct_NaN(const volume<float> &data_in);
+NEWIMAGE::volume<float> correct_NaN(const NEWIMAGE::volume<float> &data_in);
 
 // Extrapolation functions
 // function to extrapolate voxels
-void extrapolate(vector<Matrix> &data_in, int ndata_in, int ntis, volume<float> &mask, int neighbour_size, vector<Matrix> &data_out, bool outblocked, bool outpairs, vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
+void extrapolate(std::vector<NEWMAT::Matrix> &data_in, int ndata_in, int ntis, NEWIMAGE::volume<float> &mask, int neighbour_size, std::vector<NEWMAT::Matrix> &data_out, bool outblocked, bool outpairs, std::vector<int> nrpts, bool isblocked, bool ispairs, bool blockpairs);
 
 // Function to do spiral search on 2D images and extrapolate edge voxels
-Matrix extrapolate_avg(Matrix data_in, Matrix mask, int neighbour_size);
+NEWMAT::Matrix extrapolate_avg(NEWMAT::Matrix data_in, NEWMAT::Matrix mask, int neighbour_size);
 }
 
 #endif

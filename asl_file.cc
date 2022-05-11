@@ -10,8 +10,7 @@
 
 #include "miscmaths/miscmaths.h"
 #include "newimage/newimageall.h"
-#include "newmatap.h"
-#include "newmatio.h"
+#include "armawrap/newmat.h"
 #include "stdlib.h"
 #include "utils/tracer_plus.h"
 #include <iostream>
@@ -22,6 +21,7 @@
 #include "asl_functions.h"
 #include "readoptions.h"
 
+using namespace std;
 using namespace Utilities;
 using namespace NEWMAT;
 using namespace NEWIMAGE;
@@ -404,7 +404,7 @@ int main(int argc, char *argv[])
           // function to perform partial volume correction by linear regression
           //pvcorr_LR(asldata_non_pvcorr, ndata, mask, pv_gm_map, pv_wm_map, kernel, data_pvcorr);
 
-          //covert data_pvcorr to vector<Matrix> aka stdform 
+          //covert data_pvcorr to vector<Matrix> aka stdform
           Matrix data_pvcorr_mtx;
           vector<Matrix> asldataout_pvcorr;
           data_pvcorr_mtx = data_pvcorr.matrix(mask);
@@ -466,7 +466,7 @@ int main(int argc, char *argv[])
                 timeanout(asldataout, mask, opts.meanout.value() + fsub, outpairs);
                 /*cout << "Outputting ASL data mean at each TI" << endl;
 	  Matrix meanti(ntis,nvox);
-	  for (int n=0; n<ntis; n++) 
+	  for (int n=0; n<ntis; n++)
 	  {
 	  meanti.Row(n+1)=mean(asldata[n],1);
 	  }
@@ -534,7 +534,7 @@ int main(int argc, char *argv[])
 	  else if (e<1000) sprintf(cstr,"%d",e);
 	  else throw Exception("More than 1000 epochs in this ASL data file, sorry cannot handle this operation");
 	  string epno(cstr);
-	  
+
 	  epochout.setmatrix(epoch_temp,mask);
 	  save_volume4D(epochout,opts.epochout.value()+epno);
 

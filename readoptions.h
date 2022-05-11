@@ -11,15 +11,14 @@
 #if !defined(ReadOptions_h)
 #define ReadOptions_h
 
-#include "utils/log.h"
-#include "utils/options.h"
 #include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 
-using namespace Utilities;
+#include "utils/log.h"
+#include "utils/options.h"
 
 namespace OXASL
 {
@@ -28,45 +27,45 @@ class ReadOptions
 public:
     static ReadOptions &getInstance();
     ~ReadOptions() { delete ropt; }
-    Option<bool> help;
-    Option<bool> version;
+    Utilities::Option<bool> help;
+    Utilities::Option<bool> version;
 
-    Option<string> datafile;
-    Option<string> maskfile;
-    Option<int> ntis;
+    Utilities::Option<std::string> datafile;
+    Utilities::Option<std::string> maskfile;
+    Utilities::Option<int>         ntis;
 
-    Option<string> inblockform;
-    Option<string> inaslform;
-    Option<string> rpts;
-    Option<bool> ispairs;
+    Utilities::Option<std::string> inblockform;
+    Utilities::Option<std::string> inaslform;
+    Utilities::Option<std::string> rpts;
+    Utilities::Option<bool>        ispairs;
 
-    Option<bool> splitpairs;
-    Option<bool> tcdiff;
-    Option<bool> surrtcdiff;
+    Utilities::Option<bool> splitpairs;
+    Utilities::Option<bool> tcdiff;
+    Utilities::Option<bool> surrtcdiff;
 
-    Option<string> outblockform;
-    Option<string> out;
+    Utilities::Option<std::string> outblockform;
+    Utilities::Option<std::string> out;
 
-    Option<string> meanout;
-    Option<string> splitout;
+    Utilities::Option<std::string> meanout;
+    Utilities::Option<std::string> splitout;
 
-    Option<string> epochout;
-    Option<int> epochlen;
-    Option<int> epochover;
-    Option<string> epochunit;
+    Utilities::Option<std::string> epochout;
+    Utilities::Option<int>         epochlen;
+    Utilities::Option<int>         epochover;
+    Utilities::Option<std::string> epochunit;
 
-    Option<string> deconvout;
-    Option<string> aif;
+    Utilities::Option<std::string> deconvout;
+    Utilities::Option<std::string> aif;
 
     // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
     // Assumes an eroded brain
-    Option<bool> extrapolate_option;
-    Option<int> neighbour;
+    Utilities::Option<bool> extrapolate_option;
+    Utilities::Option<int>  neighbour;
 
     // Partial volume correction (linear regression method) parameters
-    Option<string> pv_gm_file;
-    Option<string> pv_wm_file;
-    Option<int> kernel;
+    Utilities::Option<std::string> pv_gm_file;
+    Utilities::Option<std::string> pv_wm_file;
+    Utilities::Option<int>         kernel;
 
     bool parse_command_line(int argc, char **argv);
 
@@ -75,7 +74,7 @@ private:
     const ReadOptions &operator=(ReadOptions &);
     ReadOptions(ReadOptions &);
 
-    OptionParser options;
+    Utilities::OptionParser options;
 
     static ReadOptions *ropt;
 };
@@ -91,117 +90,117 @@ inline ReadOptions &ReadOptions::getInstance()
 inline ReadOptions::ReadOptions()
     :
 
-    help(string("-h,--help"), false,
-        string("display this message"),
-        false, no_argument)
+    help(std::string("-h,--help"), false,
+        std::string("display this message"),
+        false, Utilities::no_argument)
     ,
 
-    version(string("-v,--version"), false,
-        string("display version identification"),
-        false, no_argument)
+    version(std::string("-v,--version"), false,
+        std::string("display version identification"),
+        false, Utilities::no_argument)
     ,
 
     //input files
-    datafile(string("--data,--datafile"), string("ASL datafile"),
-        string("data file"),
-        true, requires_argument)
-    , maskfile(string("--mask"), string("maskfile\n"),
-          string("mask"),
-          false, requires_argument)
+    datafile(std::string("--data,--datafile"), std::string("ASL datafile"),
+        std::string("data file"),
+        true, Utilities::requires_argument)
+    , maskfile(std::string("--mask"), std::string("maskfile\n"),
+          std::string("mask"),
+          false, Utilities::requires_argument)
     ,
 
     //input file information
-    ntis(string("--ntis"), 0,
-        string("Number of TIs in file"),
-        true, requires_argument)
-    , inblockform(string("--ibf,--inblockform"), string("rpt"),
-          string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
-          false, requires_argument)
-    , inaslform(string("--iaf,--inaslform"), string("diff"),
-          string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block"),
-          false, requires_argument)
-    , rpts(string("--rpts"), string("NULL"),
-          string("Number of repeats at each TI as comma separated list, not required if the number of repeats is same for all TIs  (only for use with --ibf=tis)"),
-          false, requires_argument)
+    ntis(std::string("--ntis"), 0,
+        std::string("Number of TIs in file"),
+        true, Utilities::requires_argument)
+    , inblockform(std::string("--ibf,--inblockform"), std::string("rpt"),
+          std::string("Input block format:\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI"),
+          false, Utilities::requires_argument)
+    , inaslform(std::string("--iaf,--inaslform"), std::string("diff"),
+          std::string("ASL data form:\n          diff - differenced data {default}\n          tc   - Tag-Control pairs\n          ct   - Control-Tag pairs\n          tcb  - Tag-Control pairs, tags and controls grouped together within block\n          ctb - Control-Tag pairs, tags and controls grouped together within block"),
+          false, Utilities::requires_argument)
+    , rpts(std::string("--rpts"), std::string("NULL"),
+          std::string("Number of repeats at each TI as comma separated list, not required if the number of repeats is same for all TIs  (only for use with --ibf=tis)"),
+          false, Utilities::requires_argument)
     ,
 
-    ispairs(string("--pairs,--inpairs"), false,
-        string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead\n"),
-        false, no_argument)
+    ispairs(std::string("--pairs,--inpairs"), false,
+        std::string("Data contains adjacent pairs of measuremnts (e.g. Tag, Control) DEPRECEATED used --iaf instead\n"),
+        false, Utilities::no_argument)
     ,
 
-    //asaq(string("--asaq"),false,
-    //	string("Data is as aquired: same as --blocked --pairs"),
-    //	false,no_argument),
+    //asaq(std::string("--asaq"),false,
+    //	std::string("Data is as aquired: same as --blocked --pairs"),
+    //	false,Utilities::no_argument),
 
     // manipulation options
-    splitpairs(string("--spairs"), false,
-        string("Split the pairs within the data, e.g. to separate tag and control images in output"),
-        false, no_argument)
-    , tcdiff(string("--diff"), false,
-          string("Take the difference between the pairs, i.e. Tag control difference"),
-          false, no_argument)
-    , surrtcdiff(string("--surrdiff"), false,
-          string("Do surround subtraction on the pairs\n"),
-          false, no_argument)
+    splitpairs(std::string("--spairs"), false,
+        std::string("Split the pairs within the data, e.g. to separate tag and control images in output"),
+        false, Utilities::no_argument)
+    , tcdiff(std::string("--diff"), false,
+          std::string("Take the difference between the pairs, i.e. Tag control difference"),
+          false, Utilities::no_argument)
+    , surrtcdiff(std::string("--surrdiff"), false,
+          std::string("Do surround subtraction on the pairs\n"),
+          false, Utilities::no_argument)
     ,
 
     //basic output
-    outblockform(string("--obf,--outblockform"), string("notset"),
-        string("Output block format (for --out=):\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI\n          Default is same as input block format (--ibf)"),
-        false, requires_argument)
-    , out(string("--out"), string("Out filename"),
-          string("Output data file"),
-          false, requires_argument)
+    outblockform(std::string("--obf,--outblockform"), std::string("notset"),
+        std::string("Output block format (for --out=):\n          rpt - blocks of measurements that include all TIs\n          tis - blocks of repeated measurements at a single TI\n          Default is same as input block format (--ibf)"),
+        false, Utilities::requires_argument)
+    , out(std::string("--out"), std::string("Out filename"),
+          std::string("Output data file"),
+          false, Utilities::requires_argument)
     ,
 
     // other output options
-    meanout(string("--mean"), string(""),
-        string("Output ASL data having taken mean at each TI to file"),
-        false, requires_argument)
-    , splitout(string("--split"), string(""),
-          string("Split data into separate files each each TI, specify filename root\n"),
-          false, requires_argument)
+    meanout(std::string("--mean"), std::string(""),
+        std::string("Output ASL data having taken mean at each TI to file"),
+        false, Utilities::requires_argument)
+    , splitout(std::string("--split"), std::string(""),
+          std::string("Split data into separate files each each TI, specify filename root\n"),
+          false, Utilities::requires_argument)
     ,
 
-    epochout(string("--epoch"), string(""),
-        string("Output epochs of ASL data (takes mean at each TI within the epoch)"),
-        false, requires_argument)
-    , epochlen(string("--elen,--epochlen"), 1,
-          string("Length of epochs in number of repeats"),
-          false, requires_argument)
-    , epochover(string("--eol,--epochol"), 0,
-          string("Ammount of overlap between epochs in number of repeats"),
-          false, requires_argument)
-    , epochunit(string("--eunit,--epochunit"), string("rpt"),
-          string("Epochs to be determined over:\n          rpt - repeats in the data {default}\n          tis - TIs in the data\n"),
-          false, requires_argument)
+    epochout(std::string("--epoch"), std::string(""),
+        std::string("Output epochs of ASL data (takes mean at each TI within the epoch)"),
+        false, Utilities::requires_argument)
+    , epochlen(std::string("--elen,--epochlen"), 1,
+          std::string("Length of epochs in number of repeats"),
+          false, Utilities::requires_argument)
+    , epochover(std::string("--eol,--epochol"), 0,
+          std::string("Ammount of overlap between epochs in number of repeats"),
+          false, Utilities::requires_argument)
+    , epochunit(std::string("--eunit,--epochunit"), std::string("rpt"),
+          std::string("Epochs to be determined over:\n          rpt - repeats in the data {default}\n          tis - TIs in the data\n"),
+          false, Utilities::requires_argument)
     ,
 
-    deconvout(string("--deconv"), string(""),
-        string("Deconvolution of data with arterial input functions"),
-        false, requires_argument)
-    , aif(string("--aif"), string(""),
-          string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)\n"),
-          false, requires_argument)
+    deconvout(std::string("--deconv"), std::string(""),
+        std::string("Deconvolution of data with arterial input functions"),
+        false, Utilities::requires_argument)
+    , aif(std::string("--aif"), std::string(""),
+          std::string("Arterial input functions for deconvolution (4D volume, one aif for each voxel within mask)\n"),
+          false, Utilities::requires_argument)
     ,
 
     // Extrapolate the edge of the brain to fix the artefact on the edge of the brain
     // Assumes an eroded brain
-    extrapolate_option(string("--extrapolate"), false,
-        string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"),
-        false, no_argument)
-    , neighbour(string("--neighbour"), 5, string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
-          false, requires_argument)
+    extrapolate_option(std::string("--extrapolate"), false,
+        std::string("Option to extrapolate the edge of the brain to fix the artefact on the edge of the brain"),
+        false, Utilities::no_argument)
+    , neighbour(std::string("--neighbour"), 5, std::string("Neighbour size for extrapolation, must be an odd number between 3 and 9. Default: 5\n"),
+          false, Utilities::requires_argument)
     ,
 
     // Partial volume (linear regression) options
-    pv_gm_file(string("--pvgm"), string(""), string("GM partial volume map"),
-        false, requires_argument)
-    , pv_wm_file(string("--pvwm"), string(""), string("WM partial volume map"),
-          false, requires_argument)
-    , kernel(string("--kernel"), 5, string("Kernel size (in voxels) of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
-          false, requires_argument)
+    pv_gm_file(std::string("--pvgm"), std::string(""), std::string("GM partial volume map"),
+        false, Utilities::requires_argument)
+    , pv_wm_file(std::string("--pvwm"), std::string(""), std::string("WM partial volume map"),
+          false, Utilities::requires_argument)
+    , kernel(std::string("--kernel"), 5, std::string("Kernel size (in voxels) of partial volume correction, must be an odd number between 3 and 9. Default: 5\n"),
+          false, Utilities::requires_argument)
     ,
 
     options("asl_file", "asl_file --data=<asldata> --ibf=rpt --iaf=tc --diff --out=<diffdata>\n")
@@ -246,15 +245,15 @@ inline ReadOptions::ReadOptions()
         options.add(aif);
     }
 
-    catch (X_OptionError &e)
+    catch (Utilities::X_OptionError &e)
     {
         options.usage();
-        cerr << endl
-             << e.what() << endl;
+        std::cerr << std::endl
+             << e.what() << std::endl;
     }
     catch (std::exception &e)
     {
-        cerr << e.what() << endl;
+        std::cerr << e.what() << std::endl;
     }
 }
 }
