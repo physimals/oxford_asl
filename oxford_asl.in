@@ -2056,15 +2056,17 @@ if [ -z $fixbat ]; then
     # Tissue BAT SD
     #defaults
     if [ -z $singleti ]; then
-	# multi TI/PLD data, set a more liberal prior for tissue ATT since we should be able to determine from data
-	# NB this leave the arterial BAT alone.
-	batsd=1;
+        if [ -z $batsd ]; then
+            # multi TI/PLD data, default to a more liberal prior for tissue ATT since we should be able to determine from data
+            # NB this leave the arterial BAT alone.
+            batsd=1;
+        fi
     fi
 
     # if required add batsd option for basil
     if [ ! -z $batsd ]; then
-	Log "Setting std dev of the (tissue) BAT prior to $batsd"
-	echo "--batsd=$batsd" >> $tempdir/basil_options.txt
+	    Log "Setting std dev of the (tissue) BAT prior to $batsd"
+	    echo "--batsd=$batsd" >> $tempdir/basil_options.txt
     fi
 else
     basil_options=$basil_options"--fixbat " 
