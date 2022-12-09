@@ -53,10 +53,10 @@ class DataStructurePreview(wx.Panel):
             order = self.order
 
         width, height = self.GetClientSize()
-        group_height = 0.8*self.vfactor*height / len(order)
-        group_width = self.hfactor*width
-        ox = width*(1-self.hfactor)/2
-        oy = height*(1-self.vfactor)/2
+        group_height = int(0.8*self.vfactor*height / len(order))
+        group_width = int(self.hfactor*width)
+        ox = int(width*(1-self.hfactor)/2)
+        oy = int(height*(1-self.vfactor)/2)
 
         dc = wx.AutoBufferedPaintDC(self)
         dc.Clear()
@@ -79,7 +79,7 @@ class DataStructurePreview(wx.Panel):
 
     def _centered_text(self, dc, text, x, y):
         text_size = dc.GetTextExtent(text)
-        dc.DrawText(text, x-text_size.x/2, y-text_size.y/2)
+        dc.DrawText(text, int(x-text_size.x/2), int(y-text_size.y/2))
 
     def _draw_groups(self, dc, groups, ox, oy, width, height, cont=False):
         smallest_width = width
@@ -94,14 +94,14 @@ class DataStructurePreview(wx.Panel):
                 dc.SetBrush(wx.Brush(col, wx.SOLID))
                 dc.DrawRectangle(*rect.Get())
                 text_size = dc.GetTextExtent("...")
-                dc.DrawText("...", ox+width/2-text_size.x/2, oy+height/2-text_size.y/2)
+                dc.DrawText("...", int(ox+width/2-text_size.x/2), int(oy+height/2-text_size.y/2))
 
                 # Continuation ellipsis contains similar box for each group below it
                 smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, width, height, cont=True)
             else:
                 num = self.num[group]
                 # Half the width of a normal box (full width of ellipsis box)
-                box_width = width/min(2*num, 5)
+                box_width = int(width/min(2*num, 5))
 
                 # Draw first
                 label = self._get_label(group, 0, small)
@@ -109,7 +109,7 @@ class DataStructurePreview(wx.Panel):
                 dc.SetBrush(wx.Brush(col, wx.SOLID))
                 dc.DrawRectangle(*rect.Get())
                 text_size = dc.GetTextExtent(label)
-                dc.DrawText(label, ox+box_width-text_size.x/2, oy+height/2-text_size.y/2)
+                dc.DrawText(label, int(ox+box_width-text_size.x/2), int(oy+height/2-text_size.y/2))
 
                 # Draw groups inside this group
                 smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*box_width, height)
@@ -128,7 +128,7 @@ class DataStructurePreview(wx.Panel):
                     dc.SetBrush(wx.Brush(col, wx.SOLID))
                     dc.DrawRectangle(*rect.Get())
                     text_size = dc.GetTextExtent(label)
-                    dc.DrawText(label, ox+box_width-text_size.x/2, oy+height/2-text_size.y/2)
+                    dc.DrawText(label, int(ox+box_width-text_size.x/2), int(oy+height/2-text_size.y/2))
 
                     smallest_width = self._draw_groups(dc, groups[1:], ox, oy+height, 2*box_width, height)
 

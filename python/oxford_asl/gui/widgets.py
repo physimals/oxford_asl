@@ -359,8 +359,8 @@ class NumberChooser(wx.Panel):
         self.spin = wx.SpinCtrlDouble(self, min=0, max=100000, inc=step, initial=initial)
         self.spin.SetDigits(digits)
         self.spin.Bind(wx.EVT_SPINCTRLDOUBLE, self._spin_changed)
-        self.slider = wx.Slider(self, value=initial, minValue=0, maxValue=100)
-        self.slider.SetValue(100*(initial-self.minval)/(self.maxval-self.minval))
+        self.slider = wx.Slider(self, value=0, minValue=0, maxValue=100)
+        self.slider.SetValue(int(100*(initial-self.minval)/(self.maxval-self.minval)))
         self.slider.Bind(wx.EVT_SLIDER, self._slider_changed)
         self.hbox.Add(self.slider, proportion=1, flag=wx.EXPAND)
         self.hbox.Add(self.spin, proportion=0, flag=wx.EXPAND)
@@ -377,7 +377,7 @@ class NumberChooser(wx.Panel):
         Set the selected number
         """
         self.spin.SetValue(val)
-        self.slider.SetValue(100*(val-self.minval)/(self.maxval-self.minval))
+        self.slider.SetValue(int(100*(val-self.minval)/(self.maxval-self.minval)))
 
     def _slider_changed(self, event):
         slider_pos = event.GetInt()
@@ -400,7 +400,7 @@ class NumberChooser(wx.Panel):
             self.maxval = val
         elif val < self.orig_maxval:
             self.maxval = self.maxval
-        self.slider.SetValue(100*(val-self.minval)/(self.maxval-self.minval))
+        self.slider.SetValue(int(100*(val-self.minval)/(self.maxval-self.minval)))
         if self.handler:
             self.handler()
         event.Skip()
@@ -461,7 +461,7 @@ class NumberList(wx.grid.Grid):
         width, _height = self.GetClientSize()
         col_width = (width - 5) / self.size
         for i in range(self.size):
-            self.SetColSize(i, col_width)
+            self.SetColSize(i, int(col_width))
 
     def _on_size(self, event):
         self._resize_cols()
