@@ -21,7 +21,7 @@ else
 endif
 
 XFILES    = asl_file
-SCRIPTS   = oxford_asl asl_calib asl_reg quasil toast oxford_asl_roi_stats.py oxford_asl_hadamard_decode.py
+SCRIPTS   = oxford_asl asl_calib asl_reg quasil toast
 PYMODULES = python/oxford_asl/*.py
 PYGUI     = python/oxford_asl/gui/*.py python/oxford_asl/gui/*.png
 VERSIONED = oxford_asl asl_calib quasil asl_reg toast
@@ -57,7 +57,7 @@ postinstallscript: $(PYMODULES) $(PYGUI)
 # of _version.py before installation
 pyinstall:
 	fslpython python/setup.py -V
-	fslpython -m pip install --no-deps -vv ./python/
+	fslpython -m pip install --no-deps -vv ./python/ --prefix ${FSLDEVDIR}
 
 clean:
 	rm -f ${VERSIONED} asl_file *.o
