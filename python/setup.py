@@ -106,11 +106,11 @@ kwargs = {
         'gui_scripts' : [
             "asl_gui=oxford_asl.gui.main:main",
         ],
-    },
         'console_scripts' : [
             "oxford_asl_roi_stats=oxford_asl.roi_stats:main",
             "oxford_asl_hadamard_decode=oxford_asl.hadamard_decode:main",
         ],
+    },
     'classifiers' : [
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
