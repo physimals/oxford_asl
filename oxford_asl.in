@@ -2588,7 +2588,7 @@ if [ ! -z $region_analysis ]; then
     fi
 
     if [ ! -z $region_analysis_save_rois ]; then
-        roi_analysis_args="$roi_analysis_args --save-mni-rois --save-struct-rois --save-native-rois --save-native-masks"
+        roi_analysis_args="$roi_analysis_args --save-mni-rois --save-struct-rois --save-native-rois"
     fi
 
     if [ ! -z $region_analysis_psf ]; then
