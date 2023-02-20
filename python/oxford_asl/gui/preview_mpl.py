@@ -103,7 +103,7 @@ class PreviewPanel(wx.Panel, OptionComponent):
 
             for ext in (".nii", ".nii.gz"):
                 if os.path.exists(meanfile + ext):
-                    self._preview_data = nib.load(meanfile + ext).get_data()
+                    self._preview_data = nib.load(meanfile + ext).get_fdata()
 
             if self._preview_data is None:
                 raise RuntimeError("Could not load output from asl_file")

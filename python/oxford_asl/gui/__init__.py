@@ -96,7 +96,7 @@ class OptionComponent():
             raise OptionError("%s - failed to load file - is this a valid image file?" % label)
 
         try:
-            return nii.get_data().shape
+            return nii.get_fdata().shape
         except:
             raise OptionError("%s - failed to read data shape - check image file is not corrupted")
 
@@ -161,7 +161,7 @@ def get_nvols(fname):
     :return Number of volumes or -1 if could not read the file for any reason
     """
     try:
-        shape = nib.load(fname).get_data().shape
+        shape = nib.load(fname).get_fdata().shape
         if len(shape) == 4:
             return shape[3]
         else:
