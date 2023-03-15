@@ -88,7 +88,7 @@ class FslCmd(Cmd):
             # Filenames might contain spaces so quote them
             if " " in value:
                 value = '"%s"' % value
-            self.cmd += " %s %s" % (key, str(value))
+            self.cmd += " %s=%s" % (key, str(value))
         else:
             self.cmd += " %s" % key
 

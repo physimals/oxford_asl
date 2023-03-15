@@ -60,7 +60,7 @@ class AnalysisTab(TabPage):
             "t1"          : self.t1_num.GetValue(),
             "t1b"         : self.t1b_num.GetValue(),
             "alpha"       : self.ie_num.GetValue(),
-            "spatial"     : self.spatial_cb.IsChecked(),
+            "spatial"     : 1 if self.spatial_cb.IsChecked() else 0,
             "fixbolus"    : self.fixbolus_cb.IsChecked(),
             "mc"          : self.mc_cb.IsChecked(),
             "infert1"     : self.infer_t1_cb.IsChecked(),
