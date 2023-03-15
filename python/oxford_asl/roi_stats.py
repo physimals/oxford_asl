@@ -101,7 +101,7 @@ def _transform(img, warp, ref, premat=None, postmat=None, interp="trilinear", pa
 
     if output_is_roi:
         # Binarise mask images
-        ret = Image((ret.data > output_roi_thresh).astype(np.int), header=ret.header)
+        ret = Image((ret.data > output_roi_thresh).astype(np.int32), header=ret.header)
     return ret
 
 def _write_nii(img, fname, header=None, vol=None):
@@ -162,16 +162,20 @@ STATS_FNS = {
     "I2" : i2,
 }
 
-def get_stats_binary(stats, img, var_img, roi, suffix="", ignore_nan=True, ignore_inf=True, ignore_zerovar=True, min_nvoxels=10, mask=None):
+def get_stats_binary(stats, img, var_img, roi, suffix="", 
+                     ignore_nan=True, ignore_inf=True, ignore_zerovar=True, 
+                     min_nvoxels=10, mask=None):
     """
-    Get a set of statistics for a 3D image within an roi
+    Get a set of statistics for a 3D image within a binary roi
 
     :param img: 3D Numpy array
     :param roi: 3D Numpy array with same dimensions as img and boolean data type
     :param ignore_nan: Voxels with care NaN in img are ignored
     :param ignore_inf: Voxels which are infinite in img are ignored
+    :param ignore_zerovar: Ignore voxels with zero variance
     :param min_nvoxels: If the number of voxels in the ROI is less than this number
                        (after removing Nan and infinte values) no value will be returned
+    :param mask: Additional binary mask to apply to ROI
 
     :return: Mapping from name of statistic to value. This may be NaN or infinite depending
              on the input arguments. If the number of eligible voxels is less than min_nvoxels,
@@ -185,7 +189,7 @@ def get_stats_binary(stats, img, var_img, roi, suffix="", ignore_nan=True, ignor
         raise ValueError("Mask must have same dimensions as ROI")
 
     if mask is None:
-        mask = np.ones(roi.shape, dtype=np.int)
+        mask = np.ones(roi.shape, dtype=np.int32)
     if ignore_nan:
         mask = np.logical_and(mask, ~np.isnan(img))
     if ignore_inf:
@@ -193,12 +197,10 @@ def get_stats_binary(stats, img, var_img, roi, suffix="", ignore_nan=True, ignor
     if ignore_zerovar:
         mask = np.logical_and(mask, var_img > 0)
 
-    # Only take voxels where at least one of the ROIs has non-zero percentage
     effective_roi = np.logical_and(roi, mask)
 
     sample_data = img[effective_roi]
     sample_var = var_img[effective_roi]
-    # Variance should not be zero but sometimes is - maybe masking?
     sample_var[sample_var == 0] = 1e-6
     nvoxels = len(sample_data)
     stats["Nvoxels" + suffix] = nvoxels
@@ -252,7 +254,7 @@ def get_stats_fuzzy(stats, img, var_img, roi_set, suffix="", ignore_nan=True, ig
         raise ValueError("Mask must have same dimensions as ROI")
 
     if mask is None:
-        mask = np.ones(roi_shape, dtype=np.int)
+        mask = np.ones(roi_shape, dtype=np.int32)
     if ignore_nan:
         mask = np.logical_and(mask, ~np.isnan(img))
     if ignore_inf:
@@ -343,7 +345,7 @@ def apply_psf(array, psf):
         return array
 
     # Make sure array is 4D
-    array = array.astype(np.float)
+    array = array.astype(np.float32)
     was_3d = False
     if array.ndim == 3:
         was_3d = True
@@ -469,7 +471,7 @@ def add_roi_set_from_mni_label_atlas(rois, mni2struc_warp, ref_img, struct2asl_m
     roi_set = []
     for name, label in zip(region_names, labels):
         roi = atlas_img.data.copy()
-        roi_bin = (roi == label).astype(np.int)
+        roi_bin = (roi == label).astype(np.int32)
         roi_set.append(roi_bin)
         roi_bin = Image(roi_bin, header=atlas_img.header)
         if psf is None:
@@ -730,7 +732,7 @@ def main():
                 for roi_stats in all_roi_stats:
                     rounded = dict(roi_stats)
                     for k, v in roi_stats.items():
-                        if isinstance(v, (float, np.float, np.float32, np.float64)):
+                        if isinstance(v, (float, np.float32, np.float64)):
                             rounded[k] = "%.2f" % v
                     writer.writerow(rounded)
 
