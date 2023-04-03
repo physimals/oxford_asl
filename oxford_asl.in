@@ -2185,7 +2185,7 @@ if [ $register -eq 1 ]; then
     if [ $finalreg -eq 1 ]; then
 	Log "Performing final registration"
 	cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
-	Registration $tempdir/ftiss "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+	Registration $tempdir/ftiss "-m $tempdir/mask_dil --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
     fi
 
     # Do a registration of the calibration image too as this may be easier to visualise
