@@ -226,11 +226,11 @@ fi
 if [ ! -z $stdout ]; then
     if [ ! -d  $outdir/std_space/$subdir_out ]; then mkdir -p $outdir/std_space/$subdir_out; fi
     if [ ! -z $warp ]; then
-	    applywarp --in=$tempdir/$subdir_in/$param --out=$outdir/std_space/$subdir_out/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp $APPLYWARP_OPTS
+        applywarp --in=$tempdir/$subdir_in/$param --out=$outdir/std_space/$subdir_out/$parname --ref=$std --premat=$tempdir/asl2struct.mat --warp=$warp $APPLYWARP_OPTS
     elif [ ! -z $trans ]; then
-	    flirt -in $tempdir/$subdir_in/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir_out/$parname $APPLYXFM_OPTS
+        flirt -in $tempdir/$subdir_in/$param -applyxfm -init $tempdir/asl2std.mat -ref $std -out $outdir/std_space/$subdir_out/$parname $APPLYXFM_OPTS
     else
-	    Log "ERROR: cannot do standard space out - neither warp or transformation matrix found"
+        Log "ERROR: cannot do standard space out - neither warp or transformation matrix found"
     fi
 fi
 
@@ -245,7 +245,7 @@ OutputMasked() {
     maskname=$3
 
     if [ ! -z $nativeout ]; then
-	fslmaths $outdir/native_space/$subdir_out/$parname -mas $tempdir/${maskname}mask $outdir/native_space/$subdir_out/${parname}_masked
+    fslmaths $outdir/native_space/$subdir_out/$parname -mas $tempdir/${maskname}mask $outdir/native_space/$subdir_out/${parname}_masked
     fi
 }
 
@@ -264,27 +264,27 @@ Calibrate() {
 
 Report() {
     if [ ! -z $pvexist ]; then
-	# generate text reports on parameters - the parameter must have been output first for this to work
-	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
-	parname=$1
-	subdir_out=$2
-	masktype=$3
+    # generate text reports on parameters - the parameter must have been output first for this to work
+    #NB we only do this is the PVE are available (and thus the reqd masks will exist)
+    parname=$1
+    subdir_out=$2
+    masktype=$3
 
-	repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure -m`
-	echo $repval > $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt
-	Log "Mean $parname in $masktype is $repval"
+    repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure -m`
+    echo $repval > $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt
+    Log "Mean $parname in $masktype is $repval"
 
     if [ -f "$tempdir/${masktype}mask_pure_cort."* ]; then
-	    repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cort -m`
-	    echo $repval > $outdir/native_space/$subdir_out/${parname}_cortical_${masktype}_mean.txt
-	    Log "Mean $parname in cortical $masktype is $repval"
+        repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cort -m`
+        echo $repval > $outdir/native_space/$subdir_out/${parname}_cortical_${masktype}_mean.txt
+        Log "Mean $parname in cortical $masktype is $repval"
     fi
     # This nonsense exists because we want the WM mask minus subcortial structures to be
     # referred to as 'cerebral' rather than 'cortical'
     if [ -f "$tempdir/${masktype}mask_pure_cereb."* ]; then
-	    repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cereb -m`
-	    echo $repval > $outdir/native_space/$subdir_out/${parname}_cerebral_${masktype}_mean.txt
-	    Log "Mean $parname in cerebral $masktype is $repval"
+        repval=`fslstats $outdir/native_space/$subdir_out/$parname -k $tempdir/${masktype}mask_pure_cereb -m`
+        echo $repval > $outdir/native_space/$subdir_out/${parname}_cerebral_${masktype}_mean.txt
+        Log "Mean $parname in cerebral $masktype is $repval"
     fi
 
     fi
@@ -292,24 +292,24 @@ Report() {
 
 Normalise() {
     if [ ! -z $pvexist ]; then
-	# also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
-	#NB we only do this is the PVE are available (and thus the reqd masks will exist)
-	parname=$1
-	subdir_out=$2
-	masktype=$3
-	
-	# get normalization from reported value in the output directory
-	normval=`cat $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt`
-	
-	if [ ! -z $stdout ]; then
-	    fslmaths $outdir/std_space/$subdir_out/$parname -div $normval $outdir/std_space/$subdir_out/${parname}_norm
-	fi
-	if [ ! -z $nativeout ]; then
-	    fslmaths $outdir/native_space/$subdir_out/$parname -div $normval $outdir/native_space/$subdir_out/${parname}_norm
-	fi
-	if [ ! -z $structout ]; then
-	    fslmaths $outdir/struct_space/$subdir_out/$parname -div $normval $outdir/struct_space/$subdir_out/${parname}_norm
-	fi
+    # also output the perfusion images normalised by the mean mask value - the parameter must have been output first for this to work
+    #NB we only do this is the PVE are available (and thus the reqd masks will exist)
+    parname=$1
+    subdir_out=$2
+    masktype=$3
+    
+    # get normalization from reported value in the output directory
+    normval=`cat $outdir/native_space/$subdir_out/${parname}_${masktype}_mean.txt`
+    
+    if [ ! -z $stdout ]; then
+        fslmaths $outdir/std_space/$subdir_out/$parname -div $normval $outdir/std_space/$subdir_out/${parname}_norm
+    fi
+    if [ ! -z $nativeout ]; then
+        fslmaths $outdir/native_space/$subdir_out/$parname -div $normval $outdir/native_space/$subdir_out/${parname}_norm
+    fi
+    if [ ! -z $structout ]; then
+        fslmaths $outdir/struct_space/$subdir_out/$parname -div $normval $outdir/struct_space/$subdir_out/${parname}_norm
+    fi
 
     fi
 }
@@ -329,13 +329,13 @@ Normalise_var() {
     
     
     if [ ! -z $stdout ]; then
-	fslmaths $outdir/std_space/$subdir_out/${parname}_var -div $normval $outdir/std_space/$subdir_out/${parname}_var_norm
+    fslmaths $outdir/std_space/$subdir_out/${parname}_var -div $normval $outdir/std_space/$subdir_out/${parname}_var_norm
     fi
     if [ ! -z $nativeout ]; then
-	fslmaths $outdir/native_space/$subdir_out/${parname}_var -div $normval $outdir/native_space/$subdir_out/${parname}_var_norm
+    fslmaths $outdir/native_space/$subdir_out/${parname}_var -div $normval $outdir/native_space/$subdir_out/${parname}_var_norm
     fi
     if [ ! -z $structout ]; then
-	fslmaths $outdir/struct_space/$subdir_out/${parname}_var -div $normval $outdir/struct_space/$subdir_out/${parname}_var_norm
+    fslmaths $outdir/struct_space/$subdir_out/${parname}_var -div $normval $outdir/struct_space/$subdir_out/${parname}_var_norm
     fi
 
     fi
@@ -350,10 +350,10 @@ Registration() {
     
     extraoptions=""
     if [ ! -z $lowstrucflag ]; then
-	extraoptions=$extraoptions"-r $tempdir/lowstruc"
+    extraoptions=$extraoptions"-r $tempdir/lowstruc"
     fi
     if [ ! -z $debug ]; then
-	extraoptions=$extraoptions" --debug"
+    extraoptions=$extraoptions" --debug"
     fi
     
     #if [ ! -z $reginit ]; then
@@ -361,21 +361,21 @@ Registration() {
     #fi
     
     if [ -z $distout ]; then
-	# normal registration
-	$asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
+    # normal registration
+    $asl_reg -i $regbase -o $tempdir -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions
 
-	if [ ! -z $trans ]; then
-	    # compute the transformation needed to standard space if we have the relvant structural to standard transform
-	    convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struct.mat
-	fi
-	    
+    if [ ! -z $trans ]; then
+        # compute the transformation needed to standard space if we have the relvant structural to standard transform
+        convert_xfm -omat $tempdir/asl2std.mat -concat $trans $tempdir/asl2struct.mat
+    fi
+        
     else
-	# registration for distortion correction
-	fmapregstr=""
-	if [ ! -z $nofmapreg ]; then
-	    fmapregstr="--nofmapreg"
-	fi
-	$asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$tempdir/fmap --fmapmag=$tempdir/fmapmag --fmapmagbrain=$tempdir/fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
+    # registration for distortion correction
+    fmapregstr=""
+    if [ ! -z $nofmapreg ]; then
+        fmapregstr="--nofmapreg"
+    fi
+    $asl_reg -i $regbase -o $tempdir/$distout -s $tempdir/struc --sbet $tempdir/struc_bet $transopt $extraoptions --fmap=$tempdir/fmap --fmapmag=$tempdir/fmapmag --fmapmagbrain=$tempdir/fmapmagbrain --pedir=$pedir --echospacing=$echospacing $fmapregstr
     fi
 
 
@@ -385,51 +385,51 @@ Calibration() {
  Log "Calculating M0a - calling ASL_CALIB"
     extraoptions=""
     if [ ! -z $debug ]; then
-	extraoptions=$extraoptions" --debug"
+    extraoptions=$extraoptions" --debug"
     fi
 
     #if [ ! -z $cref ]; then
-	# pass calibration reference image to asl_calib
-	#extraoptions=$extraoptions" --cref $tempdir/cref"
+    # pass calibration reference image to asl_calib
+    #extraoptions=$extraoptions" --cref $tempdir/cref"
     if [ ! -z $senscorr ]; then
-	    # use a sensitivity iamge from elsewhere
-	    Log "Sensitivity image $outdir/native_space/sensitivity being loaded into asl_calib"
-	    extraoptions=$extraoptions" --isen $outdir/native_space/sensitivity"
+        # use a sensitivity iamge from elsewhere
+        Log "Sensitivity image $outdir/native_space/sensitivity being loaded into asl_calib"
+        extraoptions=$extraoptions" --isen $outdir/native_space/sensitivity"
     fi
 
     if [ -z $te ]; then
-	#by default assume TE is zero
-	te=0
+    #by default assume TE is zero
+    te=0
     fi
 
     if [ ! -z $t2star ]; then
-	# tell asl_calib to correct for T2* rather than T2
-	extraoptions=$extraoptions" --t2star"
+    # tell asl_calib to correct for T2* rather than T2
+    extraoptions=$extraoptions" --t2star"
     fi
 
     if [ ! -z $tissref ]; then
-	# Specify reference tissue type
-	extraoptions=$extraoptions" --tissref $tissref"
+    # Specify reference tissue type
+    extraoptions=$extraoptions" --tissref $tissref"
     fi
 
     if [ ! -z $t1csf ]; then
-	# supply the T1 of csf
-	extraoptions=$extraoptions" --t1r $t1csf"
+    # supply the T1 of csf
+    extraoptions=$extraoptions" --t1r $t1csf"
     fi
 
     if [ ! -z $t2csf ]; then
-	# Supply the T2(*) of CSF
-	extraoptions=$extraoptions" --t2r $t2csf"
+    # Supply the T2(*) of CSF
+    extraoptions=$extraoptions" --t2r $t2csf"
     fi
 
     if [ ! -z $t2bl ]; then
-	# Supply the T2(*) of blood
-	extraoptions=$extraoptions" --t2b $t2bl"
+    # Supply the T2(*) of blood
+    extraoptions=$extraoptions" --t2b $t2bl"
     fi
 
     if [ ! -z $debug ]; then
-	#run asl_calib in debug mode
-	extraoptions=$extraoptions" --debug"
+    #run asl_calib in debug mode
+    extraoptions=$extraoptions" --debug"
     fi
 
     # setup the main options that we will pass to aslcalib regardless of whether we are auot generating reference mask
@@ -440,31 +440,31 @@ Calibration() {
 
     # use low res structural for auto generation of csf mask if availible
     # otherwise just use structural image
-#	if [ -z $lowstrucflag ]; then
-#	    usestruc=$tempdir/struc_bet
-#	    usetrans=$tempdir/asl2struct.mat
-#	else
-#	    usestruc=$tempdir/lowstruc_bet
-#	    usetrans=$tempdir/asl2lowstruct.mat
-#	fi
+#    if [ -z $lowstrucflag ]; then
+#        usestruc=$tempdir/struc_bet
+#        usetrans=$tempdir/asl2struct.mat
+#    else
+#        usestruc=$tempdir/lowstruc_bet
+#        usetrans=$tempdir/asl2lowstruct.mat
+#    fi
 
-	usestruc=$tempdir/struc_bet
-	usetrans=$tempdir/asl2struct.mat
+    usestruc=$tempdir/struc_bet
+    usetrans=$tempdir/asl2struct.mat
 
-	if [ ! -z $fasthasrun ]; then
+    if [ ! -z $fasthasrun ]; then
             # we have already run FAST so we can pass the PVE to asl_calib (to save running FAST again)
             if [ -z $tissref ]; then
               extraoptions=$extraoptions" --refpve $tempdir/pvcsf_struct"
             else
               extraoptions=$extraoptions" --refpve $tempdir/pv${tissref}_struct"
-	    fi
+        fi
         fi
 
-	$asl_calib -c $tempdir/calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
+    $asl_calib -c $tempdir/calib -s $usestruc -t $usetrans -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions 
 
     else
     # a manual csf mask has been supplied
-	$asl_calib -c $tempdir/calib -m $csf -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions
+    $asl_calib -c $tempdir/calib -m $csf -o $outdir/calib --bmask $tempdir/mask --osen $outdir/native_space/sensitivity $maincaliboptions $extraoptions
     fi
 }
 
@@ -511,7 +511,7 @@ if [ -z $artoff ]; then
     fslmaths ${finalstep}/mean_fblood -thr 0 $2/fblood
     if [ ! -z $senscorr ]; then
 # sensitivity correction
-	fslmaths $2/fblood -div $outdir/native_space/sensitivity $2/fblood
+    fslmaths $2/fblood -div $outdir/native_space/sensitivity $2/fblood
     fi
 fi
 
@@ -520,10 +520,10 @@ if [ ! -z $basil_pvcorr ]; then
     fslmaths ${finalstep}/mean_fwm -thr 0 $2/ftisswm
     if [ ! -z $senscorr ]; then
         # sensitivity correction
-	fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
+    fslmaths $2/ftisswm -div $outdir/native_space/sensitivity $2/ftisswm
     fi
     if [ -z $fixbat ]; then
-	fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
+    fslmaths ${finalstep}/mean_deltwm -thr 0 $2/deltwm
     fi
 
 fi
@@ -538,7 +538,7 @@ if [ ! -z $varout ]; then
     fslmaths $2/var_ftiss -div $outdir/native_space/sensitivity -div $outdir/native_space/sensitivity $2/var_ftiss
 fi
     if [ -z $fixbat ]; then
-	fslmaths ${finalstep}/var_delttiss -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_delttiss $2/var_delttiss
+    fslmaths ${finalstep}/var_delttiss -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_delttiss $2/var_delttiss
     fi
 
     #Partial volume correction - output variances of PVC results
@@ -549,7 +549,7 @@ fi
             fslmaths $2/var_ftisswm -div $outdir/native_space/sensitivity -div $outdir/native_space/sensitivity $2/var_ftisswm
         fi
         if [ -z $fixbat ]; then
-	        fslmaths ${finalstep}/var_deltwm -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_deltwm $2/var_deltwm
+            fslmaths ${finalstep}/var_deltwm -bin -add 1 -uthr 1 -mul 1e12 -add ${finalstep}/var_deltwm $2/var_deltwm
         fi
     fi
 fi
@@ -589,14 +589,14 @@ if [ $subdir_in = "pvcorr" ]; then
     Report perfusion_wm $subdir_out wm
     Normalise perfusion_wm $subdir_out wm
     if [ -z $fixbat ]; then
-	    Output deltwm arrival_wm $subdir_in $subdir_out
-	    Report arrival_wm $subdir_out wm
+        Output deltwm arrival_wm $subdir_in $subdir_out
+        Report arrival_wm $subdir_out wm
     fi
     
 else 
     Report perfusion $subdir_out wm
     if [ -z $fixbat ]; then
-	    Report arrival $subdir_out wm
+        Report arrival $subdir_out wm
     fi
 fi
 
@@ -605,8 +605,8 @@ if [ $subdir_in = "pvcorr" ]; then
     OutputMasked perfusion $subdir_out gm
     OutputMasked perfusion_wm $subdir_out wm
     if [ -z $fixbat ]; then
-	    OutputMasked arrival $subdir_out gm
-	    OutputMasked arrival_wm $subdir_out wm
+        OutputMasked arrival $subdir_out gm
+        OutputMasked arrival_wm $subdir_out wm
     fi
 fi
 
@@ -631,7 +631,7 @@ fi
 # calibrated results
 if [ ! -z $calibflag ]; then
     if [ $cmethod_output = 'single' ]; then
-	    malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
+        malpha=`echo "$Mo * $alpha" | bc` #include the inversion efficiency when we do the final calibration
     elif [ $cmethod_output = 'voxel' ]; then
         # Sensitivity map is re-calculated in PVC mode, so 'undo' the old correction and re-do the new one
         if [ ! -z $senscorr ]; then
@@ -653,7 +653,7 @@ if [ ! -z $calibflag ]; then
         Report perfusion_wm_calib $subdir_out wm
         OutputMasked perfusion_wm_calib $subdir_out wm
     else
-	    Report perfusion_calib $subdir_out wm
+        Report perfusion_calib $subdir_out wm
     fi
 
     if [ ! -z $varout ]; then
@@ -673,7 +673,7 @@ if [ ! -z $calibflag ]; then
 
     if [ -z $artoff ];then
         # output aCBV as a percentage
-	    Calibrate fblood aCBV $malpha 100 $subdir_in $subdir_out
+        Calibrate fblood aCBV $malpha 100 $subdir_in $subdir_out
     fi
 fi
 
@@ -701,7 +701,7 @@ ApplyWarps() {
     corrwarp=$1
     jacobian=$2
 
-	Log "  Applying combined warps to original data:"
+    Log "  Applying combined warps to original data:"
     Log "   - Warp: $corrwarp"
     Log "   - Jacobian: $jacobian"
 
@@ -711,7 +711,7 @@ ApplyWarps() {
     if [ ! -z $moco ]; then
         moco_xfm=$3
         Log "   - Moco: $moco_xfm"
-    	appremat="--premat=$moco_xfm"
+        appremat="--premat=$moco_xfm"
     fi
     applywarp -i $tempdir/asldata_orig -r $tempdir/nativeref -o $tempdir/asldata $appremat -w $corrwarp --rel $APPLYWARP_OPTS
 
@@ -789,252 +789,251 @@ else
 fi
 takeargs=0;boolarg="";isbool="";
     case $option in
-	-o) outflag=1 outdir=$argument
-	    takeargs=1;;
-	-i) inflag=1 infile=$argument #input/data file
-	    takeargs=1;;
-	--iaf) iaf=$argument # input asl format (asl_file syntax)
-	       takeargs=1;;
-	--ibf) ibf=$argument # input block format (asl_file syntax)
-	       takeargs=1;;
-	--rpts) rpts=$argument # the number of repeats at each TI (when --ibf=tis) - to be passed to asl_file
-		takeargs=1;;
-	-c) calibflag=1 calib=$argument #calibration image
-	    takeargs=1;;
-	--wp) whitepaper=1; # operate in 'white paper' mode
-	    ;;
-	-s) strucflag=1  #NOTE: use strucflag to determin if structural information (in any form) has been provided
-	    struc=$argument # strucutral image (not BETed)
-	    takeargs=1;;
-	--sbrain) strucbet=$argument # user supplied BETed structural
-		  takeargs=1;;
-	--fslanat) strucflag=1;
-		   fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
-		   takeargs=1;;
-	--fastsrc) strucflag=1;
-		   fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
-		   takeargs=1;;
-	-r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
-	    takeargs=1;;
-	-t) transflag=1;
-	    trans=$argument;
-	    stdout=1;
-	    takeargs=1;;
-	-S) stdflag=1 std=$argument
-	    takeargs=1;;
-	--warp) transflag=1;
-		warp=$argument; #structural to standard warp
-		stdout=1;
-		takargs=1;;
-	-m) mask=$argument
-	    takeargs=1;;
-	--mc) isbool=1; # do motion correction using mcflirt
-	      boolarg=moco;
-	      ;;
-	--tis) tis=$argument
-	    takeargs=1;;
-	--plds) plds=$argument
-	    takeargs=1;;
-	--tiimg) tiimg=$argument
-	    takeargs=1;;
-	--bolus) boluset=1 boluslen=$argument
-	    takeargs=1;;
-	--bat) bat=$argument
-	    takeargs=1;;
-	--batsd) batsd=$argument
-	    takeargs=1;;
-	--slicedt) slicedt=$argument
-	    takeargs=1;;
-	--sliceband) sliceband=$argument
-	    takeargs=1;;
-	--fa) fa=$argument
-	    takeargs=1;;
-	--t1) t1set=$argument # the T1 of tissue to be used in kinetic model
-	    takeargs=1;;
-	--t1b) t1bset=$argument
-	       takeargs=1;;
-	--t1im) t1im=$argument # A T1 (of tissue) image
-		takeargs=1;;
-	--batim) batim=$argument # A BAT (seconds) image
-		takeargs=1;;
-	--noiseprior) noiseprior=1
-	    ;;
-	--noisesd) noisesd=$argument
-	    takeargs=1;;
-	--cmethod) cmethod=$argument
-	    takeargs=1;;
-	--tissref) tissref=$argument
-	    takeargs=1;;
-	--edgecorr) isbool=1;
-		    boolarg=edgecorr;
-		    ;;
-	--csf) csfflag=1 csf=$argument
-	    takeargs=1;;
-	--cref) cref=$argument; senscorr=1;
-	    takeargs=1;;
-	--isen) isen=$argument; senscorr=1;
-	    takeargs=1;;
-	--senscorr) needseg=1; senscorr=1; #disbale 
-	    ;;
-	--M0) M0=$argument; calibflag=1;
-	    takeargs=1;;
-	--t1t) t1tset=$argument; #the T1 of tissue to be used in calibration
-	    takeargs=1;;
-	--tr) tr=$argument
-	    takeargs=1;;
-	--te) te=$argument #supply the echo time for calibration correction for T2
-	    takeargs=1;;
-	--t2star) t2star=1 #do calibration with T2* rather than T2
-	    ;;
-	--t1csf) t1csf=$argument #custom T1 for CSF
-	    takeargs=1;;
-	--t2csf) t2csf=$argument #custom T2 for CSF
-	    takeargs=1;;
-	--t2bl) t2bl=$argument #custom T2 of blood
-	    takeargs=1;;
-	--regfrom) regfromflag=1 regfrom=$argument
+    -o) outflag=1 outdir=$argument
         takeargs=1;;
-	--regfrom-method) regfrom_method=$argument
-		takeargs=1;;
-	--reg-init-bbr) reg_init_bbr=1
+    -i) inflag=1 infile=$argument #input/data file
+        takeargs=1;;
+    --iaf) iaf=$argument # input asl format (asl_file syntax)
+           takeargs=1;;
+    --ibf) ibf=$argument # input block format (asl_file syntax)
+           takeargs=1;;
+    --rpts) rpts=$argument # the number of repeats at each TI (when --ibf=tis) - to be passed to asl_file
+        takeargs=1;;
+    -c) calibflag=1 calib=$argument #calibration image
+        takeargs=1;;
+    --wp) whitepaper=1; # operate in 'white paper' mode
         ;;
-	--finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
-		    boolarg=finalreg;
-		    ;;
-	--asl2struc) asl2struc=$argument
-	    takeargs=1;;
-	--cgain) cgain=$argument
-	    takeargs=1;;
-	--alpha) alpha=$argument
-	    takeargs=1;;
-	--zblur) zblur=1
-	    ;;
-	--structout) structout=1
-	    ;;
-	--advout) advout=1
-	    ;;
-	--spatial) #spatial=1
-		   isbool=1;
-		   boolarg=spatial;
-	    ;;
-	--infert1) infert1=1
-	    ;;
-	--artoff) artoff=1
-	    ;;
-	--artonly) artonly=1
-	    ;;
-	--artsupp) artoff=1 #this does same job as --artoff, but is explicitly linked to vascular crushers in the data
-	    ;;
-	--fixbat) fixbat=1
-	    ;;
-	--fixbolus) isbool=1
-		    boolarg=fixbolus;
-	    ;;
-	--casl) casl=1
-		;;
-	--disp) disp=$argument
-	    takeargs=1;;
-	--exch) exch=$argument
-	    takeargs=1;;
-	--pvcorr) pvcorr=1
-	    ;;
-	--pvgm) pvgm=$argument
-	    takeargs=1;;
-	--pvwm) pvwm=$argument
-	    takeargs=1;;
-	--fulldata) fulldata=1
-	    ;;
-	--elen) epoch=1 elen=$argument
-	    takeargs=1;;
-	--eol) eol=$argument
-	       takeargs=1;;
-	--fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
-		;;
+    -s) strucflag=1  #NOTE: use strucflag to determin if structural information (in any form) has been provided
+        struc=$argument # strucutral image (not BETed)
+        takeargs=1;;
+    --sbrain) strucbet=$argument # user supplied BETed structural
+          takeargs=1;;
+    --fslanat) strucflag=1;
+           fslanat=$argument # user supplied fslanat dir (overrides the structural image inputs)
+           takeargs=1;;
+    --fastsrc) strucflag=1;
+           fastsrc=$argument # user supplied FAST results (this is the stub of the filenames)
+           takeargs=1;;
+    -r) lowstrucflag=1 lowstruc=$argument #low resolution structural image
+        takeargs=1;;
+    -t) transflag=1;
+        trans=$argument;
+        stdout=1;
+        takeargs=1;;
+    -S) stdflag=1 std=$argument
+        takeargs=1;;
+    --warp) transflag=1;
+        warp=$argument; #structural to standard warp
+        stdout=1;
+        takargs=1;;
+    -m) mask=$argument
+        takeargs=1;;
+    --mc) isbool=1; # do motion correction using mcflirt
+          boolarg=moco;
+          ;;
+    --tis) tis=$argument
+        takeargs=1;;
+    --plds) plds=$argument
+        takeargs=1;;
+    --tiimg) tiimg=$argument
+        takeargs=1;;
+    --bolus) boluset=1 boluslen=$argument
+        takeargs=1;;
+    --bat) bat=$argument
+        takeargs=1;;
+    --batsd) batsd=$argument
+        takeargs=1;;
+    --slicedt) slicedt=$argument
+        takeargs=1;;
+    --sliceband) sliceband=$argument
+        takeargs=1;;
+    --fa) fa=$argument
+        takeargs=1;;
+    --t1) t1set=$argument # the T1 of tissue to be used in kinetic model
+        takeargs=1;;
+    --t1b) t1bset=$argument
+           takeargs=1;;
+    --t1im) t1im=$argument # A T1 (of tissue) image
+        takeargs=1;;
+    --batim) batim=$argument # A BAT (seconds) image
+        takeargs=1;;
+    --noiseprior) noiseprior=1
+        ;;
+    --noisesd) noisesd=$argument
+        takeargs=1;;
+    --cmethod) cmethod=$argument
+        takeargs=1;;
+    --tissref) tissref=$argument
+        takeargs=1;;
+    --edgecorr) isbool=1;
+            boolarg=edgecorr;
+            ;;
+    --csf) csfflag=1 csf=$argument
+        takeargs=1;;
+    --cref) cref=$argument; senscorr=1;
+        takeargs=1;;
+    --isen) isen=$argument; senscorr=1;
+        takeargs=1;;
+    --senscorr) needseg=1; senscorr=1; #disbale 
+        ;;
+    --M0) M0=$argument; calibflag=1;
+        takeargs=1;;
+    --t1t) t1tset=$argument; #the T1 of tissue to be used in calibration
+        takeargs=1;;
+    --tr) tr=$argument
+        takeargs=1;;
+    --te) te=$argument #supply the echo time for calibration correction for T2
+        takeargs=1;;
+    --t2star) t2star=1 #do calibration with T2* rather than T2
+        ;;
+    --t1csf) t1csf=$argument #custom T1 for CSF
+        takeargs=1;;
+    --t2csf) t2csf=$argument #custom T2 for CSF
+        takeargs=1;;
+    --t2bl) t2bl=$argument #custom T2 of blood
+        takeargs=1;;
+    --regfrom) regfromflag=1 regfrom=$argument
+        takeargs=1;;
+    --regfrom-method) regfrom_method=$argument
+        takeargs=1;;
+    --reg-init-bbr) reg_init_bbr=1
+        ;;
+    --finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
+        boolarg=finalreg;
+        ;;
+    --asl2struc) asl2struc=$argument
+        takeargs=1;;
+    --cgain) cgain=$argument
+        takeargs=1;;
+    --alpha) alpha=$argument
+        takeargs=1;;
+    --zblur) zblur=1
+        ;;
+    --structout) structout=1
+        ;;
+    --advout) advout=1
+        ;;
+    --spatial) #spatial=1
+        isbool=1;
+        boolarg=spatial;
+        ;;
+    --infert1) infert1=1
+        ;;
+    --artoff) artoff=1
+        ;;
+    --artonly) artonly=1
+        ;;
+    --artsupp) artoff=1 #this does same job as --artoff, but is explicitly linked to vascular crushers in the data
+        ;;
+    --fixbat) fixbat=1
+        ;;
+    --fixbolus) isbool=1
+        boolarg=fixbolus;
+        ;;
+    --casl) casl=1
+        ;;
+    --disp) disp=$argument
+        takeargs=1;;
+    --exch) exch=$argument
+        takeargs=1;;
+    --pvcorr) pvcorr=1
+        ;;
+    --pvgm) pvgm=$argument
+        takeargs=1;;
+    --pvwm) pvwm=$argument
+        takeargs=1;;
+    --fulldata) fulldata=1
+        ;;
+    --elen) epoch=1 elen=$argument
+        takeargs=1;;
+    --eol) eol=$argument
+           takeargs=1;;
+    --fast) fast=2 #do a one step analysis (NB generally a good idea to have spatial on for this option)
+        ;;
 
-	# fieldmap/distorition correction related arguments
-	--fmap) fmap=$argument
-		takeargs=1;;
-	--fmapmag) fmapmag=$argument
-		   takeargs=1;;
-	--fmapmagbrain) fmapmagbrain=$argument
-			takeargs=1;;
-	--echospacing) echospacing=$argument
-		       takeargs=1;;
-	--pedir) pedir=$argument
-		 takeargs=1;;
-	--nofmapreg) isbool=1
-		     boolarg=nofmapreg
-		     ;;
-	--gdcwarp) gdcwarp=$argument #User-supplied gradient distortion correction warp
-		 takeargs=1;; 
-	--cblip) cblip=$argument #blip reversed calibration image
-		 takeargs=1;; 
-	# 
-	--model-options) model_options=$argument
-	    takeargs=1;;
-	--region-analysis) region_analysis=1
-	    ;;
-	--region-analysis-save-rois) region_analysis_save_rois=1
-	    ;;
-	--region-analysis-atlas) region_analysis_atlases+=( "$argument" )
+    # fieldmap/distorition correction related arguments
+    --fmap) fmap=$argument
         takeargs=1;;
-	--region-analysis-atlas-labels) region_analysis_atlases_labels+=( "$argument" )
+    --fmapmag) fmapmag=$argument
         takeargs=1;;
-	--region-analysis-psf) region_analysis_psf+=( "$argument" )
+    --fmapmagbrain) fmapmagbrain=$argument
         takeargs=1;;
-	--gm-thresh) gm_thresh=$argument
-	    takeargs=1;;
-	--wm-thresh) wm_thresh=$argument
-	    takeargs=1;;
+    --echospacing) echospacing=$argument
+        takeargs=1;;
+    --pedir) pedir=$argument
+        takeargs=1;;
+    --nofmapreg) isbool=1
+        boolarg=nofmapreg
+        ;;
+    --gdcwarp) gdcwarp=$argument #User-supplied gradient distortion correction warp
+        takeargs=1;; 
+    --cblip) cblip=$argument #blip reversed calibration image
+        takeargs=1;; 
+    --model-options) model_options=$argument
+        takeargs=1;;
+    --region-analysis) region_analysis=1
+        ;;
+    --region-analysis-save-rois) region_analysis_save_rois=1
+        ;;
+    --region-analysis-atlas) region_analysis_atlases+=( "$argument" )
+        takeargs=1;;
+    --region-analysis-atlas-labels) region_analysis_atlases_labels+=( "$argument" )
+        takeargs=1;;
+    --region-analysis-psf) region_analysis_psf+=( "$argument" )
+        takeargs=1;;
+    --gm-thresh) gm_thresh=$argument
+        takeargs=1;;
+    --wm-thresh) wm_thresh=$argument
+        takeargs=1;;
     --qc-output) qc_output=1
         ;;
-	--verbose) verbose=$argument
-	    takeargs=1;;
-	--debug) debug=1
-	    ;; 
-	--devel) devel=1
-	    ;;
-	--version) Version
-	    ;;
-	*)  #Usage
-	    echo "Error! Unrecognised option on command line: $option"
-	    echo ""
-	    exit 1;;
+    --verbose) verbose=$argument
+        takeargs=1;;
+    --debug) debug=1
+        ;; 
+    --devel) devel=1
+        ;;
+    --version) Version
+        ;;
+    *)  #Usage
+        echo "Error! Unrecognised option on command line: $option"
+        echo ""
+        exit 1;;
     esac
 
 
     # sort out a shift required by a command line option that takes arguments
     if [ -z $arg ]; then
-	# an argument has been supplied on the command NOT using an =
-	if [ $takeargs -eq 1 ]; then
-	    shift;
-	fi
+    # an argument has been supplied on the command NOT using an =
+    if [ $takeargs -eq 1 ]; then
+        shift;
+    fi
     fi
     
     if [ ! -z $isbool ]; then
-	    # this is an (explicit) boolean setting
-	if [ ! -z $arg ]; then
-	    # an argument has been supplied on the command using an =
-	    # set the variable based on the argument
-	    case $argument in
-		on) eval $boolarg=1
-		    ;;
-		off) eval $boolarg=""
-		     ;;
-		1) eval $boolarg=1
-		   ;;
-		0) eval $boolarg=""
-		   ;;
-		*)  Usage
-		    echo "Error! Unrecognised setting for boolean option: $1"
-		    echo ""
-		    exit 1;;
-	    esac
-	else
-	    # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
-	    # this sets the variable to true
-	    eval $boolarg=1;
-	fi
+        # this is an (explicit) boolean setting
+    if [ ! -z $arg ]; then
+        # an argument has been supplied on the command using an =
+        # set the variable based on the argument
+        case $argument in
+        on) eval $boolarg=1
+            ;;
+        off) eval $boolarg=""
+             ;;
+        1) eval $boolarg=1
+           ;;
+        0) eval $boolarg=""
+           ;;
+        *)  Usage
+            echo "Error! Unrecognised setting for boolean option: $1"
+            echo ""
+            exit 1;;
+        esac
+    else
+        # no argument has been suppled with this command (NOTE that you cannot supply an arugment to a bool option without an =)
+        # this sets the variable to true
+        eval $boolarg=1;
+    fi
     fi
 
 
@@ -1061,14 +1060,14 @@ if [ ! -z $transflag ]; then
    #if transformation matrix included then output in std space
     stdout=1;
     if [ -z $strucflag ]; then
-	echo "ERROR: Structural image is required along with transformation matrix to output results in standard space"
-	exit 1
+    echo "ERROR: Structural image is required along with transformation matrix to output results in standard space"
+    exit 1
     fi
 fi
 
 if [ ! -z $strucflag ]; then
-	# else-if strucutral image included output in structural space
-	structout=1;
+    # else-if strucutral image included output in structural space
+    structout=1;
 fi
 
 # set the output directory here if not specified
@@ -1096,19 +1095,19 @@ if [ -z $inflag ]; then
     exit 1
 else
     if [ `imtest $infile` -eq 0 ]; then
-	echo "ERROR: $infile is not an image/has not been found"
-	exit 1
+    echo "ERROR: $infile is not an image/has not been found"
+    exit 1
     fi
 fi
 Log "Input file: $infile"
 
 if [ ! -z $strucflag ]; then
     if [ ! -z $struc ]; then
-	if [ `imtest $struc` -eq 0 ]; then
-	    echo "ERROR: $struc is not an image/has not been found"
-	    exit 1
-	fi
-	Log "Structural image: $struc"
+    if [ `imtest $struc` -eq 0 ]; then
+        echo "ERROR: $struc is not an image/has not been found"
+        exit 1
+    fi
+    Log "Structural image: $struc"
     fi
     
 fi
@@ -1118,8 +1117,8 @@ fi
 
 if [ ! -z $lowstruc ]; then
     if [ `imtest $lowstruc` -eq 0 ]; then
-	echo "ERROR: $lowstruc is not an image/has not been found"
-	exit 1
+    echo "ERROR: $lowstruc is not an image/has not been found"
+    exit 1
     fi
     Log "Low res. structural image: $lowstruc"
 fi
@@ -1154,9 +1153,9 @@ fi
 if [ $fixbolus = "undef" ]; then
     # fixbolus is to take its default value
     if [ ! -z $casl ]; then
-	fixbolus=1;
+    fixbolus=1;
     else
-	fixbolus="";
+    fixbolus="";
     fi
 fi
 
@@ -1168,23 +1167,23 @@ if [ ! -z $fslanat ]; then
     # we are being supplied with an fslanat directory
     # copy over the structural and brain extracted strucutral so that we can use them
     if ls $fslanat/T1_biascorr.* 1> /dev/null 2>&1; then
-	Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
-	imcp $fslanat/T1_biascorr $tempdir/struc
-	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    Log "Using structural images (bias corrected) from fsl_anat: $fslanat"
+    imcp $fslanat/T1_biascorr $tempdir/struc
+    imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     else
-	Log "Using structural images from fsl_anat: $fslanat"
-	imcp $fslanat/T1 $tempdir/struc
-	imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
+    Log "Using structural images from fsl_anat: $fslanat"
+    imcp $fslanat/T1 $tempdir/struc
+    imcp $fslanat/T1_biascorr_brain $tempdir/struc_bet
     fi
     chmod u+w $tempdir/struc.* $tempdir/struc_bet.*
     
     # use the registration to standard space - if it is there
     if [ -e $fslanat/T1_to_MNI_nonlin_coeff.nii.gz ]; then
         stdout=1; transflag=1;
-	warp=$fslanat/T1_to_MNI_nonlin_coeff.nii.gz
+    warp=$fslanat/T1_to_MNI_nonlin_coeff.nii.gz
     elif [ -e $fslanat/T1_to_MNI_lin.mat ]; then
         stdout=1; transflag=1;
-	trans=$fslanat/T1_to_MNI_lin.mat
+    trans=$fslanat/T1_to_MNI_lin.mat
     fi
     
 elif [ ! -z $struc ]; then
@@ -1192,24 +1191,24 @@ elif [ ! -z $struc ]; then
     Log "Structural image is: $struc"
     if [ -z $strucbet ]; then
        #bet the structural for calibration and registration
-	bet $struc $tempdir/struc_bet
-	Log "BET on structural image"
+    bet $struc $tempdir/struc_bet
+    Log "BET on structural image"
     else
-	fslmaths $strucbet $tempdir/struc_bet
+    fslmaths $strucbet $tempdir/struc_bet
     fi
 fi
 
 if [ ! -z $transflag ]; then
     # deal with Standard brain image
     if [ -z $stdflag ]; then
-	std=${FSLDIR}/data/standard/MNI152_T1_2mm
+    std=${FSLDIR}/data/standard/MNI152_T1_2mm
     fi
     Log "Standard brain is: $std"
 
     if [ ! -z $warp ]; then
-	Log "Structural to standard transformation warp: $warp"
+    Log "Structural to standard transformation warp: $warp"
     elif [ ! -z $trans ]; then
-	Log "Structural to standard transformation matrix: $trans"
+    Log "Structural to standard transformation matrix: $trans"
     fi
 fi
 
@@ -1225,18 +1224,18 @@ if [ ! -z $calib ]; then
     tsize=`fslinfo $calib | grep "^dim4" | sed 's:dim4[ ]*::'`
     if [ $tsize -gt 1 ]; then
         #cut - throw away first volume
-	Log "Removing first volume of calibration time series - to ensure data is in steady state"
-	tsize=`expr $tsize - 1`
-	fslroi $calib $tempdir/calib 1 $tsize
+    Log "Removing first volume of calibration time series - to ensure data is in steady state"
+    tsize=`expr $tsize - 1`
+    fslroi $calib $tempdir/calib 1 $tsize
 
-	if [ ! -z $moco ]; then
-	    #motion correction
-	    mcflirt -in $tempdir/calib -o $tempdir/calib
-	fi
-	# take the mean
-	fslmaths $tempdir/calib -Tmean $tempdir/calib
+    if [ ! -z $moco ]; then
+        #motion correction
+        mcflirt -in $tempdir/calib -o $tempdir/calib
+    fi
+    # take the mean
+    fslmaths $tempdir/calib -Tmean $tempdir/calib
     else
-	fslmaths $calib $tempdir/calib
+    fslmaths $calib $tempdir/calib
     fi
     # Save original so we can reapply motion correction/warps to original data
     imcp $tempdir/calib $tempdir/calib_orig
@@ -1247,18 +1246,18 @@ if [ ! -z $cref ]; then
     tsize=`fslinfo $cref | grep "^dim4" | sed 's:dim4[ ]*::'`
     if [ $tsize -gt 1 ]; then
         #cut - throw away first volume
-	Log "Removing first volume of calibration reference time series - to ensure data is in steady state"
-	tsize=`expr $tsize - 1`
-	fslroi $cref $tempdir/cref 1 $tsize
+    Log "Removing first volume of calibration reference time series - to ensure data is in steady state"
+    tsize=`expr $tsize - 1`
+    fslroi $cref $tempdir/cref 1 $tsize
 
-	if [ ! -z $moco ]; then
-	    #motion correction
-	    mcflirt -in $tempdir/cref -o $tempdir/cref
-	fi
-	# take the mean
-	fslmaths $tempdir/cref -Tmean $tempdir/cref
+    if [ ! -z $moco ]; then
+        #motion correction
+        mcflirt -in $tempdir/cref -o $tempdir/cref
+    fi
+    # take the mean
+    fslmaths $tempdir/cref -Tmean $tempdir/cref
     else
-	fslmaths $cref $tempdir/cref
+    fslmaths $cref $tempdir/cref
     fi
     # Save original so we can reapply motion correction/warps to original data
     imcp $tempdir/cref $tempdir/cref_orig
@@ -1269,18 +1268,18 @@ if [ ! -z $cblip ]; then
     tsize=`fslinfo $cblip | grep "^dim4" | sed 's:dim4[ ]*::'`
     if [ $tsize -gt 1 ]; then
         #cut - throw away first volume
-	Log "Removing first volume of blipped calibration time series - to ensure data is in steady state"
-	tsize=`expr $tsize - 1`
-	fslroi $cblip $tempdir/cblip 1 $tsize
+    Log "Removing first volume of blipped calibration time series - to ensure data is in steady state"
+    tsize=`expr $tsize - 1`
+    fslroi $cblip $tempdir/cblip 1 $tsize
 
-	if [ ! -z $moco ]; then
-	    #motion correction
-	    mcflirt -in $tempdir/cblip -o $tempdir/cblip
-	fi
-	# take the mean
-	fslmaths $tempdir/cblip -Tmean $tempdir/cblip
+    if [ ! -z $moco ]; then
+        #motion correction
+        mcflirt -in $tempdir/cblip -o $tempdir/cblip
+    fi
+    # take the mean
+    fslmaths $tempdir/cblip -Tmean $tempdir/cblip
     else
-	fslmaths $cblip $tempdir/cblip
+    fslmaths $cblip $tempdir/cblip
     fi
     # NOTE cblip is still wholehead, we dont need it masked
     # Save original so we can reapply motion correction/warps to original data
@@ -1306,24 +1305,24 @@ fslmaths $tempdir/asldata -Tmean $tempdir/nativeref
 if [ ! -z $moco ]; then
     Log "Motion Correction"
     if [ ! -z $calib ]; then
-	# we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
-	# this also removes motion effects between asldata and calibration image
-	Log "Motion correction to calibration image"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib -mats -plots
+    # we use the calibration image as our reference for motion correction - since this will be most consistent if the data has a range of different TIs and background suppression etc
+    # this also removes motion effects between asldata and calibration image
+    Log "Motion correction to calibration image"
+    mcflirt -in $tempdir/asldata -out $tempdir/asldata -r $tempdir/calib -mats -plots
 
-	# to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
-	# Extract the middle transformation
-	middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
-	convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
-	# convert all the transformations
-	for mat in `ls $tempdir/asldata.mat/MAT_*`; do
-	    convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
-	done
+    # to reduce interpolation of the ASL data change the transformations so that we end up in the space of the central volume of asldata
+    # Extract the middle transformation
+    middlemat=`ls $tempdir/asldata.mat/MAT_* | awk '{ lines[NR]=$0; } END { print lines[int(NR/2)+1] }'`
+    convert_xfm -omat $tempdir/calib2asl.mat -inverse $middlemat
+    # convert all the transformations
+    for mat in `ls $tempdir/asldata.mat/MAT_*`; do
+        convert_xfm -omat $mat -concat $tempdir/calib2asl.mat $mat
+    done
     # Concatenate the motion matrices for use with applywarp
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
     applywarp --ref=$tempdir/nativeref --in=$tempdir/asldata_orig --out=$tempdir/asldata --premat=$tempdir/asldata.cat $APPLYWARP_OPTS
-	# Convert all calibration images to align with asldata
-	flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
+    # Convert all calibration images to align with asldata
+    flirt -in $tempdir/calib -out $tempdir/calib -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     if [ ! -z $cref ]; then
         flirt -in $tempdir/cref -out $tempdir/cref -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
@@ -1331,8 +1330,8 @@ if [ ! -z $moco ]; then
         flirt -in $tempdir/cblip -out $tempdir/cblip -ref $tempdir/nativeref -init $tempdir/calib2asl.mat -applyxfm $APPLYXFM_OPTS
     fi
     else
-	Log "Motion correction to middle volume of ASL data"
-	mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats -plots
+    Log "Motion correction to middle volume of ASL data"
+    mcflirt -in $tempdir/asldata -out $tempdir/asldata -mats -plots
     # Save concatenated motion matrices for later use with applywarp if required
     cat $tempdir/asldata.mat/MAT* > $tempdir/asldata.cat
     fi
@@ -1392,18 +1391,18 @@ fi
 ### deal with TIs (as specified on the command line)
 if [ ! -z $tiimg ]; then
     # Cannot easily define alltis array - therefore cannot do epochwise analysis
-	if [ ! -z $epoch ]; then
-	    echo "ERROR: cannot do epochwise analysis with a voxelwise TI image"
-	    exit 1
-	fi
+    if [ ! -z $epoch ]; then
+        echo "ERROR: cannot do epochwise analysis with a voxelwise TI image"
+        exit 1
+    fi
     if [ ! -z $tis ]; then
-	    echo "ERROR: Cannot specify a TI image as well as a list of TIs"
-	    exit 1
-	fi
+        echo "ERROR: Cannot specify a TI image as well as a list of TIs"
+        exit 1
+    fi
     if [ ! -z $slicedt ]; then
-	    echo "ERROR: Cannot specify slice timing correction with a voxelwise TI image"
-	    exit 1
-	fi
+        echo "ERROR: Cannot specify slice timing correction with a voxelwise TI image"
+        exit 1
+    fi
     Log "Using voxelwise TI image: $tiimg"
     ntis=`fslinfo $tiimg | grep "^dim4" | sed 's:dim4[ ]*::' |tr -d [:blank:]`
     tislist=" --tiimg=$tiimg"
@@ -1458,13 +1457,13 @@ Log "Input block format is: $ibf"
 afrptstr=""
 if [ $ibf == "tis" ]; then
     if [ ! -z $rpts ]; then
-	# the repeats at each TI have been specified
-	afrptstr="--rpts=$rpts"
+    # the repeats at each TI have been specified
+    afrptstr="--rpts=$rpts"
 
-	if [ ! -z $epoch ]; then
-	    echo "ERROR: cannot do epochwise analysis when there are not the same number of repeats for each TI"
-	    exit 1
-	fi
+    if [ ! -z $epoch ]; then
+        echo "ERROR: cannot do epochwise analysis when there are not the same number of repeats for each TI"
+        exit 1
+    fi
     fi
 fi
 
@@ -1503,8 +1502,8 @@ else
     rptslist=""
     therpts=`echo $rpts | sed 's:,: :g'`
     for rp in $therpts; do
-	count=`expr ${count} + 1`
-	rptslist=`echo $rptslist --rpt${count}=$rp`
+    count=`expr ${count} + 1`
+    rptslist=`echo $rptslist --rpt${count}=$rp`
     done
     Log "RPTs list: $rptslist"
 fi
@@ -1523,11 +1522,11 @@ if [ $ntis -lt 2 ]; then
 #elif [ $repeats -gt 1 ]; then
  #   if [ -z $fulldata ]; then
         # take the mean over the TIs for faster analysis
-#	Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
-#	datafile=$tempdir/diffdata_mean
-#	repeats=1
+#    Log " Multi TI data, mean is being taken at each TI to pass to BASIL"
+#    datafile=$tempdir/diffdata_mean
+#    repeats=1
  #   else
-#	Log "Multi TI data, all data passed to BASIL for analysis"
+#    Log "Multi TI data, all data passed to BASIL for analysis"
  #       datafile=$tempdir/diffdata
  #   fi
 #else
@@ -1542,8 +1541,8 @@ fi
 # NB: we use the tislist and numerb of repeats for BASIl for the conventional perfusion image
 for ((r=1; r<$repeats; r++)); do
     for ((i=0; i<$ntis; i++)); do
-	idx=`expr $r \* $ntis + $i`
-	alltis[$idx]=${alltis[$i]}
+    idx=`expr $r \* $ntis + $i`
+    alltis[$idx]=${alltis[$i]}
     done
 done
 echo ${alltis[*]}
@@ -1551,7 +1550,7 @@ Log `echo ${alltis[*]}`
 
 ### Segmentation of structural image - if we have a structural image we ALWAYS ensure we have a segmentation
 if [ ! -z $fslanat ]; then
-	Log "Using FSL_ANAT outputs at: $fslanat"
+    Log "Using FSL_ANAT outputs at: $fslanat"
     # we are being supplied with an fslanat directory
     fasthasrun=1 #this means that we have PVE for calibration & PVC purposes
     
@@ -1566,20 +1565,20 @@ if [ ! -z $fslanat ]; then
        imcp $fslanat/T1_fast_bias $tempdir/biasfield_struct
        chmod u+w $tempdir/biasfield_struct.*
     else
-	Log "No Bias field found in $fslanat"
+    Log "No Bias field found in $fslanat"
     fi
     
 elif [ ! -z $struc ]; then
     # do we have the results from FAST already? If not run it
     if [ -z $fastsrc ]; then
-	Log "Segmenting the structural image"
-	fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
-	fastsrc=$tempdir/seg
+    Log "Segmenting the structural image"
+    fast -B -b -o $tempdir/seg -p $tempdir/struc_bet
+    fastsrc=$tempdir/seg
     else
-	# FAST has been run externally
-	Log "Using FAST outputs at: $fastsrc"
+    # FAST has been run externally
+    Log "Using FAST outputs at: $fastsrc"
     fi
-	
+    
     # we are now sure we have FAST outputs
     fasthasrun=1
 
@@ -1590,11 +1589,11 @@ elif [ ! -z $struc ]; then
     chmod u+w $tempdir/pvcsf_struct.* $tempdir/pvgm_struct.* $tempdir/pvwm_struct.*
 
     if [ ! -z ${fastsrc}_bias ]; then # test to see if there is a bias field in the FAST output
-	Log "Bias field extracted from ${fastsrc} sucessfully"
-	imcp ${fastsrc}_bias $tempdir/biasfield_struct
+    Log "Bias field extracted from ${fastsrc} sucessfully"
+    imcp ${fastsrc}_bias $tempdir/biasfield_struct
     chmod u+w $tempdir/biasfield_struct.*
     else
-	Log "No Bias field found with ${fastsrc}"
+    Log "No Bias field found with ${fastsrc}"
     fi
 fi
 ### End of: Segmentation
@@ -1606,10 +1605,10 @@ register=0
 if [ ! -z $strucflag ]; then # if structural image has not been suppled then skip the registration
     register=1
     if [ ! -z $asl2struc ]; then # we have been supplied with a transformation matrix - we do not need registration, but we do want to transform the results
-	register=0
-	Log "Using existing asl to structural transform: $asl2struc"
-	cp $asl2struc $tempdir/asl2struct.mat
-	convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
+    register=0
+    Log "Using existing asl to structural transform: $asl2struc"
+    cp $asl2struc $tempdir/asl2struct.mat
+    convert_xfm -omat $tempdir/struct2asl.mat -inverse $tempdir/asl2struct.mat
     fi
 fi
 
@@ -1767,61 +1766,61 @@ fi
 # Do TOPUP if applicable
 if [ ! -z $cblip ]; then
     if [ -z $calib ]; then
-	Log "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
+    Log "WARNING: Cannot do TOPUP on blip-reversed calibration image ($cblip) without correpsonding calibration image"
     elif [ -z $echospacing ] || [ -z $pedir ]; then
-	Log "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
+    Log "WARNING: Cannot do TOPUP on blip-reversed calibration image without echospacing (dwell time) and pahse encode direction"
     else
-	Log "Distortion correction: running topup"
-	
+    Log "Distortion correction: running topup"
+    
     # Create topup params. Note that TOPUP requires to total readout time which is the echo spacing multiplied
     # by the output dimension size - 1. We are interpreting the xyz axis as being the axes of the underlying
     # voxel array - normally these will correspond to RAS space but this is not guaranteed. However this seems
     # to be what other FSL tools use which take an encoding direction.
-	case $pedir in
-	    x)
+    case $pedir in
+        x)
         dimsize=`fslinfo $cblip | grep "^dim1" | sed 's:dim1[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "1 0 0 $totaltime" > $tempdir/topup_params.txt
-		echo "-1 0 0 $totaltime" >> $tempdir/topup_params.txt
-		;;
-    	-x)
+        echo "1 0 0 $totaltime" > $tempdir/topup_params.txt
+        echo "-1 0 0 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+        -x)
         dimsize=`fslinfo $cblip | grep "^dim1" | sed 's:dim1[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "-1 0 0 $totaltime" > $tempdir/topup_params.txt
-		echo "1 0 0 $totaltime" >> $tempdir/topup_params.txt
-		;;
-	    y)
+        echo "-1 0 0 $totaltime" > $tempdir/topup_params.txt
+        echo "1 0 0 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+        y)
         dimsize=`fslinfo $cblip | grep "^dim2" | sed 's:dim2[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "0 1 0 $totaltime" > $tempdir/topup_params.txt
-		echo "0 -1 0 $totaltime" >> $tempdir/topup_params.txt
-		;;
-	    -y)
+        echo "0 1 0 $totaltime" > $tempdir/topup_params.txt
+        echo "0 -1 0 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+        -y)
         dimsize=`fslinfo $cblip | grep "^dim2" | sed 's:dim2[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "0 -1 0 $totaltime" > $tempdir/topup_params.txt
-		echo "0 1 0 $totaltime" >> $tempdir/topup_params.txt
-		;;
-	    z)
+        echo "0 -1 0 $totaltime" > $tempdir/topup_params.txt
+        echo "0 1 0 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+        z)
         dimsize=`fslinfo $cblip | grep "^dim3" | sed 's:dim3[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "0 0 1 $totaltime" > $tempdir/topup_params.txt
-		echo "0 0 -1 $totaltime" >> $tempdir/topup_params.txt
-		;;
-    	-z)
+        echo "0 0 1 $totaltime" > $tempdir/topup_params.txt
+        echo "0 0 -1 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+        -z)
         dimsize=`fslinfo $cblip | grep "^dim3" | sed 's:dim3[ ]*::'`
         totaltime=`echo "$echospacing * ($dimsize-1)" | bc`
-		echo "0 0 -1 $totaltime" > $tempdir/topup_params.txt
-		echo "0 0 1 $totaltime" >> $tempdir/topup_params.txt
-		;;
-	esac
+        echo "0 0 -1 $totaltime" > $tempdir/topup_params.txt
+        echo "0 0 1 $totaltime" >> $tempdir/topup_params.txt
+        ;;
+    esac
     
     Log "For TOPUP using total read-out time of ($dimsize - 1) x $echospacing s = $totaltime s"
 
-	# do topup
-	fslmerge -t $tempdir/calib_blipped $tempdir/calib $tempdir/cblip 
-	topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
-	topupresult=$tempdir/topupresult
+    # do topup
+    fslmerge -t $tempdir/calib_blipped $tempdir/calib $tempdir/cblip 
+    topup --imain=$tempdir/calib_blipped --datain=$tempdir/topup_params.txt --config=b02b0.cnf --out=$tempdir/topupresult --fout=$tempdir/topupresult_fmap
+    topupresult=$tempdir/topupresult
     fi
 fi
 
@@ -1844,7 +1843,7 @@ if [ -e $tempdir/fmap.* ]; then
     # use whatever registration matrix we already have to initialise here 
     distbase=$tempdir/pwi # use the perfusion-weighted image (mean over all TIs) as the best basis we have for registration at this point
     if [ -z $finalreg ]; then
-	distbase=$regfrom # use whatever image we have been using for (inital) registration
+    distbase=$regfrom # use whatever image we have been using for (inital) registration
     fi
 
     Registration $distbase "-m $tempdir/mask --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly" distcorr
@@ -1857,7 +1856,7 @@ if [ -e $tempdir/fmap.* ]; then
     # to use --postmat above to transform into ASL space  but this needs to happen before we apply
     # the user warp 
     if [ ! -z $gdcwarp ]; then
-	    Log "Adding user-supplied GDC warp to distortion correction warp"
+        Log "Adding user-supplied GDC warp to distortion correction warp"
         convertwarp -r $tempdir/nativeref -o $tempdir/asldist_warp -w $tempdir/asldist_warp --warp2=$tempdir/asldist_userwarp --rel -j $tempdir/distcorr/jacobian_parts --constrainj
     fi
 
@@ -1884,39 +1883,39 @@ if [ ! -z $topupresult ]; then
     # in one transformation to avoid multiple interpolations, however this does not seem to be supported by applytopup
 
 #    if [ -e $tempdir/struc.* ]; then
-#	# currently DISABLED and applytopup is used with topup results
-#	#we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
-#	# the fieldmap provided is from topup and will be in ASL space
-#	# convert ot the correct units of rad/s from Hz
-#	fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
-#	# use the existing registration to get the fieldmap into T1 space
-#	flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
-#	# asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
-#	imcp $tempdir/struc $tempdir/fmapmag
-#	imcp $tempdir/struc_bet $tempdir/fmapmagbrain
-#	nofmapreg=1
+#    # currently DISABLED and applytopup is used with topup results
+#    #we will do the distorition correction using epi_reg so that we can merge with motion correction matrices and also get the jacobian
+#    # the fieldmap provided is from topup and will be in ASL space
+#    # convert ot the correct units of rad/s from Hz
+#    fslmaths ${topupresult}_fmap -mul 3.1459 -mul 2 $tempdir/fmap
+#    # use the existing registration to get the fieldmap into T1 space
+#    flirt -in $tempdir/fmap -out $tempdir/fmap -ref $tempdir/struc -applyxfm -init $tempdir/asl2struct.mat
+#    # asl_reg/epi_reg will expect a fieldmap magnitude image (although doesn't really need it in this case) - just use the structural
+#    imcp $tempdir/struc $tempdir/fmapmag
+#    imcp $tempdir/struc_bet $tempdir/fmapmagbrain
+#    nofmapreg=1
 #    else
-	Log "Distortion Correction using TOPUP"
-	# we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
-	applytopup --imain=$tempdir/calib,$tempdir/cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
-	repeatsubtract=1;
-	applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
-	if [ ! $cmethod="voxel" ]; then
-	    Log "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
-	fi
-	if [ ! -z $cref ]; then
-	    applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
+    Log "Distortion Correction using TOPUP"
+    # we will use apply topup - this does not do the jacboian magntiude correction - therefore strictly only okay if using voxelwise calibration
+    applytopup --imain=$tempdir/calib,$tempdir/cblip --inindex=1,2 --datain=$tempdir/topup_params.txt --topup=${topupresult} --out=$tempdir/calib --method=jac
+    repeatsubtract=1;
+    applytopup --imain=$tempdir/asldata --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/asldata --method=jac #ND using asldata as this has been motion corrected by this point (if requested)
+    if [ ! $cmethod="voxel" ]; then
+        Log "WARNING: Using apply_topup this does not correct for magntiude using the jocbian in distortion correction - this is not optimal when not using voxelwise calibration, to avoid this supply structural image(s)"
+    fi
+    if [ ! -z $cref ]; then
+        applytopup --imain=$tempdir/cref --datain=$tempdir/topup_params.txt --inindex=1 --topup=${topupresult} --out=$tempdir/cref --method=jac
     fi
 fi
 
 # Repeat the label-control subtraction on the corrected data
 if [ ! -z $repeatsubtract ]; then
     if [ $iaf = 'diff' ]; then
-	# make sure the block format is correct for BASIL
-	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    # make sure the block format is correct for BASIL
+    asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     else
-	# create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
-	asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
+    # create label-control difference data using asl_file - this gets it into the right block form for BASIL (blocks of TIs)
+    asl_file --data=$tempdir/asldata --ntis=$ntis --ibf=$ibf $afrptstr --iaf=$iaf --obf=tis --diff --out=$tempdir/diffdata --mean=$tempdir/diffdata_mean
     fi
 fi
 ### End of: Distortion Correction
@@ -2042,9 +2041,9 @@ fi
 #deal with BAT
 if [ -z $bat ]; then
     if [ -z $casl ]; then
-	bat=0.7 #PASL default
+    bat=0.7 #PASL default
     else
-	bat=1.3 #CASL default
+    bat=1.3 #CASL default
     fi
 fi
 echo "--bat=$bat" >> $tempdir/basil_options.txt  
@@ -2065,8 +2064,8 @@ if [ -z $fixbat ]; then
 
     # if required add batsd option for basil
     if [ ! -z $batsd ]; then
-	    Log "Setting std dev of the (tissue) BAT prior to $batsd"
-	    echo "--batsd=$batsd" >> $tempdir/basil_options.txt
+        Log "Setting std dev of the (tissue) BAT prior to $batsd"
+        echo "--batsd=$batsd" >> $tempdir/basil_options.txt
     fi
 else
     basil_options=$basil_options"--fixbat " 
@@ -2087,12 +2086,12 @@ fi
 if [ ! -z $noiseprior ]; then
     # use an informative nosie prior
      if [ -z $noisesd ]; then
-	 Log "Using SNR of $snr to set noise std dev"
-	# estimate signal magntiude
-	fslmaths $tempdir/diffdata_mean -Tmax $tempdir/datamax
-	brain_mag=`fslstats $tempdir/datamax -k $tempdir/mask -M`
-	# this will correspond to whole brain CBF (roughly) - about 0.5 of GM
-	noisesd=`echo "scale=2;sqrt( $brain_mag * 2 / $snr )" | bc`
+     Log "Using SNR of $snr to set noise std dev"
+    # estimate signal magntiude
+    fslmaths $tempdir/diffdata_mean -Tmax $tempdir/datamax
+    brain_mag=`fslstats $tempdir/datamax -k $tempdir/mask -M`
+    # this will correspond to whole brain CBF (roughly) - about 0.5 of GM
+    noisesd=`echo "scale=2;sqrt( $brain_mag * 2 / $snr )" | bc`
     fi
 
     Log "Using a prior noise sd of: $noisesd"
@@ -2183,9 +2182,9 @@ Dobasil $datafile $tempdir $initbasil
 # use existing registration for initial aligment
 if [ $register -eq 1 ]; then
     if [ $finalreg -eq 1 ]; then
-	Log "Performing final registration"
-	cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
-	Registration $tempdir/ftiss "-m $tempdir/mask_dil --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
+    Log "Performing final registration"
+    cp $tempdir/asl2struct.mat $outdir/native_space/asl2struct_init.mat #preserve the intial registration for future reference
+    Registration $tempdir/ftiss "-m $tempdir/mask_dil --tissseg $tempdir/tissseg --imat $tempdir/asl2struct.mat --finalonly"
     fi
 
     # Do a registration of the calibration image too as this may be easier to visualise
@@ -2237,15 +2236,15 @@ fi
 
 if [ ! -z $pvgm ]; then
     #using supplied PV images
-	Log "Loading supplied PV images"
-	if [ -z $pvwm ]; then
-	    Log "ERROR: no WM PV image has been supplied"
-	fi
-	Log "PV GM is: $pvgm"
-	fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
-	Log "PV WM is: $pvwm"
-	fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
-	pvexist=1
+    Log "Loading supplied PV images"
+    if [ -z $pvwm ]; then
+        Log "ERROR: no WM PV image has been supplied"
+    fi
+    Log "PV GM is: $pvgm"
+    fslmaths $pvgm -thr 0.1 -min 1 $tempdir/pvgm_inasl
+    Log "PV WM is: $pvwm"
+    fslmaths $pvwm -thr 0.1 -min 1 $tempdir/pvwm_inasl
+    pvexist=1
 fi
 
 # Thresholds for voxels to be considered 'pure' GM / WM
@@ -2271,13 +2270,13 @@ if [ ! -z $pvexist ]; then
     # excludes subcortical regions including the cerebellum
     if [ ! -z $warp ]; then
         struc2std_warp=$warp
-	    Log "Using user-supplied structural->standard space warp to generate cortical GM/WM masks"
+        Log "Using user-supplied structural->standard space warp to generate cortical GM/WM masks"
     elif [ -f "$fslanat/T1_to_MNI_nonlin_coeff."* ]; then
-	    Log "Using FSL_ANAT structural->standard space warp to generate cortical GM/WM masks"
-	    struc2std_warp=$fslanat/T1_to_MNI_nonlin_coeff
+        Log "Using FSL_ANAT structural->standard space warp to generate cortical GM/WM masks"
+        struc2std_warp=$fslanat/T1_to_MNI_nonlin_coeff
     elif [ -e "$fslanat/T1_to_MNI_lin.mat" ]; then
-	    Log "Using FSL_ANAT structural->standard space linear transformation to generate cortical GM/WM masks"
-	    struc2std_trans=$fslanat/T1_to_MNI_lin.mat
+        Log "Using FSL_ANAT structural->standard space linear transformation to generate cortical GM/WM masks"
+        struc2std_trans=$fslanat/T1_to_MNI_lin.mat
     fi
 
     if [ ! -z $struc2std_warp ] || [ ! -z $struc2std_trans ]; then
@@ -2285,18 +2284,18 @@ if [ ! -z $pvexist ]; then
         fslroi $FSLDIR/data/atlases/HarvardOxford/HarvardOxford-sub-prob-2mm.nii.gz $tempdir/rcort_std 11 2
         fslmaths $tempdir/lcort_std -add $tempdir/rcort_std -Tmean -mul 2 $tempdir/cort_std
         if [ ! -z $struc2std_warp ]; then
-	        invwarp --ref=$tempdir/struc --warp="$struc2std_warp" --out=$tempdir/std2struc_warp
-	        applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --warp=$tempdir/std2struc_warp --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+            invwarp --ref=$tempdir/struc --warp="$struc2std_warp" --out=$tempdir/std2struc_warp
+            applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --warp=$tempdir/std2struc_warp --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
         else
             convert_xfm -omat "$struc2std_trans" -inverse $tempdir/std2struc_trans
-	        applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --premat=$tempdir/std2struc_trans --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
+            applywarp --in=$tempdir/cort_std --out=$tempdir/cort_asl --ref=$tempdir/nativeref --premat=$tempdir/std2struc_trans --postmat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
         fi
 
         fslmaths $tempdir/cort_asl -thr 50 -bin $tempdir/cort_mask_asl
         fslmaths $tempdir/gmmask_pure -mas $tempdir/cort_mask_asl $tempdir/gmmask_pure_cort
         fslmaths $tempdir/wmmask_pure -mas $tempdir/cort_mask_asl $tempdir/wmmask_pure_cereb
     else
-	    Log "WARNING: No structural->standard space transformation - cannot generate cortical-only GM/WM masks"
+        Log "WARNING: No structural->standard space transformation - cannot generate cortical-only GM/WM masks"
     fi
 fi
 ### End of: Partial Volume Estimates
@@ -2323,18 +2322,18 @@ fi
 if [ -z $alpha ]; then
         # based on the ASL white paper
     if [ -z $casl ]; then
-	alpha=0.98;
+    alpha=0.98;
     else
-	alpha=0.85;
+    alpha=0.85;
     fi
 fi
 
 if [ -z $cmethod ]; then
 # default calibration method is 'voxelwise' unless we have CSF PV estimates or CSF mask has been supplied
     if [ ! -z $fasthasrun ] || [ ! -z $csf ]; then
-	cmethod=single
+    cmethod=single
     else
-	cmethod=voxel
+    cmethod=voxel
     fi
 fi
 
@@ -2377,7 +2376,7 @@ if [ ! -z $calib ]; then
             asl_file --data=$tempdir/calib_ero --ntis=1 --mask=$tempdir/mask --extrapolate --neighbour=5 --out=$Momap
         fi
     elif [ $cmethod != 'single' ]; then
-	    Log "Error unrecognised calibration method: $cmethod, (use single, voxel or both)"
+        Log "Error unrecognised calibration method: $cmethod, (use single, voxel or both)"
     fi 
 elif [ ! -z $M0 ]; then
     # An M0 value has been supplied, use this
@@ -2420,10 +2419,10 @@ if [ ! -z $pvcorr ]; then
     elif [ ! -z $fasthasrun ]; then
       if [ ! -z $tempdir/biasfield_struct ]; then
         if [ ! -z $senscorr ]; then
-	      # Struct->ASL registration may have changed, so re-transform the bias field and invert to use for sensitivity correction
+          # Struct->ASL registration may have changed, so re-transform the bias field and invert to use for sensitivity correction
           Log "Re-registering bias field and calculating sensitivity map"
           applywarp --ref=$tempdir/nativeref --in=$tempdir/biasfield_struct --out=$outdir/native_space/biasfield --premat=$tempdir/struct2asl.mat $APPLYWARP_OPTS
-	      fslmaths $outdir/native_space/biasfield -recip $outdir/native_space/sensitivity
+          fslmaths $outdir/native_space/biasfield -recip $outdir/native_space/sensitivity
         fi
       fi
     fi
@@ -2463,31 +2462,31 @@ if [ ! -z $epoch ]; then
 
     ecount=0
     for e in $epochlist; do
-	Log "Processing epoch: $e"
-	etislist=""
+    Log "Processing epoch: $e"
+    etislist=""
         # deal with the TIs
-	for ((ei=0; ei<$elen; ei++)); do
-	    ethis=`expr $ecount \* $eadv + $ei`
-	    #echo $ethis
-	    eidx=`expr $ei + 1`
-	    #echo $ei
-	    #echo ${alltis[$ethis]}
-	    etislist=$etislist" --ti${eidx}=${alltis[$ethis]}"
-	done
-	Log "TIs for this epoch: "
-	Log $etislist
+    for ((ei=0; ei<$elen; ei++)); do
+        ethis=`expr $ecount \* $eadv + $ei`
+        #echo $ethis
+        eidx=`expr $ei + 1`
+        #echo $ei
+        #echo ${alltis[$ethis]}
+        etislist=$etislist" --ti${eidx}=${alltis[$ethis]}"
+    done
+    Log "TIs for this epoch: "
+    Log $etislist
 
-	mkdir $tempdir/$e
-	cp $tempdir/basil_options_core.txt $tempdir/$e/basil_options.txt # get the 'core' options and make a new basil_options file jsut for this TI
-	echo "--repeats=1" >> $tempdir/$e/basil_options.txt #for epochs we specify all the TIs explicitly
-	echo $etislist >>  $tempdir/$e/basil_options.txt #these are the basil options for this epoch
+    mkdir $tempdir/$e
+    cp $tempdir/basil_options_core.txt $tempdir/$e/basil_options.txt # get the 'core' options and make a new basil_options file jsut for this TI
+    echo "--repeats=1" >> $tempdir/$e/basil_options.txt #for epochs we specify all the TIs explicitly
+    echo $etislist >>  $tempdir/$e/basil_options.txt #these are the basil options for this epoch
 
-	fast=2 #we now switch BASIL to fast level '2' - this means it will only do analysis in a single step from here on in, but we will use our existing analysis for initialisation.
-	
-	Dobasil $tempdir/$e $tempdir/$e $tempdir/basil/finalMVN # init with results of first basil run
+    fast=2 #we now switch BASIL to fast level '2' - this means it will only do analysis in a single step from here on in, but we will use our existing analysis for initialisation.
+    
+    Dobasil $tempdir/$e $tempdir/$e $tempdir/basil/finalMVN # init with results of first basil run
 
     # Output epochwise results
-	Log "Saving results from epoch: $e"
+    Log "Saving results from epoch: $e"
     if [ $cmethod = 'both' ]; then
         # Output with voxelwise and refregion calibration in separate subdirs
         Dooutput / voxelwise/$e voxel
@@ -2497,7 +2496,7 @@ if [ ! -z $epoch ]; then
         Dooutput / $e $cmethod
     fi
 
-	ecount=`expr $ecount + 1`
+    ecount=`expr $ecount + 1`
     done
 fi
 ### End of: Epoch BASIL
@@ -2524,8 +2523,8 @@ fi
 ##if [ ! -z $epoch ]; then
 # epochwise analysis
 #    for e in $epochlist; do
-#	Log "Saving results from epoch: $e"
-#	Dooutput $e
+#    Log "Saving results from epoch: $e"
+#    Dooutput $e
  #   done
 #fi
 
@@ -2622,7 +2621,7 @@ fi
 # useful but not essential enough to be part of the default output, and avoids the
 # need to save the entire temporary directory.
 if [ ! -z $qc_output ]; then
-	qcdir=$outdir/qc_output
+    qcdir=$outdir/qc_output
     mkdir $qcdir
     Log "Generating QC output in $qcdir"
     
