@@ -109,6 +109,7 @@ Usage_extended() {
     echo "                   image is brain extracted before use in registration."
     echo " --reg-init-bbr  : Use BBR in the initial registration. This makes sense mostly when"
     echo "                   using --regfrom-method=pwi"
+    echo " --regfrom-bet-thresh: Fractional threshold to use when brain-extracting images for registration (default 0.2)"
 #    echo " -t          : structural to standard space transformation matrix"
 #    echo "               (requires structural image)"
 #    echo " --structout : (also) save the maps in structural space (for use with -t)"
@@ -768,6 +769,7 @@ spatial=1; # we always use spatial priors, use --spatial=off to turn off.
 finalreg=1; # we always try to refine the registration using the perfusion image (Registration 2)
 fixbolus=undef; # the default for this is determined by other command line parameters.
 edgecorr=1; # we do edge correction with the voxelwise calibration method by default
+regfrom_bet_thresh=0.2; # Extraction threshold fraction to use with BET - by default conservative to avoid erosion of brain
 
 # Declare arrays for additional ROI atlases
 declare -a region_analysis_atlases
@@ -898,6 +900,8 @@ takeargs=0;boolarg="";isbool="";
         takeargs=1;;
     --reg-init-bbr) reg_init_bbr=1
         ;;
+    --regfrom-bet-thresh) regfrom_bet_thresh=$argument
+        takeargs=1;;
     --finalreg) isbool=1; # To turn off the final registration step that uses the perfusion image itself (with BBR) - helpful is the perfusion image is poor and thus not a good basis for registration
         boolarg=finalreg;
         ;;
@@ -1639,7 +1643,7 @@ if [ -z $regfrom ]; then
         regfrom=$tempdir/calib_brain
     elif [ $regfrom_method == "mean" ]; then
         Log "Using brain extracted mean ASL image as initial registration reference"
-        bet $tempdir/meanasl $tempdir/meanasl_brain -f 0.2 #somewhat conservative fraction to avoid erosion
+        bet $tempdir/meanasl $tempdir/meanasl_brain -f $regfrom_bet_thresh
         regfrom=$tempdir/meanasl_brain
     else
         Log "ERROR: Unrecognized regfrom_method: $regfrom_method"
@@ -1739,7 +1743,7 @@ elif [ ! -z $lowstrucflag ]; then
     Log "Mask generated from low res. structural"
 # otherwise just use mean time series
 else
-    bet $tempdir/meanasl $tempdir/meanasl -f 0.2 # use a fairly low fraction value to avoid erosion
+    bet $tempdir/meanasl $tempdir/meanasl -f $regfrom_bet_thresh
     fslmaths $tempdir/meanasl -bin $tempdir/mask
     Log "Mask generated from mean time series"
 fi
